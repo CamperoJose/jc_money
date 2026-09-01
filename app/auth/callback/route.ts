@@ -13,7 +13,16 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+    console.error("[auth/callback] exchangeCodeForSession falló:", error.message);
+    const url = new URL(`${origin}/login`);
+    url.searchParams.set("error", "auth");
+    url.searchParams.set("detalle", error.message);
+    return NextResponse.redirect(url);
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  const errorDescription = searchParams.get("error_description");
+  const url = new URL(`${origin}/login`);
+  url.searchParams.set("error", "auth");
+  if (errorDescription) url.searchParams.set("detalle", errorDescription);
+  return NextResponse.redirect(url);
 }
