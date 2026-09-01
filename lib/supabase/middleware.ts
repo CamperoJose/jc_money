@@ -44,10 +44,20 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const allowedEmail = process.env.ALLOWED_EMAIL?.toLowerCase();
+
+  // Lista blanca: uno o varios correos separados por coma en ALLOWED_EMAIL.
+  const allowedEmails = (process.env.ALLOWED_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const userEmail = user?.email?.toLowerCase();
 
   // Usuario autenticado pero no autorizado -> cerrar sesión y bloquear.
-  if (user && allowedEmail && user.email?.toLowerCase() !== allowedEmail) {
+  if (
+    user &&
+    allowedEmails.length > 0 &&
+    (!userEmail || !allowedEmails.includes(userEmail))
+  ) {
     await supabase.auth.signOut();
     const url = request.nextUrl.clone();
     url.pathname = "/login";
