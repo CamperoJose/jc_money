@@ -4,7 +4,26 @@
 
 ## Última actualización: 2026-09-01
 
-### Fase actual: 0 (Preparación) — en curso
+### Fase actual: 0 → 1 (scaffold hecho, esperando datos en Supabase)
+
+### App Next.js scaffoldeada (build verde) ✅
+- Next.js 15 (App Router) + Tailwind v4 + tema de tweakcn del usuario aplicado en `app/globals.css`.
+- shadcn/ui base (button, card, table) + Phosphor Icons. Fuentes Montserrat/Merriweather/Source Code Pro.
+- Auth Supabase con Google: `/login`, `/auth/callback`, `/auth/signout`, middleware con lista blanca
+  (`ALLOWED_EMAIL`).
+- Módulo **Patrimonio**: `lib/queries/patrimonio.ts` (fuente única), API `/api/patrimonio/snapshots`
+  y `/api/patrimonio/resumen`, página `/tracking/patrimonio` con KPIs, gráfico (Recharts) y tabla.
+- `npm run build` pasa limpio.
+- Script de migración de CONTEOS: `scripts/migracion/importar_excel.py` (con dry-run).
+- Guía local: `docs/desarrollo-local.md`.
+- Decisiones confirmadas: C1 (Debts = por cobrar), diseño (empezar ya, tema aplicado).
+
+### Pendiente del usuario para ver datos reales
+1. Aplicar `0001` (esquema) en Supabase; entrar una vez a la app; aplicar `0002` (semillas).
+2. Correr `importar_excel.py` (dry-run y luego --commit) para cargar el patrimonio.
+3. Cargar env vars en Vercel y definir la rama de producción.
+
+
 
 ### ⚠️ Restricción del entorno (importante)
 La política de red de este entorno remoto **bloquea la salida hacia Supabase y Vercel** (el proxy

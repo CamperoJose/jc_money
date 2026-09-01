@@ -29,7 +29,7 @@
 
 ## C. Correcciones / discrepancias respecto a la spec (requieren confirmación del usuario)
 
-### C1. `Debts` en CONTEOS es un ACTIVO (por cobrar), no un pasivo — ⚠️ ABIERTA
+### C1. `Debts` en CONTEOS es un ACTIVO (por cobrar), no un pasivo — ✅ CONFIRMADA por el usuario
 
 La spec §7.2 dice que las deudas se **restan** del patrimonio. Pero validando la fórmula del `Total`
 contra las filas reales del Excel, la columna `Debts` de CONTEOS se **suma** (es dinero por cobrar).
