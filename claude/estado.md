@@ -6,6 +6,19 @@
 
 ### Fase actual: 0 (Preparación) — en curso
 
+### ⚠️ Restricción del entorno (importante)
+La política de red de este entorno remoto **bloquea la salida hacia Supabase y Vercel** (el proxy
+rechaza `api.supabase.com:443` y `*.supabase.co:443` por *organization policy*). Además el host
+directo `db.<ref>.supabase.co` resuelve **solo IPv6** y el contenedor no tiene IPv6. Solo se permite
+salida a **GitHub, npm y pypi**. Consecuencia:
+- Claude **no puede** aplicar migraciones ni configurar Supabase/Vercel en vivo desde la sesión.
+- Claude **sí puede**: escribir todo el código, instalar dependencias (npm), y pushear a GitHub.
+- El usuario aplica el SQL (SQL Editor de Supabase) y setea las env vars en Vercel; Vercel despliega
+  desde el push y la app **sí** llega a Supabase (red de Vercel, no la del sandbox).
+
+Credenciales recibidas y guardadas en `.env.local` (ignorado por git): URL, anon/publishable key,
+DB password, Google Client ID/Secret, project ref. Falta: `sb_secret_...` (server-side, no urgente).
+
 ### Hecho
 - Análisis completo del Excel `My_Money_v5.0.xlsx` (5 hojas). Ver `claude/analisis-excel.md`.
 - Documentación de planificación: `CLAUDE.md`, carpeta `claude/` (roadmap, modelo de datos,
