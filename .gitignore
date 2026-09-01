@@ -1,0 +1,26 @@
+# Entorno / secretos
+.env
+.env.local
+.env*.local
+*.pem
+**/service-account*.json
+
+# Node / Next.js (para cuando exista el proyecto)
+node_modules/
+.next/
+out/
+dist/
+build/
+.vercel/
+
+# Python (script de migración)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Sistema / editor
+.DS_Store
+*.log
+.idea/
+.vscode/
