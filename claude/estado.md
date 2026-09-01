@@ -22,6 +22,26 @@
 1. Aplicar `0001` (esquema) en Supabase; entrar una vez a la app; aplicar `0002` (semillas).
 2. Correr `importar_excel.py` (dry-run y luego --commit) para cargar el patrimonio.
 3. Cargar env vars en Vercel y definir la rama de producción.
+4. (No urgente) Entregar la *secret key* de Supabase (`sb_secret_...`) para Fase 2.
+5. (Seguridad, no urgente) Rotar `GOOGLE_CLIENT_SECRET` y contraseña de DB (pasaron por chat).
+
+### Pendiente de Claude (próxima sesión — priorizado)
+1. **Patrimonio – completar:** grid editable AG Grid (saldos por cuenta × fecha), alta/edición de
+   fotos desde la web (formularios + `POST/PUT/DELETE`), distribución por cuenta.
+2. **Extender la migración** a GASTOS, DPF y DEUDAS (hoy solo CONTEOS) + bandera `import_batch`.
+3. **Módulo Gastos** (Fase 1): API + grid con filtros + dashboard categoría/mes, ingreso vs gasto.
+4. **Módulo Inversiones DPF** (Fase 1): API + panel de indicadores + grid de depósitos.
+5. **Módulo Deudas** (Fase 1): API + grid simple.
+6. Toggle de tema claro/oscuro (el tema ya define ambas paletas).
+7. Fase 2: voz (Gemini), recordatorios/correos, respaldos a Drive, scheduler externo.
+
+### Notas técnicas para retomar
+- Entorno de Claude (sandbox) **no llega a Supabase/Vercel** (solo GitHub/npm/pypi). Claude escribe y
+  pushea; el usuario aplica SQL, migra y despliega desde su PC. Ver la sección de restricción arriba.
+- Stack real: Next.js 15 (App Router) + Tailwind **v4** (CSS-first, sin `tailwind.config`) + shadcn/ui
+  (`components.json`, iconLibrary phosphor) + `@supabase/ssr`. Fuente única de datos de patrimonio en
+  `lib/queries/patrimonio.ts`. Cálculo en `lib/patrimonio.ts`. `npm run build` verde.
+- Rutas API máquina (ingesta/respaldo/recordatorios/estado) ya excluidas del middleware; falta implementarlas.
 
 
 

@@ -34,12 +34,12 @@ Meta: esquema de DB + autenticación funcionando **antes** de tocar la interfaz.
 - [x] Documentación de planificación (`claude/`, `CLAUDE.md`, `cosas_manuales.md`).
 - [x] Esquema SQL completo con RLS (`supabase/migrations/0001_schema_inicial.sql`).
 - [x] Semillas de catálogos (`supabase/migrations/0002_seed_catalogos.sql`).
-- [ ] 👤 Crear proyecto Supabase y aplicar migraciones (o 🤖 vía CLI con credenciales).
-- [ ] 👤 Configurar Google OAuth y restringir al correo del usuario.
-- [ ] 🤖 Scaffold Next.js (App Router) + Tailwind + shadcn/ui + Phosphor. 🔒
-- [ ] 👤 Exportar tema desde tweakcn → 🤖 aplicarlo en `globals.css` + Tailwind. 🔒
-- [ ] 🤖 Login con Google + middleware de lista blanca (solo el correo del usuario).
-- [ ] 🤖 Deploy inicial en Vercel. 🔒
+- [x] 👤 Proyecto Supabase creado (credenciales entregadas). [ ] 👤 aplicar migraciones (pendiente).
+- [x] 👤 Google OAuth configurado y pegado en Supabase.
+- [x] 🤖 Scaffold Next.js (App Router) + Tailwind v4 + shadcn/ui + Phosphor.
+- [x] 👤/🤖 Tema de tweakcn exportado y aplicado en `app/globals.css`.
+- [x] 🤖 Login con Google + middleware de lista blanca (solo el correo del usuario).
+- [ ] 👤 Deploy en Vercel (repo importado; falta env vars + rama de producción).
 
 Detalle: `claude/todos/fase-0-preparacion.md`.
 
@@ -48,9 +48,9 @@ Detalle: `claude/todos/fase-0-preparacion.md`.
 Meta: migrar el Excel y construir Tracking (híbrido: grid en PC, tarjetas/dashboards en celular).
 **Orden: Patrimonio → Gastos → DPF → Deudas.**
 
-- [ ] 🤖 Script de migración en Python (pandas + openpyxl), con **dry-run** que muestre cuántos
-      registros por hoja y qué se descarta, **antes** de escribir en Supabase.
-- [ ] 🤖 API + UI **Patrimonio** (fotos, balances, curva BOB/USD, distribución por cuenta/moneda).
+- [x] 🤖 Script de migración en Python con **dry-run** (CONTEOS → patrimonio). [ ] 👤 ejecutarlo.
+- [~] 🤖 API + UI **Patrimonio**: lectura (curva BOB/USD, distribución por moneda, tabla) HECHA;
+      falta grid editable AG Grid, alta/edición desde la web, y distribución por cuenta.
 - [ ] 🤖 API + UI **Gastos** (grid con filtros, dashboard categoría/mes, ingreso vs gasto).
 - [ ] 🤖 API + UI **Inversiones DPF** (grid + panel de indicadores).
 - [ ] 🤖 API + UI **Deudas** (grid simple).

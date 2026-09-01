@@ -20,24 +20,26 @@ Meta: DB + auth funcionando antes de tocar UI. 🤖 Claude · 👤 usuario · �
 - [ ] 👤 Añadir las Redirect URLs (local y Vercel) en Google y en Supabase.
 - [ ] 🤖 Middleware/lista blanca: permitir **solo** el correo del usuario; rechazar el resto.
 
-## Proyecto Next.js 🔒 (necesita credenciales Supabase)
-- [ ] 🤖 `create-next-app` (App Router, TypeScript, Tailwind).
-- [ ] 🤖 Instalar y configurar shadcn/ui (CLI) + componentes base (button, input, dialog, table, card…).
-- [ ] 🤖 Instalar Phosphor Icons (React) — usar pesos Fill/Duotone para acentos.
-- [ ] 🤖 Instalar AG Grid Community y Tremor/Recharts (se usan en Fase 1).
-- [ ] 🤖 Cliente Supabase (browser + server) y helpers de sesión.
-- [ ] 🤖 `.env.local.example` con todas las variables (sin valores reales). Nunca commitear `.env.local`.
-- [ ] 🤖 Estructura de carpetas: `app/`, `app/api/`, `lib/`, `components/`.
+## Proyecto Next.js — HECHO
+- [x] 🤖 Proyecto Next.js 15 (App Router, TypeScript) — hecho a mano (no create-next-app).
+- [x] 🤖 shadcn/ui base (button, card, table). Faltan más componentes según se necesiten (input, dialog, select…).
+- [x] 🤖 Phosphor Icons (React) integrado (pesos duotone/bold).
+- [x] 🤖 Recharts instalado. **Falta AG Grid Community** (grid editable de PC) — pendiente Fase 1.
+- [x] 🤖 Cliente Supabase browser + server (`lib/supabase/`) y refresco de sesión.
+- [x] 🤖 `.env.local.example` con todas las variables.
+- [x] 🤖 Estructura `app/`, `app/api/`, `lib/`, `components/`.
 
-## Tema visual 🔒 (necesita export de tweakcn del usuario)
-- [ ] 👤 Diseñar tema en https://tweakcn.com/editor/theme (oscuro, acento dorado). → `cosas_manuales.md`
-- [ ] 👤 Exportar variables CSS y pasarlas a Claude.
-- [ ] 🤖 Pegar variables en `globals.css` + ajustar `tailwind.config`. **No inventar paleta.**
+## Tema visual — HECHO
+- [x] 👤 Usuario diseñó y exportó el tema de tweakcn (verde, Tailwind v4).
+- [x] 🤖 Aplicado en `app/globals.css` tal cual. **No se inventó paleta.**
 
 ## Login + Deploy
-- [ ] 🤖 Página de login con Google; página protegida de prueba que lea algo de la DB.
-- [ ] 👤 Crear proyecto en Vercel, importar el repo, cargar variables de entorno. → `cosas_manuales.md`
-- [ ] 🤖 Deploy inicial y verificación end-to-end (login → leer DB).
+- [x] 🤖 Página de login con Google + middleware con lista blanca (`ALLOWED_EMAIL`).
+- [x] 🤖 Página protegida `/tracking/patrimonio` que lee de la DB.
+- [x] 👤 Proyecto creado en Vercel e importado el repo.
+- [ ] 👤 Cargar variables de entorno en Vercel + definir **rama de producción**. → `cosas_manuales.md`
+- [ ] 👤 Aplicar `0001` (esquema) y `0002` (semillas) en Supabase. → `docs/desarrollo-local.md`
+- [ ] 👤/🤖 Verificación end-to-end (login → leer DB) — pendiente hasta aplicar el esquema.
 
 ## Cierre de fase
-- [ ] 🤖 Actualizar `claude/estado.md` con el estado y el punto de retome.
+- [x] 🤖 `claude/estado.md` actualizado con el punto de retome.

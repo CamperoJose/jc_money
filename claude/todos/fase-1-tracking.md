@@ -4,13 +4,14 @@ Orden: **Patrimonio → Gastos → DPF → Deudas.** Patrón híbrido: grid (AG 
 tarjetas + dashboards en celular. API primero: la UI consume la API, no la DB directa.
 
 ## Migración del Excel (transversal, antes de las UIs con datos reales)
-- [ ] 🤖 Script Python (`scripts/migracion/`) con pandas + openpyxl (`data_only=True`).
-- [ ] 🤖 **Dry-run obligatorio**: reporte de cuántos registros por hoja y qué filas se descartan,
-      mostrado al usuario **antes** de escribir en Supabase.
-- [ ] 🤖 Bandera de origen / `import_batch` para poder revertir la carga inicial.
-- [ ] 🤖 Descartar datos sucios de CONTEOS (`M21` nota, `M22` #ERROR!, filas 30/33/34).
+- [x] 🤖 Script Python `scripts/migracion/importar_excel.py` (openpyxl + psycopg2), CONTEOS → patrimonio.
+- [x] 🤖 **Dry-run** por defecto: reporte de fotos válidas, filas descartadas y totales antes de escribir.
+- [x] 🤖 Descarta datos sucios de CONTEOS (filas sin FECHA/T/C válidos: nota, #ERROR!, cálculos sueltos).
+- [x] 🤖 Idempotente por fecha (salta fotos ya existentes).
+- [ ] 👤 **Ejecutar** el script (dry-run + `--commit`) desde el PC. → `docs/desarrollo-local.md`
+- [ ] 🤖 Extender a GASTOS, DPF y DEUDAS (hoy solo migra CONTEOS).
+- [ ] 🤖 Bandera de origen / `import_batch` para revertir (pendiente; hoy la idempotencia es por fecha).
 - [ ] 🤖 Reportar fechas sospechosas (posible typo mes/día) para confirmación (ver `decisiones.md` C3).
-- [ ] 🤖 Idempotencia (o aviso antes de duplicar).
 
 ## PATRIMONIO — PRIORIDAD 1
 Origen: hoja CONTEOS → `net_worth_snapshots` + `net_worth_balances`.
@@ -22,17 +23,20 @@ Origen: hoja CONTEOS → `net_worth_snapshots` + `net_worth_balances`.
 - [ ] 🤖 `DPF Congelado` como activo en BOB.
 
 ### API
-- [ ] 🤖 `GET /api/patrimonio/snapshots` (lista con totales BOB/USD y variación vs foto anterior).
-- [ ] 🤖 `GET /api/patrimonio/snapshots/:id` (balances por cuenta).
-- [ ] 🤖 `POST/PUT/DELETE` de fotos y balances. Recalcular y almacenar `total_bob`/`total_usd`.
-- [ ] 🤖 `GET /api/patrimonio/resumen` (serie temporal + distribución por cuenta y por moneda).
+- [x] 🤖 `GET /api/patrimonio/snapshots` (fotos con balances y totales BOB/USD recalculados).
+- [x] 🤖 `GET /api/patrimonio/resumen` (serie temporal, variación vs foto anterior, distribución por moneda).
+- [x] 🤖 Capa de datos única `lib/queries/patrimonio.ts` (usada por API y página).
+- [ ] 🤖 `GET /api/patrimonio/snapshots/:id` (detalle) — pendiente.
+- [ ] 🤖 `POST/PUT/DELETE` de fotos y balances (alta/edición desde la web) — pendiente.
 
 ### UI
-- [ ] 🤖 PC: grid editable (AG Grid) saldos por cuenta y por fecha, con totales.
-- [ ] 🤖 Dashboard: curva de patrimonio neto en **BOB y USD**, distribución por cuenta y por moneda,
-      variación respecto a la foto anterior.
-- [ ] 🤖 Celular: tarjetas/lista + dashboards responsivos.
-- [ ] 🤖 Acento dorado reservado para el **patrimonio neto** (según dirección visual de la spec).
+- [x] 🤖 Página `/tracking/patrimonio`: KPIs (patrimonio neto BOB/USD con acento del tema, variación, T/C),
+      curva de evolución (Recharts) y tabla de fotos. Responsiva.
+- [x] 🤖 Distribución por moneda (última foto).
+- [x] 🤖 Acento del tema (primary) reservado al **patrimonio neto**.
+- [ ] 🤖 **Grid editable AG Grid** (saldos por cuenta × fecha) para PC — pendiente.
+- [ ] 🤖 Edición/alta de fotos desde la UI (formularios) — pendiente.
+- [ ] 🤖 Distribución por **cuenta** (además de por moneda) — pendiente.
 
 ## GASTOS — PRIORIDAD 2
 Origen: hoja GASTOS PRESUPUESTO → `transactions` (+ `budgets` tabla, UI pospuesta).
