@@ -2,7 +2,27 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 8 — job usa capital DPF activo, dashboard DPF enriquecido)
+## Última actualización: 2026-09-02 (sesión 9 — BCB: formato real de respuesta + reintento de params)
+
+### Sesión 9 — lo hecho ✅ (T/C del BCB, con la respuesta REAL de producción)
+- **El debug reveló la respuesta real del BCB:** no es `<codError>/<valor>`, sino una **lista de
+  pares** `<return><codDato>Nombre</codDato><dato>Valor</dato></return>`. El namespace real es
+  `http://ws.bcb.gob.bo/`. Y devolvía **CodError 1003** (moneda inválida) con `codMoneda=35`.
+- **Fix parser:** `parseRespuestaBCB` ahora entiende el formato de pares (CodError, Valor, CodMoneda,
+  Fecha, Descripcion), con respaldo al formato plano del doc y a tomar el primer par numérico si no
+  hay clave "Valor".
+- **Fix binding (causa del 1003):** clásico gotcha JAX-WS — los parámetros reales suelen ser
+  `arg0/arg1/arg2`, no `codIndicador/codMoneda/fecha`. El cliente ahora **reintenta con arg0/arg1/arg2**
+  cuando el codError es de binding (1001/1002/1003). Si ambas convenciones fallan con 1003, lanza el
+  error real (entonces sí es la moneda: cambiar el código en Parámetros, ej. 34 compra).
+- **Debug mejorado:** `/api/jobs/tipo-cambio?debug=1` ahora devuelve **la matriz de intentos**
+  (ambas convenciones) con sobre, status y XML crudo.
+- **Tests internos con la respuesta real** en `scripts/test-bcb.ts` (32 checks, todos pasan): parseo
+  del 1003 real, parseo de éxito en pares, reintento a arg0/arg1/arg2, y 1003 en ambas → lanza.
+
+---
+
+## Update previo: 2026-09-02 (sesión 8 — job usa capital DPF activo, dashboard DPF enriquecido)
 
 ### Sesión 8 — lo hecho ✅
 - **Job de patrimonio · valor DPF dinámico:** el saldo de la cuenta de tipo `dpf` (ej. "DPF

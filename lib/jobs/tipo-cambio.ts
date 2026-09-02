@@ -4,7 +4,6 @@ import {
   obtenerTipoCambioBCB,
   diagnosticarTipoCambioBCB,
   descripcionMoneda,
-  type DiagnosticoBCB,
 } from "@/lib/bcb";
 
 export interface ResultadoTcJob {
@@ -57,7 +56,7 @@ async function leerConfig(admin: SupabaseClient, userId: string) {
 export async function diagnosticarTC(
   admin: SupabaseClient,
   opts?: { targetDate?: string; fetchImpl?: typeof fetch }
-): Promise<DiagnosticoBCB & { rate_date: string; cod_indicador: number; cod_moneda: number }> {
+) {
   const fetchImpl = opts?.fetchImpl ?? fetch;
   const targetDate = opts?.targetDate ?? fechaBoliviaHoy();
   const userId = await getUsuarioId(admin);

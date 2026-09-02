@@ -62,6 +62,12 @@ export function fechaISOaConsulta(iso: string): string {
 /** Nombres de parámetro por defecto del método (según el documento del BCB). */
 export const PARAM_NAMES_DEFAULT = ["codIndicador", "codMoneda", "fecha"] as const;
 
+/** Nombres alternativos (JAX-WS sin @WebParam los expone como arg0/arg1/arg2). */
+export const PARAM_NAMES_ALT = ["arg0", "arg1", "arg2"] as const;
+
+/** codError que sugieren un problema de binding de parámetros (no de negocio). */
+const CODERROR_BINDING = new Set(["1001", "1002", "1003"]);
+
 /** Extrae el targetNamespace del WSDL. */
 export function extraerTargetNamespace(wsdl: string): string | null {
   const m = wsdl.match(/targetNamespace\s*=\s*"([^"]+)"/);
@@ -126,10 +132,49 @@ function aNumero(s: string | null): number | null {
 }
 
 /**
- * Parsea la respuesta SOAP/XML del método obtenerIndicador. Tolerante a
- * prefijos de namespace y a que venga envuelta en un Envelope o suelta.
+ * Parsea la respuesta SOAP/XML del método obtenerIndicador.
+ *
+ * El BCB responde una LISTA de pares:
+ *   <return><codDato>CodError</codDato><dato>0</dato></return>
+ *   <return><codDato>Valor</codDato><dato>6.96</dato></return> …
+ * Se soporta ese formato (primario) y, como respaldo, el formato plano del
+ * documento (<codError>…</codError><valor>…</valor>). Tolerante a prefijos.
  */
 export function parseRespuestaBCB(xml: string): RespuestaBCB {
+  const bloques = [...xml.matchAll(/<(?:\w+:)?return\b[^>]*>([\s\S]*?)<\/(?:\w+:)?return>/gi)];
+  const mapa = new Map<string, string>();
+  for (const b of bloques) {
+    const nombre = tag(b[1], "codDato");
+    if (nombre == null) continue;
+    mapa.set(nombre.trim().toLowerCase(), (tag(b[1], "dato") ?? "").trim());
+  }
+
+  if (mapa.size > 0) {
+    const codError = mapa.get("coderror") ?? "";
+    let valor = aNumero(mapa.get("valor") ?? null);
+    // Respaldo: si no hay clave "valor" pero la consulta fue exitosa, toma el
+    // primer par numérico que no sea un campo meta conocido.
+    if (valor == null && codError === "0") {
+      const meta = new Set(["coderror", "codmoneda", "codindicador"]);
+      for (const [k, v] of mapa) {
+        if (meta.has(k)) continue;
+        const n = aNumero(v);
+        if (n != null) {
+          valor = n;
+          break;
+        }
+      }
+    }
+    return {
+      codError,
+      desIndicador: mapa.get("descripcion") ?? mapa.get("desindicador") ?? null,
+      codMoneda: aNumero(mapa.get("codmoneda") ?? null),
+      fecha: mapa.get("fecha") ?? null,
+      valor,
+    };
+  }
+
+  // Formato plano (respaldo).
   return {
     codError: tag(xml, "codError") ?? "",
     desIndicador: tag(xml, "desIndicador"),
@@ -181,15 +226,13 @@ export interface DiagnosticoBCB {
   parsed: RespuestaBCB;
 }
 
-/**
- * Ejecuta la consulta y devuelve TODO (sobre enviado, HTTP status, XML crudo y
- * parseo) sin lanzar por codError. Útil para diagnosticar el servicio en prod.
- */
-export async function diagnosticarTipoCambioBCB(
+/** Ejecuta UNA consulta con namespace y nombres de parámetro dados. */
+async function intentarConsulta(
   fetchImpl: FetchLike,
+  namespace: string,
+  paramNames: string[],
   consulta: ConsultaBCB
 ): Promise<DiagnosticoBCB> {
-  const { namespace, paramNames } = await resolverServicio(fetchImpl, consulta);
   const fecha = fechaISOaConsulta(consulta.fechaISO);
   const envelope = construirEnvelope(namespace, paramNames, [
     consulta.codIndicador,
@@ -205,27 +248,66 @@ export async function diagnosticarTipoCambioBCB(
   return { namespace, paramNames, envelope, status: res.status, raw, parsed: parseRespuestaBCB(raw) };
 }
 
+/** Convenciones de nombres de parámetro a probar (primaria + arg0/arg1/arg2). */
+function convenciones(primary: string[]): string[][] {
+  const lista = [primary, [...PARAM_NAMES_ALT]];
+  const vistos = new Set<string>();
+  return lista.filter((c) => {
+    const k = c.join("|");
+    if (vistos.has(k)) return false;
+    vistos.add(k);
+    return true;
+  });
+}
+
 /**
- * Consulta el T/C al BCB. Descubre namespace y nombres de parámetro del WSDL si
- * no se proveen, arma el sobre SOAP, hace el POST y parsea la respuesta.
- * Lanza Error con mensaje claro ante fallos de red o codError != 0.
+ * Diagnóstico: prueba las convenciones de nombres de parámetro y devuelve TODOS
+ * los intentos (sobre, status, XML crudo, parseo) sin lanzar. Para depurar prod.
+ */
+export async function diagnosticarTipoCambioBCB(
+  fetchImpl: FetchLike,
+  consulta: ConsultaBCB
+): Promise<{ namespace: string; intentos: DiagnosticoBCB[] }> {
+  const { namespace, paramNames } = await resolverServicio(fetchImpl, consulta);
+  const intentos: DiagnosticoBCB[] = [];
+  for (const nombres of convenciones(paramNames)) {
+    intentos.push(await intentarConsulta(fetchImpl, namespace, nombres, consulta));
+  }
+  return { namespace, intentos };
+}
+
+/**
+ * Consulta el T/C al BCB. Descubre namespace del WSDL si no se provee y prueba
+ * las convenciones de nombres de parámetro (codIndicador/… y arg0/arg1/arg2),
+ * devolviendo el primer intento exitoso. Lanza Error claro si ninguno funciona.
  */
 export async function obtenerTipoCambioBCB(
   fetchImpl: FetchLike,
   consulta: ConsultaBCB
 ): Promise<RespuestaBCB> {
-  const d = await diagnosticarTipoCambioBCB(fetchImpl, consulta);
-  if (d.status < 200 || d.status >= 300) {
-    throw new Error(`El servicio del BCB respondió HTTP ${d.status}.`);
+  const { namespace, paramNames } = await resolverServicio(fetchImpl, consulta);
+  let ultimo: DiagnosticoBCB | null = null;
+
+  for (const nombres of convenciones(paramNames)) {
+    const d = await intentarConsulta(fetchImpl, namespace, nombres, consulta);
+    ultimo = d;
+    if (d.status < 200 || d.status >= 300) continue;
+    const r = d.parsed;
+    if (r.codError === "0" && r.valor != null) return r;
+    // Si el error NO es de binding, no tiene sentido reintentar con otros nombres.
+    if (r.codError && !CODERROR_BINDING.has(r.codError)) {
+      throw new Error(`BCB codError ${r.codError}: ${BCB_ERRORES[r.codError] ?? "error desconocido"}`);
+    }
   }
-  const r = d.parsed;
-  if (r.codError && r.codError !== "0") {
+
+  if (ultimo && (ultimo.status < 200 || ultimo.status >= 300)) {
+    throw new Error(`El servicio del BCB respondió HTTP ${ultimo.status}.`);
+  }
+  const r = ultimo?.parsed;
+  if (r?.codError && r.codError !== "0") {
     throw new Error(`BCB codError ${r.codError}: ${BCB_ERRORES[r.codError] ?? "error desconocido"}`);
   }
-  if (r.valor == null) {
-    throw new Error(
-      `La respuesta del BCB no incluyó un valor. Revisa el formato (namespace ${d.namespace}, params ${d.paramNames.join("/")}). Fragmento: ${d.raw.slice(0, 300)}`
-    );
-  }
-  return r;
+  throw new Error(
+    `La respuesta del BCB no incluyó un valor. namespace ${namespace}, params probados. Fragmento: ${ultimo?.raw.slice(0, 300) ?? ""}`
+  );
 }

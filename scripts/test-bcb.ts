@@ -94,6 +94,32 @@ chk("parse valor con coma", parseRespuestaBCB("<valor>6,96</valor>").valor === 6
 const soapErr = `<indicador><tipoCambio><codError>2001</codError></tipoCambio></indicador>`;
 chk("parse error 2001", parseRespuestaBCB(soapErr).codError === "2001");
 
+// 6b) FORMATO REAL del BCB: lista de pares <return><codDato>..</codDato><dato>..</dato></return>
+//     Respuesta real de error observada en producción (moneda inválida).
+const soapReal1003 = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns2:obtenerIndicadorResponse xmlns:ns2="http://ws.bcb.gob.bo/"><return><codDato>CodError</codDato><dato>1003</dato></return></ns2:obtenerIndicadorResponse></soap:Body></soap:Envelope>`;
+const pReal = parseRespuestaBCB(soapReal1003);
+chk("real: codError 1003", pReal.codError === "1003", pReal.codError);
+chk("real: valor null en error", pReal.valor === null, pReal.valor);
+
+// Respuesta REAL de éxito (formato de pares) — mismo esquema codDato/dato.
+const soapPairOk = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns2:obtenerIndicadorResponse xmlns:ns2="http://ws.bcb.gob.bo/">
+  <return><codDato>CodError</codDato><dato>0</dato></return>
+  <return><codDato>Descripcion</codDato><dato>Tipo de Cambio</dato></return>
+  <return><codDato>CodMoneda</codDato><dato>35</dato></return>
+  <return><codDato>Fecha</codDato><dato>02/09/2026</dato></return>
+  <return><codDato>Valor</codDato><dato>6.96000</dato></return>
+</ns2:obtenerIndicadorResponse></soap:Body></soap:Envelope>`;
+const pPair = parseRespuestaBCB(soapPairOk);
+chk("pair ok: codError 0", pPair.codError === "0", pPair.codError);
+chk("pair ok: valor 6.96", pPair.valor === 6.96, pPair.valor);
+chk("pair ok: codMoneda 35", pPair.codMoneda === 35, pPair.codMoneda);
+chk("pair ok: fecha", pPair.fecha === "02/09/2026", pPair.fecha);
+chk("pair ok: desIndicador", pPair.desIndicador === "Tipo de Cambio", pPair.desIndicador);
+
+// Respaldo: sin clave "Valor" explícita, toma el primer par numérico no-meta.
+const soapPairNoValor = `<return><codDato>CodError</codDato><dato>0</dato></return><return><codDato>TipoCambio</codDato><dato>6.96</dato></return>`;
+chk("pair fallback valor", parseRespuestaBCB(soapPairNoValor).valor === 6.96, parseRespuestaBCB(soapPairNoValor).valor);
+
 // 7) Orquestación con fetch simulado (descubre namespace + POST)
 async function testOrquestacion() {
   const llamadas: string[] = [];
@@ -145,9 +171,40 @@ async function testErrorLanza() {
   chk("codError 2001 lanza excepción", lanzo);
 }
 
+// 10) Reintento: si la convención codIndicador/… da 1003 (binding), reintenta
+//     con arg0/arg1/arg2 y tiene éxito.
+async function testRetryArgs() {
+  const fakeFetch = async (url: string, init?: { body?: string }) => {
+    if (url.endsWith("?wsdl")) return { ok: true, status: 200, text: async () => wsdlFake };
+    const body = init?.body ?? "";
+    return body.includes("<arg1>")
+      ? { ok: true, status: 200, text: async () => soapPairOk }
+      : { ok: true, status: 200, text: async () => soapReal1003 };
+  };
+  const r = await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 35, fechaISO: "2026-09-02" });
+  chk("retry a arg0/arg1/arg2 tras 1003", r.valor === 6.96, r.valor);
+}
+
+// 11) Si AMBAS convenciones dan 1003, lanza el codError 1003 (moneda inválida real).
+async function test1003Ambas() {
+  const fakeFetch = async (url: string) =>
+    url.endsWith("?wsdl")
+      ? { ok: true, status: 200, text: async () => wsdlFake }
+      : { ok: true, status: 200, text: async () => soapReal1003 };
+  let msg = "";
+  try {
+    await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 99, fechaISO: "2026-09-02" });
+  } catch (e) {
+    msg = e instanceof Error ? e.message : String(e);
+  }
+  chk("1003 en ambas convenciones lanza codError 1003", msg.includes("1003"), msg);
+}
+
 await testOrquestacion();
 await testNamespaceProvisto();
 await testErrorLanza();
+await testRetryArgs();
+await test1003Ambas();
 
 if (fallos > 0) {
   console.error(`\n${fallos} test(s) fallaron.`);
