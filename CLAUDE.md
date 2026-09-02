@@ -20,20 +20,27 @@ salvo que aquí se anote explícitamente una corrección validada (ver `claude/d
 
 ## 2. Estado actual del proyecto
 
-**Fase actual: 0 (Preparación) — en curso.** Ver siempre [`claude/estado.md`](./claude/estado.md)
-para el estado vivo y el punto exacto donde retomar.
+**Fase actual: 2 (Tracking) — Patrimonio y Gastos en producción.** Ver siempre
+[`claude/estado.md`](./claude/estado.md) para el estado vivo y el punto exacto donde retomar.
 
-Lo que YA existe en el repo:
+Lo que YA existe y está **desplegado en producción** (`jc-money.vercel.app`, rama por defecto
+`claude/jc-money-setup-dzuiql`):
 
-- Documentación de planificación completa en `claude/`.
-- Esquema SQL inicial con RLS en `supabase/migrations/0001_schema_inicial.sql`.
-- Semillas de catálogos en `supabase/migrations/0002_seed_catalogos.sql`.
-- Lista de tareas manuales del usuario en [`cosas_manuales.md`](./cosas_manuales.md).
+- App Next.js 15 (App Router) + Tailwind v4 + tema tweakcn, shadcn/ui, Phosphor.
+- **Auth** Supabase con Google (sin lista blanca por correo; aislamiento por RLS). Sesiones ~90 días.
+- **Patrimonio**: dashboard + matriz estilo Excel (fotos manual/auto, Δ vs. anterior). Datos de
+  CONTEOS migrados (`0003`).
+- **Gastos**: registro (fecha/hora Bolivia GMT-4, cuenta, categoría, monto/moneda), dashboard y
+  lista con filtros. Independiente de cuentas salvo por el job (ver abajo).
+- **Configuración → Parámetros**: ABM de categorías (gasto/ingreso/inversión).
+- **Job diario de patrimonio** (`/api/jobs/patrimonio-diario` + GitHub Actions 00:30 Bolivia):
+  autocalcula la foto de cierre del día = última foto + neto de gastos/ingresos del día.
+- Migraciones `0001`–`0005` aplicadas en Supabase.
 
-Lo que **todavía NO** existe (bloqueado por tareas manuales o por orden de fases):
+Lo que **todavía NO** existe (por orden de fases):
 
-- Proyecto Next.js (esperando credenciales de Supabase y tema de tweakcn — ver `cosas_manuales.md`).
-- App desplegada, auth con Google, migración de datos.
+- Módulos **Inversiones DPF** y **Deudas**.
+- Fase 2 restante: voz (Gemini), recordatorios/correos, respaldos a Drive.
 
 ## 3. Stack (decidido, no reabrir sin pedido explícito del usuario)
 

@@ -2,9 +2,35 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-01 (sesión 3 — módulo Gastos + Configuración/Parámetros)
+## Última actualización: 2026-09-01 (sesión 4 — deploy, job en vivo, UI/responsive)
 
-### Fase actual: 2 (Tracking) — módulo Gastos funcional + ABM de parámetros
+### Fase actual: 2 (Tracking) — Patrimonio + Gastos EN PRODUCCIÓN
+
+### Sesión 4 — lo hecho ✅
+- **Desplegado a producción**: todo el trabajo (sesiones 2–4) fusionado por fast-forward a la rama
+  por defecto `claude/jc-money-setup-dzuiql` (la que despliega Vercel). `jc-money.vercel.app` en vivo.
+- **Job diario FUNCIONANDO**. Depuración: el `catch` ocultaba los errores de PostgREST (no son
+  `Error` → mostraba "Error en el job"); ahora se expone el detalle real. Causa raíz del fallo:
+  se había corrido una versión **vieja** de `0004` sin `snapshot_at`/`kind`; **re-correr `0004`**
+  (idempotente) lo arregló. Además el job obtiene el user_id **desde tablas** (service role), no del
+  endpoint admin de auth (evita "User not allowed").
+- **Auth login prod**: el redirect caía a localhost porque la allow-list de Supabase solo tenía
+  localhost. Fix = agregar en Supabase → Auth → URL Config: Site URL `https://jc-money.vercel.app`
+  y Redirect URLs `https://jc-money.vercel.app/auth/callback` y `/**`. En Google, el único redirect
+  URI válido es el callback de Supabase (se quitó el `/login`). El código usa `window.location.origin`
+  (no cambió).
+- **Sesiones largas (~90 días)**: cookies de auth con `maxAge` extendido en `lib/supabase/server.ts`
+  y `lib/supabase/middleware.ts`. Ojo: revisar que Supabase → Auth → Sessions no imponga un timeout menor.
+- **Se quitó la lista blanca por correo** (`ALLOWED_EMAIL`): entra cualquier usuario autenticado con
+  Google; el aislamiento de datos queda por RLS.
+- **UI + responsive**: fix del layout (era `flex` siempre → en móvil la barra del menú se encogía y
+  "se perdía"; ahora `lg:flex`, apilado en móvil). Sidebar rediseñado + drawer móvil de ancho completo
+  con barra superior que muestra la sección. Matriz de Patrimonio oculta T/C/USD/Cuentas en pantallas
+  chicas. Loaders en todas las secciones para navegación ágil.
+- **SSH**: remoto del repo cambiado a `git@github.com:CamperoJose/jc_money.git` (la clave
+  `~/.ssh/id_ed25519` ya autentica con GitHub).
+- **Config manual pendiente del usuario** (ver `cosas_manuales.md` §8b): secrets de GitHub `APP_URL`
+  + `API_BEARER_TOKEN`; en Vercel `SUPABASE_SERVICE_ROLE_KEY` (la service_role real) + `API_BEARER_TOKEN`.
 
 ### Sesión 3 — lo hecho ✅
 - **Participantes: ELIMINADOS** de todo el sistema (por pedido). La migración 0004 incluye una
@@ -152,16 +178,17 @@ DB password, Google Client ID/Secret, project ref. Falta: `sb_secret_...` (serve
   se resta como pasivo. Discrepa de la spec §7.2 → decisión abierta C1 en `decisiones.md`.
 
 ### Punto de retome (próximo paso)
-1. El usuario ejecuta las tareas marcadas 👤 en `cosas_manuales.md` (Supabase, Google OAuth, tweakcn).
-2. Con las credenciales de Supabase: aplicar las migraciones y verificar RLS.
-3. Scaffold del proyecto Next.js (Fase 0) → luego migración + módulo **Patrimonio** (Fase 1).
+1. **Inversiones DPF** (siguiente módulo por roadmap): API + panel de indicadores + grid de depósitos.
+   Ya existen las categorías de inversión (parámetros) y la tabla `dpf_deposits`.
+2. Luego **Deudas** (grid simple sobre `debts`).
+3. Fase 2 restante: voz (Gemini), recordatorios/correos (Nodemailer), respaldos a Drive.
 
-### Esperando del usuario (bloqueantes)
-- Credenciales de Supabase (URL + keys).
-- Tema exportado de tweakcn (no se estiliza nada sin él).
-- Confirmar decisión C1 (`Debts` de CONTEOS = por cobrar).
-- Credenciales Google OAuth para el login.
+### Notas para el usuario (operación)
+- El job de patrimonio corre solo a las 00:30 (Bolivia). Para probar a mano: GitHub → Actions →
+  "Patrimonio diario" → Run workflow.
+- Si el redirect de login vuelve a fallar, revisar la allow-list de Supabase (Auth → URL Config).
 
-### Decisiones abiertas pendientes de confirmar
-- C1 (`Debts` = activo por cobrar), C3 (fechas con posible typo), C4 (dato mal ubicado en DEUDAS).
-- Preguntas de spec §18 (categorías, anticipación recordatorios, frecuencia correo, retención respaldos, budgets en Fase 1).
+### Decisiones (histórico)
+- C1 confirmada: `Debts` de CONTEOS = activo por cobrar (se suma). Aplicada en `0003`.
+- Participantes: descartados (se pidió quitarlos por completo).
+- Un movimiento de gasto es independiente del patrimonio; solo impacta vía el job diario.
