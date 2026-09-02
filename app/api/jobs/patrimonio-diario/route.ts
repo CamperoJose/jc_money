@@ -32,11 +32,24 @@ async function manejar(request: Request) {
     const resultado = await ejecutarPatrimonioDiario(admin, { targetDate });
     return NextResponse.json(resultado, { status: resultado.ok ? 200 : 500 });
   } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : "Error en el job" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: detalleError(e) }, { status: 500 });
   }
+}
+
+/** Extrae el mensaje real, incluidos los errores de PostgREST (objetos, no Error). */
+function detalleError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    const partes = [o.message, o.details, o.hint, o.code].filter(Boolean);
+    if (partes.length) return partes.join(" | ");
+    try {
+      return JSON.stringify(o);
+    } catch {
+      return "Error desconocido";
+    }
+  }
+  return String(e);
 }
 
 export async function POST(request: Request) {
