@@ -173,3 +173,129 @@ export function htmlDpfAlerta(items: DpfAlertaItem[], hoy: string): { subject: s
   const text = `Hoy vence(n) ${items.length} DPF. Se libera ${bob(totalLiberado)} (ganancia ${bob(totalGanancia)}).`;
   return { subject: `MyMoney · 🔔 Hoy se libera ${items.length === 1 ? "un DPF" : `${items.length} DPF`} (${bob(totalLiberado)})`, html: contenido.length ? layout("Alerta de DPF", contenido) : "", text };
 }
+
+// ============================================================================
+// Resumen semanal (lunes)
+// ============================================================================
+
+function listaCategorias(items: { nombre: string; monto: number }[]): string {
+  if (!items.length) return `<div style="color:${GRIS};font-size:12px;">Sin gastos por categoría.</div>`;
+  return items
+    .map(
+      (c) => `<tr>
+        <td style="padding:6px 0;font-size:13px;">${c.nombre}</td>
+        <td style="padding:6px 0;font-size:13px;text-align:right;font-weight:bold;">${bob(c.monto)}</td>
+      </tr>`
+    )
+    .join("");
+}
+
+function deltaChip(deltaBob: number | null, deltaPct: number | null, label: string): string {
+  if (deltaBob == null) return `<div style="color:${GRIS};font-size:12px;">Sin comparación de patrimonio.</div>`;
+  const sube = deltaBob >= 0;
+  const color = sube ? VERDE : "#dc2626";
+  return `<div style="display:inline-block;padding:5px 12px;border-radius:999px;background:${VERDE_CLARO};color:${color};font-size:13px;font-weight:bold;">
+    ${sube ? "▲" : "▼"} ${bob(Math.abs(deltaBob))}${deltaPct != null ? ` (${pct(deltaPct)})` : ""} <span style="font-weight:normal;color:${GRIS};">${label}</span>
+  </div>`;
+}
+
+export interface SemanalEmailData {
+  fecha: string;
+  gasto7: number;
+  topCategorias: { nombre: string; monto: number }[];
+  deltaPatrimonioBob: number | null;
+  deltaPatrimonioPct: number | null;
+  dpfProximos: { titulo: string; fecha: string; monto: number; dias: number }[];
+  presupuestoPct: number | null;
+  presupuestoExcedidas: number;
+}
+
+export function htmlResumenSemanal(d: SemanalEmailData): { subject: string; html: string; text: string } {
+  const dpf = d.dpfProximos.length
+    ? `<div style="margin-top:14px;"><div style="font-size:12px;font-weight:bold;color:${VERDE};">📅 DPF que vencen esta semana</div>
+        ${d.dpfProximos
+          .map((i) => `<div style="font-size:13px;color:${TEXTO};margin-top:4px;">• <strong>${i.titulo}</strong> — ${fechaLarga(i.fecha)} (${i.dias <= 0 ? "hoy/vencido" : `en ${i.dias} d`}) · ${bob(i.monto)}</div>`)
+          .join("")}</div>`
+    : "";
+  const presu = d.presupuestoPct != null
+    ? `<div style="margin-top:14px;font-size:13px;color:${TEXTO};">🎯 Presupuesto del mes: <strong>${pct(d.presupuestoPct)}</strong> usado${d.presupuestoExcedidas > 0 ? ` · <span style="color:#dc2626;">${d.presupuestoExcedidas} categoría(s) excedida(s)</span>` : ""}.</div>`
+    : "";
+
+  const contenido = `
+    <div style="text-align:center;padding-bottom:10px;">
+      <div style="font-size:15px;font-weight:bold;color:${VERDE};">🗓️ Resumen de la semana</div>
+      <div style="font-size:12px;color:${GRIS};">${fechaLarga(d.fecha)}</div>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        ${kpi("Gasto de la semana", bob(d.gasto7), "Últimos 7 días", "#dc2626")}
+        ${kpi("Patrimonio", "", "vs. hace 7 días")}
+      </tr>
+    </table>
+    <div style="text-align:center;margin:6px 0 4px;">${deltaChip(d.deltaPatrimonioBob, d.deltaPatrimonioPct, "en 7 días")}</div>
+    <div style="margin-top:14px;font-size:12px;color:${GRIS};text-transform:uppercase;letter-spacing:.4px;">Top gastos por categoría</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;border-top:1px solid ${BORDE};">
+      ${listaCategorias(d.topCategorias)}
+    </table>
+    ${dpf}
+    ${presu}`;
+  const text = `Resumen semanal: gasto ${bob(d.gasto7)}. Patrimonio ${d.deltaPatrimonioBob != null ? (d.deltaPatrimonioBob >= 0 ? "+" : "") + bob(d.deltaPatrimonioBob) : "—"} en 7 días.`;
+  return { subject: `MyMoney · 🗓️ Resumen semanal (gasto ${bob(d.gasto7)})`, html: layout("Resumen semanal", contenido), text };
+}
+
+// ============================================================================
+// Reporte mensual (primer lunes del mes) — del mes que acaba de cerrar
+// ============================================================================
+
+export interface MensualEmailData {
+  period: string; // 'YYYY-MM' reportado
+  gastoMes: number;
+  ingresoMes: number;
+  topCategorias: { nombre: string; monto: number }[];
+  deltaPatrimonioBob: number | null;
+  deltaPatrimonioPct: number | null;
+  presupuestoPlaneado: number;
+  presupuestoGastado: number;
+  presupuestoExcedidas: number;
+  dpfCobrados: number;
+  gananciaDpfMes: number;
+}
+
+function nombreMesPeriodo(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-BO", { month: "long", year: "numeric" }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+export function htmlReporteMensual(d: MensualEmailData): { subject: string; html: string; text: string } {
+  const balance = d.ingresoMes - d.gastoMes;
+  const presu = d.presupuestoPlaneado > 0
+    ? `<div style="margin-top:14px;font-size:13px;color:${TEXTO};">🎯 Presupuesto: gastaste <strong>${bob(d.presupuestoGastado)}</strong> de <strong>${bob(d.presupuestoPlaneado)}</strong>${d.presupuestoExcedidas > 0 ? ` · <span style="color:#dc2626;">${d.presupuestoExcedidas} excedida(s)</span>` : " · dentro del plan 👏"}.</div>`
+    : "";
+  const dpf = d.dpfCobrados > 0
+    ? `<div style="margin-top:8px;font-size:13px;color:${TEXTO};">🪙 DPF cobrados este mes: <strong>${d.dpfCobrados}</strong> · ganancia ${bob(d.gananciaDpfMes)}.</div>`
+    : "";
+
+  const contenido = `
+    <div style="text-align:center;padding-bottom:10px;">
+      <div style="font-size:15px;font-weight:bold;color:${VERDE};">📈 Reporte de ${nombreMesPeriodo(d.period)}</div>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        ${kpi("Gasto del mes", bob(d.gastoMes), undefined, "#dc2626")}
+        ${kpi("Ingreso del mes", bob(d.ingresoMes), undefined, VERDE)}
+      </tr>
+      <tr>
+        ${kpi("Balance", `${balance >= 0 ? "+" : ""}${bob(balance)}`, "Ingreso − gasto", balance >= 0 ? VERDE : "#dc2626")}
+        ${kpi("Patrimonio", "", "vs. inicio de mes")}
+      </tr>
+    </table>
+    <div style="text-align:center;margin:6px 0 4px;">${deltaChip(d.deltaPatrimonioBob, d.deltaPatrimonioPct, "en el mes")}</div>
+    <div style="margin-top:14px;font-size:12px;color:${GRIS};text-transform:uppercase;letter-spacing:.4px;">Top gastos por categoría</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;border-top:1px solid ${BORDE};">
+      ${listaCategorias(d.topCategorias)}
+    </table>
+    ${presu}
+    ${dpf}`;
+  const text = `Reporte ${nombreMesPeriodo(d.period)}: gasto ${bob(d.gastoMes)}, ingreso ${bob(d.ingresoMes)}, balance ${bob(balance)}.`;
+  return { subject: `MyMoney · 📈 Reporte de ${nombreMesPeriodo(d.period)}`, html: layout("Reporte mensual", contenido), text };
+}

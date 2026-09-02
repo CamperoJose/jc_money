@@ -84,9 +84,10 @@ luego Inversiones DPF, y al final Deudas. Ver `claude/roadmap.md`.
 
 ## 6. Cómo trabajar en este repo
 
-- **Rama de trabajo: SIEMPRE `main`, y SOLO `main`.** No se crean ramas de feature ni de
-  Claude: se desarrolla, commitea y pushea directo a `main`. `main` es la rama por defecto del
-  repo y la que despliega Vercel. Cualquier sesión de Claude debe trabajar exclusivamente en `main`.
+- **Rama de trabajo: SIEMPRE `main`, y SOLO `main`. NUNCA crear ramas nuevas** (ni de feature, ni de
+  Claude, ni temporales). El repo tiene UNA sola rama, `main`, que es la default y la que despliega
+  Vercel. Se desarrolla, commitea y pushea directo a `main`. Confirmado por el usuario (sesión 12):
+  no crear más ramas bajo ninguna circunstancia.
 - **Antes de codear una fase**, lee su archivo de TODOs en `claude/todos/`.
 - **Al terminar un bloque de trabajo**, actualiza `claude/estado.md` y marca los TODOs cerrados.
 - **Commits** en español, claros y descriptivos.

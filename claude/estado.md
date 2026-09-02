@@ -2,7 +2,30 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 11 — Tendencias, gastos 7 días, autofill, UI polish)
+## Última actualización: 2026-09-02 (sesión 12 — presupuestos, tema, correos periódicos)
+
+### Sesión 12 — lo hecho ✅
+- **Operativo:** migraciones 0010/0011/0012 aplicadas por el usuario; repo con UNA sola rama `main`
+  (regla reforzada en CLAUDE.md §6: **NUNCA crear ramas**). Tema/monitoreo lo revisa el usuario.
+- **Selector de tema (claro/oscuro/sistema):** en el pie del sidebar, persistido en localStorage, sin
+  flash (script inline en `<head>`). Respeta la paleta tweakcn (no se inventan colores). Dark mode por
+  clase `.dark` en `<html>`. Versión mini cuando el sidebar está colapsado.
+- **Presupuestos** (`/tracking/gastos/presupuestos`, tabla `budgets` ya existente): tope mensual por
+  categoría de gasto, barras de avance vs. gastado, alertas (≥85% y excedido), KPIs (planeado,
+  gastado, restante, % global) y **copiar del mes anterior**. `lib/presupuestos.ts` + queries/mutations
+  + API `/api/presupuestos{,/copiar}`. Guardado inline (blur/Enter), 0 quita el tope.
+- **Correos periódicos** (todos salen del job de medianoche `/api/jobs/correos`):
+  - Diario: patrimonio + alerta de DPF que vence hoy (ya existían).
+  - **Semanal (lunes):** resumen de la semana (gasto 7d + top categorías, Δ patrimonio 7d, DPF que
+    vencen esta semana, avance de presupuesto).
+  - **Mensual (1er lunes):** reporte del mes que cerró (gasto/ingreso/balance, top categorías, Δ
+    patrimonio del mes, presupuesto cumplido/excedido, DPF cobrados y su ganancia).
+  - Lógica de fecha en `lib/jobs/correos.ts`; plantillas nuevas en `lib/emails/plantillas.ts`.
+- **Decisión:** NO se harán respaldos a Drive (por pedido del usuario).
+
+---
+
+## Update previo: 2026-09-02 (sesión 11 — Tendencias, gastos 7 días, autofill, UI polish)
 
 ### Sesión 11 — lo hecho ✅
 - **Correos:** probados en producción por el usuario, funcionan. ✅

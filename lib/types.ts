@@ -100,6 +100,28 @@ export interface DpfDepositUI extends DpfDeposit {
   liberacion: DpfLiberacion;
 }
 
+// --- Presupuestos (por categoría de gasto) ----------------------------------
+
+export interface Budget {
+  id: string;
+  period: string; // 'YYYY-MM'
+  category_id: string;
+  amount_planned: number;
+}
+
+export type BudgetEstado = "sin_presupuesto" | "ok" | "alerta" | "excedido";
+
+export interface BudgetUI {
+  category_id: string;
+  category_name: string;
+  planned: number; // 0 si no hay presupuesto
+  spent: number; // gastado en el periodo (BOB)
+  restante: number; // planned − spent
+  pct: number; // spent / planned (0 si sin presupuesto)
+  estado: BudgetEstado;
+  budget_id: string | null;
+}
+
 // --- Deudas (que me deben) --------------------------------------------------
 
 export type DebtStatus = "pendiente" | "parcial" | "pagado";

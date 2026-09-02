@@ -23,9 +23,11 @@ import {
   Vault,
   Flask,
   Package,
+  Target,
   type Icon,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/tracking/theme-toggle";
 
 interface NavItem {
   href: string;
@@ -58,6 +60,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/tracking/gastos", label: "Dashboard", icon: ChartPieSlice },
       { href: "/tracking/gastos/registros", label: "Movimientos", icon: Receipt },
+      { href: "/tracking/gastos/presupuestos", label: "Presupuestos", icon: Target },
     ],
   },
   {
@@ -218,6 +221,7 @@ export function Sidebar({ email }: { email?: string | null }) {
 
       {/* Pie */}
       <div className="border-t border-sidebar-border p-3">
+        <ThemeToggle mini={mini} />
         <button
           type="button"
           onClick={toggleCollapse}
