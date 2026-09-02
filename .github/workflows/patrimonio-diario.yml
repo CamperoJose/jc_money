@@ -1,10 +1,16 @@
 name: Patrimonio diario (autocálculo)
 
-# Corre a las 00:30 de Bolivia (GMT-4) = 04:30 UTC, todos los días.
+# Programado ~00:17 de Bolivia (GMT-4) = 04:17 UTC, todos los días.
+# NOTA: los cron de GitHub Actions se encolan y pueden retrasarse bastante
+# (a veces horas), sobre todo en minutos "redondos" como :00 y :30. Por eso se
+# usa un minuto poco congestionado (:17). El retraso NO afecta la exactitud: el
+# job cierra SIEMPRE "ayer" (23:59 Bolivia) y es idempotente, así que corra a la
+# 00:17 o a las 04:57 el resultado es el mismo. Si se necesitara puntualidad,
+# se usaría un scheduler externo (cron-job.org), ya contemplado en CLAUDE.md.
 # También se puede disparar a mano desde la pestaña Actions.
 on:
   schedule:
-    - cron: "30 4 * * *"
+    - cron: "17 4 * * *"
   workflow_dispatch:
     inputs:
       date:
