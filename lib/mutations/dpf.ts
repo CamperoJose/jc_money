@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DpfStatus } from "@/lib/types";
-import { sumarDias, interesBruto, interesLiquido } from "@/lib/dpf";
+import { sumarDias, interesBruto, interesLiquido, redondeaTasa, redondeaMonto } from "@/lib/dpf";
 
 export interface DpfInput {
   pizarra?: string | null; // entidad financiera
@@ -13,8 +13,11 @@ export interface DpfInput {
   principal: number; // capital BOB
   annual_rate: number; // ej. 0.077 (fracción, no %)
   status?: DpfStatus;
+  cobra_iva?: boolean; // retiene RC-IVA (13%). Por defecto false.
   gcia_economica?: number | null;
   gcia_financiera?: number | null;
+  paid_account_id?: string | null; // cuenta/banco a la que se cobró
+  paid_at?: string | null; // fecha de cobro (YYYY-MM-DD)
   notes?: string | null;
 }
 
@@ -45,10 +48,15 @@ function limpiar(v?: string | null): string | null {
 
 function filaDesde(input: DpfInput) {
   const term = Math.round(input.term_days);
+  const principal = redondeaMonto(input.principal);
+  const rate = redondeaTasa(input.annual_rate); // mata el ruido de float (6.6% → 0.066)
+  const cobraIva = input.cobra_iva ?? false;
+  const status = input.status ?? "activo";
   const endDate = input.end_date || sumarDias(input.start_date, term);
   // Ganancia realizada: si el usuario no la entrega, se proyecta desde el capital.
-  const bruto = input.gcia_economica ?? interesBruto(input.principal, input.annual_rate, term);
-  const liquido = input.gcia_financiera ?? interesLiquido(bruto);
+  const bruto = redondeaMonto(input.gcia_economica ?? interesBruto(principal, rate, term));
+  const liquido = redondeaMonto(input.gcia_financiera ?? interesLiquido(bruto, cobraIva));
+  const pagado = status === "pagado";
   return {
     pizarra: limpiar(input.pizarra),
     id_dpf_externo: limpiar(input.id_dpf_externo),
@@ -56,13 +64,17 @@ function filaDesde(input: DpfInput) {
     nro_dpf: limpiar(input.nro_dpf),
     start_date: input.start_date,
     end_date: endDate,
-    principal: input.principal,
+    principal,
     term_days: term,
-    annual_rate: input.annual_rate,
-    status: input.status ?? "activo",
-    gcia_economica: Math.round(bruto * 100) / 100,
-    gcia_financiera: Math.round(liquido * 100) / 100,
-    rc_iva_retencion: Math.round((bruto - liquido) * 100) / 100,
+    annual_rate: rate,
+    status,
+    cobra_iva: cobraIva,
+    gcia_economica: bruto,
+    gcia_financiera: liquido,
+    rc_iva_retencion: redondeaMonto(bruto - liquido),
+    // El cobro solo aplica cuando está pagado; si no, se limpia.
+    paid_account_id: pagado ? input.paid_account_id || null : null,
+    paid_at: pagado ? input.paid_at || null : null,
     notes: limpiar(input.notes),
   };
 }

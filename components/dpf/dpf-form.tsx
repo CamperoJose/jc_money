@@ -14,18 +14,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBob, formatDate } from "@/lib/format";
-import { sumarDias, interesBruto, interesLiquido } from "@/lib/dpf";
-import type { DpfDeposit, DpfStatus } from "@/lib/types";
+import { sumarDias, interesBruto, interesLiquido, redondeaTasa } from "@/lib/dpf";
+import type { Account, DpfDeposit, DpfStatus } from "@/lib/types";
 
 const PLAZOS = [30, 60, 90, 120, 180, 270, 360, 720];
 
+/** Convierte una fracción (0.066) a texto de % sin ruido de float ("6.6"). */
+function tasaAInput(fraccion: number): string {
+  const pct = redondeaTasa(fraccion) * 100;
+  // Redondea a 4 decimales de % y quita ceros/coma sobrantes.
+  return String(Math.round(pct * 10000) / 10000);
+}
+
 export function DpfForm({
+  cuentas,
   registro,
   open,
   onOpenChange,
 }: {
+  cuentas: Account[];
   registro?: DpfDeposit | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -38,8 +48,11 @@ export function DpfForm({
   const [inicio, setInicio] = useState(registro?.start_date ?? hoyInput());
   const [plazo, setPlazo] = useState(String(registro?.term_days ?? 90));
   const [monto, setMonto] = useState(registro ? String(registro.principal) : "");
-  const [tasa, setTasa] = useState(registro ? String(registro.annual_rate * 100) : "");
+  const [tasa, setTasa] = useState(registro ? tasaAInput(registro.annual_rate) : "");
   const [estado, setEstado] = useState<DpfStatus>(registro?.status ?? "activo");
+  const [cobraIva, setCobraIva] = useState(registro?.cobra_iva ?? false);
+  const [cuentaCobro, setCuentaCobro] = useState(registro?.paid_account_id ?? "");
+  const [fechaCobro, setFechaCobro] = useState(registro?.paid_at ?? hoyInput());
   const [notas, setNotas] = useState(registro?.notes ?? "");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,17 +65,17 @@ export function DpfForm({
 
   const proyeccion = useMemo(() => {
     const principal = parseFloat(monto);
-    const rate = parseFloat(tasa) / 100;
+    const rate = redondeaTasa((parseFloat(tasa) || 0) / 100);
     if (!(principal > 0) || !(rate > 0) || !(plazoNum > 0)) return null;
     const bruto = interesBruto(principal, rate, plazoNum);
-    const liquido = interesLiquido(bruto);
+    const liquido = interesLiquido(bruto, cobraIva);
     return { bruto, liquido, rcIva: Math.round((bruto - liquido) * 100) / 100, total: principal + liquido };
-  }, [monto, tasa, plazoNum]);
+  }, [monto, tasa, plazoNum, cobraIva]);
 
   async function guardar() {
     setError(null);
     const principal = parseFloat(monto);
-    const rate = parseFloat(tasa) / 100;
+    const rate = redondeaTasa((parseFloat(tasa) || 0) / 100);
     if (!(principal > 0)) return setError("Ingresa un capital mayor a 0.");
     if (!(rate > 0 && rate <= 1)) return setError("Ingresa una tasa anual válida (ej. 7.7).");
     if (!(plazoNum > 0)) return setError("Selecciona un plazo válido.");
@@ -76,6 +89,9 @@ export function DpfForm({
       principal,
       annual_rate: rate,
       status: estado,
+      cobra_iva: cobraIva,
+      paid_account_id: estado === "pagado" ? cuentaCobro || null : null,
+      paid_at: estado === "pagado" ? fechaCobro || null : null,
       notes: notas,
     };
 
@@ -201,6 +217,21 @@ export function DpfForm({
           </div>
         </div>
 
+        {/* Cobra IVA (RC-IVA 13%) */}
+        <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2.5">
+          <div className="pr-3">
+            <Label className="cursor-pointer" htmlFor="cobraIva">
+              ¿Cobra IVA (RC-IVA 13%)?
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {cobraIva
+                ? "Se retiene 13% sobre el interés (líquido = bruto · 0,87)."
+                : "Sin retención: el interés líquido es igual al bruto."}
+            </p>
+          </div>
+          <Switch id="cobraIva" checked={cobraIva} onChange={setCobraIva} />
+        </div>
+
         {/* Estado */}
         <div className="space-y-1.5">
           <Label htmlFor="estado">Estado</Label>
@@ -209,6 +240,41 @@ export function DpfForm({
             <option value="pagado">Cobrado (pagado)</option>
           </Select>
         </div>
+
+        {/* Declaración de cobro (solo si está pagado) */}
+        {estado === "pagado" && (
+          <div className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                Declaración de cobro
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cuentaCobro">¿A qué cuenta se cobró?</Label>
+              <Select
+                id="cuentaCobro"
+                value={cuentaCobro}
+                onChange={(e) => setCuentaCobro(e.target.value)}
+              >
+                <option value="">— Selecciona cuenta —</option>
+                {cuentas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.currency})
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fechaCobro">Fecha de cobro</Label>
+              <Input
+                id="fechaCobro"
+                type="date"
+                value={fechaCobro}
+                onChange={(e) => setFechaCobro(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Notas */}
         <div className="space-y-1.5">

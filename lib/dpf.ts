@@ -2,7 +2,7 @@
 // Sin dependencias de red ni de Supabase: fácil de testear y de reutilizar en
 // servidor y cliente. Todo el dinero está en BOB.
 
-import type { DpfDeposit, DpfDepositUI, DpfLiberacion } from "@/lib/types";
+import type { Account, DpfDeposit, DpfDepositUI, DpfLiberacion } from "@/lib/types";
 import { fechaBoliviaHoy } from "@/lib/datetime";
 
 /**
@@ -38,9 +38,22 @@ export function interesBruto(principal: number, annualRate: number, termDays: nu
   return redondea((principal * annualRate * termDays) / DIAS_ANIO);
 }
 
-/** Interés líquido = bruto · (1 − RC-IVA). */
-export function interesLiquido(bruto: number): number {
-  return redondea(bruto * (1 - RC_IVA));
+/**
+ * Interés líquido. Solo se retiene RC-IVA (13%) si el DPF cobra IVA; en caso
+ * contrario el líquido es igual al bruto (sin retención).
+ */
+export function interesLiquido(bruto: number, cobraIva = false): number {
+  return redondea(cobraIva ? bruto * (1 - RC_IVA) : bruto);
+}
+
+/** Redondea un porcentaje/tasa a 4 decimales, matando el ruido de float. */
+export function redondeaTasa(fraccion: number): number {
+  return Math.round(fraccion * 10000) / 10000;
+}
+
+/** Redondea a 2 decimales (dinero). */
+export function redondeaMonto(n: number): number {
+  return redondea(n);
 }
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -55,9 +68,13 @@ function redondea(n: number): number {
  * Enriquece un DPF con todos sus derivados (interés, días restantes, progreso,
  * estado de liberación). `hoy` por defecto = hoy en Bolivia.
  */
-export function enriquecerDpf(d: DpfDeposit, hoy: string = fechaBoliviaHoy()): DpfDepositUI {
+export function enriquecerDpf(
+  d: DpfDeposit,
+  hoy: string = fechaBoliviaHoy(),
+  cuentas?: Map<string, Account>
+): DpfDepositUI {
   const bruto = interesBruto(d.principal, d.annual_rate, d.term_days);
-  const liquido = interesLiquido(bruto);
+  const liquido = interesLiquido(bruto, d.cobra_iva);
   const rcIva = redondea(bruto - liquido);
   const interesDiario = redondea((d.principal * d.annual_rate) / DIAS_ANIO);
 
@@ -84,6 +101,7 @@ export function enriquecerDpf(d: DpfDeposit, hoy: string = fechaBoliviaHoy()): D
     diasTranscurridos,
     progreso,
     liberacion,
+    paidAccount: d.paid_account_id ? cuentas?.get(d.paid_account_id) ?? null : null,
   };
 }
 
@@ -109,9 +127,13 @@ export interface ResumenDpf {
 }
 
 /** Construye el panel de indicadores a partir de los DPF crudos. */
-export function resumenDpf(deposits: DpfDeposit[], hoy: string = fechaBoliviaHoy()): ResumenDpf {
+export function resumenDpf(
+  deposits: DpfDeposit[],
+  hoy: string = fechaBoliviaHoy(),
+  cuentas?: Map<string, Account>
+): ResumenDpf {
   const dpfs = deposits
-    .map((d) => enriquecerDpf(d, hoy))
+    .map((d) => enriquecerDpf(d, hoy, cuentas))
     .sort((a, b) => a.end_date.localeCompare(b.end_date));
 
   const noPagados = dpfs.filter((d) => d.status !== "pagado");
@@ -168,6 +190,7 @@ export interface ParamsSimulador {
   tasaAnual: number; // ej. 0.077
   periodos: number; // cuántos DPF se abren
   reinvertirInteres: boolean; // reinvertir el interés líquido al vencer
+  cobraIva: boolean; // aplicar retención RC-IVA (13%) al interés
   fechaInicio: string; // YYYY-MM-DD
 }
 
@@ -241,7 +264,7 @@ export function simularLaddering(p: ParamsSimulador): ResultadoSimulador {
     const principal = redondea(aporteFresco + reinversion);
 
     const bruto = interesBruto(principal, p.tasaAnual, p.plazoDias);
-    const liquido = interesLiquido(bruto);
+    const liquido = interesLiquido(bruto, p.cobraIva);
     const vencimiento = sumarDias(fecha, p.plazoDias);
 
     deposits.push({ apertura: fecha, vencimiento, principal, interesLiquido: liquido, interesBruto: bruto, liberado: false });

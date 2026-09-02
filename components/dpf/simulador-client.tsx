@@ -45,6 +45,7 @@ export function SimuladorClient() {
   const [tasa, setTasa] = useState("7.7");
   const [periodos, setPeriodos] = useState("24");
   const [reinvertir, setReinvertir] = useState("si");
+  const [cobraIva, setCobraIva] = useState("no");
   const [fechaInicio, setFechaInicio] = useState(hoyInput());
 
   const params: ParamsSimulador = useMemo(
@@ -56,9 +57,10 @@ export function SimuladorClient() {
       tasaAnual: Math.max(0, (parseFloat(tasa) || 0) / 100),
       periodos: Math.max(1, Math.min(240, parseInt(periodos, 10) || 12)),
       reinvertirInteres: reinvertir === "si",
+      cobraIva: cobraIva === "si",
       fechaInicio,
     }),
-    [montoInicial, aportePeriodico, cadenciaDias, plazoDias, tasa, periodos, reinvertir, fechaInicio]
+    [montoInicial, aportePeriodico, cadenciaDias, plazoDias, tasa, periodos, reinvertir, cobraIva, fechaInicio]
   );
 
   const r = useMemo(() => simularLaddering(params), [params]);
@@ -117,6 +119,12 @@ export function SimuladorClient() {
               <Select value={reinvertir} onChange={(e) => setReinvertir(e.target.value)}>
                 <option value="si">Sí (interés compuesto)</option>
                 <option value="no">No (solo capital)</option>
+              </Select>
+            </Campo>
+            <Campo label="¿Cobra IVA (RC-IVA 13%)?">
+              <Select value={cobraIva} onChange={(e) => setCobraIva(e.target.value)}>
+                <option value="no">No (sin retención)</option>
+                <option value="si">Sí (retiene 13%)</option>
               </Select>
             </Campo>
           </CardContent>
@@ -196,7 +204,8 @@ export function SimuladorClient() {
           </Card>
 
           <p className="text-xs text-muted-foreground">
-            Interés bruto = capital · tasa · plazo/365. Interés líquido = bruto · 0,87 (retención RC-IVA 13%). El
+            Interés bruto = capital · tasa · plazo/365. Interés líquido = bruto{" "}
+            {cobraIva === "si" ? "· 0,87 (retención RC-IVA 13%)" : "(sin retención de IVA)"}. El
             simulador asume que cada depósito se renueva con el capital liberado más el aporte del periodo.
           </p>
         </div>

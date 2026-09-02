@@ -25,11 +25,11 @@ import {
 import { DpfForm } from "@/components/dpf/dpf-form";
 import { etiquetaLiberacion } from "@/components/dpf/dpf-dashboard";
 import { formatBob, formatPercent, formatDate } from "@/lib/format";
-import type { DpfDeposit, DpfDepositUI, DpfLiberacion } from "@/lib/types";
+import type { Account, DpfDeposit, DpfDepositUI, DpfLiberacion } from "@/lib/types";
 
 type FiltroEstado = "todos" | DpfLiberacion;
 
-export function DpfClient({ dpfs }: { dpfs: DpfDepositUI[] }) {
+export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Account[] }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<DpfDeposit | null>(null);
@@ -195,6 +195,15 @@ export function DpfClient({ dpfs }: { dpfs: DpfDepositUI[] }) {
                         </td>
                         <td className="px-3 py-2.5">
                           <Badge variant={et.color}>{et.texto}</Badge>
+                          {d.status === "pagado" && d.paidAccount && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              → {d.paidAccount.name}
+                              {d.paid_at ? ` · ${formatDate(d.paid_at)}` : ""}
+                            </div>
+                          )}
+                          {!d.cobra_iva && (
+                            <div className="text-[10px] text-muted-foreground">sin IVA</div>
+                          )}
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center justify-end gap-1">
@@ -251,7 +260,7 @@ export function DpfClient({ dpfs }: { dpfs: DpfDepositUI[] }) {
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-xs text-muted-foreground tabular-nums">
                         {d.status === "pagado"
-                          ? "Cobrado"
+                          ? `Cobrado${d.paidAccount ? ` → ${d.paidAccount.name}` : ""}`
                           : d.diasRestantes < 0
                             ? `venció hace ${Math.abs(d.diasRestantes)} d`
                             : d.diasRestantes === 0
@@ -287,6 +296,7 @@ export function DpfClient({ dpfs }: { dpfs: DpfDepositUI[] }) {
       {formOpen && (
         <DpfForm
           key={editando?.id ?? "nuevo"}
+          cuentas={cuentas}
           registro={editando}
           open={formOpen}
           onOpenChange={setFormOpen}

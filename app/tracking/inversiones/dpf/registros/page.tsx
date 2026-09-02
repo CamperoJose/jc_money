@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDpfs } from "@/lib/queries/dpf";
+import { getDpfs, getCuentasMap } from "@/lib/queries/dpf";
+import { getCuentas } from "@/lib/queries/patrimonio";
 import { enriquecerDpf } from "@/lib/dpf";
 import { Card, CardContent } from "@/components/ui/card";
 import { DpfClient } from "@/components/dpf/dpf-client";
-import type { DpfDepositUI } from "@/lib/types";
+import type { Account, DpfDepositUI } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,16 @@ export default async function DpfRegistrosPage() {
   const supabase = await createClient();
 
   let dpfs: DpfDepositUI[] = [];
+  let cuentas: Account[] = [];
   let errorMsg: string | null = null;
   try {
-    const raw = await getDpfs(supabase);
-    dpfs = raw.map((d) => enriquecerDpf(d));
+    const [raw, cuentasMap, cuentasList] = await Promise.all([
+      getDpfs(supabase),
+      getCuentasMap(supabase),
+      getCuentas(supabase),
+    ]);
+    cuentas = cuentasList;
+    dpfs = raw.map((d) => enriquecerDpf(d, undefined, cuentasMap));
   } catch (e) {
     errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
   }
@@ -34,7 +41,7 @@ export default async function DpfRegistrosPage() {
 
   return (
     <div className="space-y-4">
-      <DpfClient dpfs={dpfs} />
+      <DpfClient dpfs={dpfs} cuentas={cuentas} />
     </div>
   );
 }

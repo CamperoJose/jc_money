@@ -76,24 +76,47 @@ export interface DpfDeposit {
   term_days: number; // plazo (ej. 90)
   annual_rate: number; // tasa anual (ej. 0.077)
   status: DpfStatus;
+  cobra_iva: boolean; // si retiene RC-IVA (13%). Por defecto false.
   gcia_economica: number | null; // ganancia bruta realizada (override opcional)
   gcia_financiera: number | null; // ganancia líquida realizada (override opcional)
   rc_iva_retencion: number | null; // retención realizada (override opcional)
+  paid_account_id: string | null; // cuenta/banco a la que se cobró (al pagar)
+  paid_at: string | null; // fecha de cobro (YYYY-MM-DD)
   notes: string | null;
 }
 
-/** DPF con todos los derivados calculados para la UI. */
+/** Cuenta a la que se cobró un DPF (resuelta para la UI). */
 export interface DpfDepositUI extends DpfDeposit {
   interesDiario: number;
   interesBruto: number; // proyectado a fin de plazo
-  interesLiquido: number; // bruto · (1 − RC-IVA)
-  rcIva: number; // bruto · RC-IVA
+  interesLiquido: number; // cobra_iva ? bruto·0,87 : bruto
+  rcIva: number; // cobra_iva ? bruto·0,13 : 0
   montoAlVencimiento: number; // principal + interés líquido
+  paidAccount: Account | null; // cuenta de cobro resuelta
   diasRestantes: number; // end_date − hoy (negativo si venció)
   diasTotales: number; // end_date − start_date
   diasTranscurridos: number;
   progreso: number; // 0..1
   liberacion: DpfLiberacion;
+}
+
+// --- Tipo de cambio (BCB) ---------------------------------------------------
+
+export interface ExchangeRate {
+  id: string;
+  rate_date: string; // YYYY-MM-DD
+  cod_indicador: number;
+  cod_moneda: number;
+  moneda_desc: string | null;
+  valor: number; // Bs por unidad de moneda
+  source: string; // 'bcb' | 'manual'
+  fetched_at: string;
+}
+
+/** Configuración paramétrica del consumo de T/C. */
+export interface TcConfig {
+  cod_indicador: number;
+  cod_moneda: number;
 }
 
 export type SnapshotKind = "manual" | "auto";

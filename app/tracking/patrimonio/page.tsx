@@ -13,6 +13,9 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getResumen, type ResumenPatrimonio } from "@/lib/queries/patrimonio";
+import { getResumenDpf } from "@/lib/queries/dpf";
+import type { ResumenDpf } from "@/lib/dpf";
+import { DpfResumenCard } from "@/components/dpf/dpf-resumen-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +45,14 @@ export default async function PatrimonioDashboard() {
     resumen = await getResumen(supabase);
   } catch (e) {
     errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
+  }
+
+  // DPF: tolerante a que la tabla/migración aún no exista (no rompe el dashboard).
+  let resumenDpf: ResumenDpf | null = null;
+  try {
+    resumenDpf = await getResumenDpf(supabase);
+  } catch {
+    resumenDpf = null;
   }
 
   return (
@@ -86,6 +97,8 @@ export default async function PatrimonioDashboard() {
         ) : (
           <Contenido resumen={resumen} />
         ))}
+
+      {resumenDpf && resumenDpf.totalHistorico > 0 && <DpfResumenCard resumen={resumenDpf} />}
     </div>
   );
 }
