@@ -28,8 +28,9 @@
 - `lib/mailer.ts` (Nodemailer, credenciales SOLO por env), plantillas HTML en `lib/emails/plantillas.ts`
   (mini-dash de patrimonio + alerta de DPF que vence hoy), job `lib/jobs/correos.ts`, endpoint
   `/api/jobs/correos` y paso en el workflow (después del cierre, `continue-on-error`).
-- **Env vars que el usuario debe setear (Vercel + GitHub secrets):** `SMTP_USER` (gmail),
-  `SMTP_PASS` (App Password, sin espacios), `MAIL_TO` (destinatario; opcional, default = SMTP_USER).
+- **Env vars que el usuario debe setear (SOLO en Vercel; el correo se envía desde la función):**
+  `SMTP_USER` (gmail), `SMTP_PASS` (App Password, sin espacios), `MAIL_TO` (opcional, default = SMTP_USER).
+  GitHub solo necesita los ya existentes APP_URL + API_BEARER_TOKEN (curl al endpoint).
   Opcionales: `SMTP_HOST` (default smtp.gmail.com), `SMTP_PORT` (default 465). La App Password NUNCA
   va al repo. Probar: `POST /api/jobs/correos` con el bearer token.
 
