@@ -24,10 +24,14 @@
 - **Sidebar:** grupos **Activos** y **Deudas** activados.
 - **Migraciones pendientes de aplicar (en orden):** 0010, 0011, 0012.
 
-### PENDIENTE (necesita input del usuario) — Correos
-- Envío de correo diario de patrimonio con mini-dash HTML, y correo aparte de alerta cuando un DPF
-  vence ese día. Stack: Nodemailer + SMTP Gmail (App Password). **Falta que el usuario genere la App
-  Password y setee `SMTP_USER`/`SMTP_PASS`/`MAIL_TO` en Vercel + GitHub secrets.** Con eso se construye.
+### Correos — CÓDIGO LISTO ✅ (falta que el usuario setee las env vars)
+- `lib/mailer.ts` (Nodemailer, credenciales SOLO por env), plantillas HTML en `lib/emails/plantillas.ts`
+  (mini-dash de patrimonio + alerta de DPF que vence hoy), job `lib/jobs/correos.ts`, endpoint
+  `/api/jobs/correos` y paso en el workflow (después del cierre, `continue-on-error`).
+- **Env vars que el usuario debe setear (Vercel + GitHub secrets):** `SMTP_USER` (gmail),
+  `SMTP_PASS` (App Password, sin espacios), `MAIL_TO` (destinatario; opcional, default = SMTP_USER).
+  Opcionales: `SMTP_HOST` (default smtp.gmail.com), `SMTP_PORT` (default 465). La App Password NUNCA
+  va al repo. Probar: `POST /api/jobs/correos` con el bearer token.
 
 ---
 

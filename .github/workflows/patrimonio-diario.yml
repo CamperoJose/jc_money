@@ -64,3 +64,21 @@ jobs:
           if [ "$codigo" -ge 300 ]; then
             exit 1
           fi
+
+      - name: Correos (patrimonio + alerta DPF)
+        continue-on-error: true  # un fallo de correo no debe tumbar el cierre
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then
+            echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN." >&2
+            exit 1
+          fi
+          URL="$APP_URL/api/jobs/correos"
+          echo "POST $URL"
+          codigo=$(curl -sS -o correos.json -w "%{http_code}" \
+            -X POST "$URL" \
+            -H "Authorization: Bearer $API_BEARER_TOKEN")
+          echo "HTTP $codigo"; cat correos.json; echo
+          if [ "$codigo" -ge 300 ]; then exit 1; fi
