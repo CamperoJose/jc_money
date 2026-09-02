@@ -10,7 +10,6 @@ export interface TransaccionInput {
   exchange_rate?: number | null;
   account_id?: string | null;
   category_id?: string | null;
-  participant_id?: string | null;
   description?: string | null;
 }
 
@@ -46,7 +45,6 @@ function filaDesde(input: TransaccionInput) {
     exchange_rate: input.currency === "BOB" ? null : input.exchange_rate ?? null,
     account_id: input.account_id || null,
     category_id: input.category_id || null,
-    participant_id: input.participant_id || null,
     description: input.description?.trim() || null,
     source: "manual" as const,
   };

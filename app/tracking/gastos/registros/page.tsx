@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCuentas } from "@/lib/queries/patrimonio";
-import { getTransacciones, getCategorias, getParticipantes } from "@/lib/queries/gastos";
+import { getTransacciones, getCategorias } from "@/lib/queries/gastos";
 import { Card, CardContent } from "@/components/ui/card";
 import { GastosClient } from "@/components/gastos/gastos-client";
-import type { Account, Category, Participant, TransactionUI } from "@/lib/types";
+import type { Account, Category, TransactionUI } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,14 +13,12 @@ export default async function GastosRegistrosPage() {
   let transacciones: TransactionUI[] = [];
   let cuentas: Account[] = [];
   let categorias: Category[] = [];
-  let participantes: Participant[] = [];
   let errorMsg: string | null = null;
   try {
-    [transacciones, cuentas, categorias, participantes] = await Promise.all([
+    [transacciones, cuentas, categorias] = await Promise.all([
       getTransacciones(supabase),
       getCuentas(supabase),
       getCategorias(supabase),
-      getParticipantes(supabase),
     ]);
   } catch (e) {
     errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
@@ -41,12 +39,7 @@ export default async function GastosRegistrosPage() {
 
   return (
     <div className="space-y-4">
-      <GastosClient
-        transacciones={transacciones}
-        cuentas={cuentas}
-        categorias={categorias}
-        participantes={participantes}
-      />
+      <GastosClient transacciones={transacciones} cuentas={cuentas} categorias={categorias} />
     </div>
   );
 }

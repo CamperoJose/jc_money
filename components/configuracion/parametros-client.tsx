@@ -9,7 +9,6 @@ import {
   Check,
   X,
   Warning,
-  Users,
   Tag,
   TrendUp,
   Bank,
@@ -18,25 +17,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { Category, CategoryKind, Participant } from "@/lib/types";
+import type { Category, CategoryKind } from "@/lib/types";
 
-type Tab = "participantes" | "gasto" | "ingreso" | "inversion";
+type Tab = "gasto" | "ingreso" | "inversion";
 
-const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
-  { id: "participantes", label: "Participantes", icon: Users },
+const TABS: { id: Tab; label: string; icon: typeof Tag }[] = [
   { id: "gasto", label: "Categorías de gasto", icon: Tag },
   { id: "ingreso", label: "Categorías de ingreso", icon: TrendUp },
   { id: "inversion", label: "Categorías de inversión", icon: Bank },
 ];
 
-export function ParametrosClient({
-  categorias,
-  participantes,
-}: {
-  categorias: Category[];
-  participantes: Participant[];
-}) {
-  const [tab, setTab] = useState<Tab>("participantes");
+export function ParametrosClient({ categorias }: { categorias: Category[] }) {
+  const [tab, setTab] = useState<Tab>("gasto");
 
   const porKind = (k: CategoryKind) =>
     categorias.filter((c) => c.kind === k).sort((a, b) => a.name.localeCompare(b.name));
@@ -46,7 +38,7 @@ export function ParametrosClient({
       <div>
         <h1 className="text-2xl font-bold">Parámetros</h1>
         <p className="text-sm text-muted-foreground">
-          Administra los catálogos que usan tus movimientos: participantes y categorías.
+          Administra los catálogos de categorías que usan tus movimientos e inversiones.
         </p>
       </div>
 
@@ -72,15 +64,6 @@ export function ParametrosClient({
         })}
       </div>
 
-      {tab === "participantes" && (
-        <Catalogo
-          key="participantes"
-          items={participantes}
-          endpoint="/api/parametros/participantes"
-          singular="participante"
-          placeholder="Nombre del participante…"
-        />
-      )}
       {tab === "gasto" && (
         <Catalogo
           key="gasto"

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account } from "@/lib/types";
 import { calcularTotalBob, calcularTotalUsd } from "@/lib/patrimonio";
+import { snapshotAtDesdeFecha } from "@/lib/datetime";
 
 export interface RegistroInput {
   snapshot_date: string; // YYYY-MM-DD
@@ -55,6 +56,8 @@ export async function crearRegistro(
     .from("net_worth_snapshots")
     .insert({
       snapshot_date: input.snapshot_date,
+      snapshot_at: snapshotAtDesdeFecha(input.snapshot_date),
+      kind: "manual",
       exchange_rate: input.exchange_rate,
       total_bob: totalBob,
       total_usd: totalUsd,
@@ -87,6 +90,7 @@ export async function actualizarRegistro(
     .from("net_worth_snapshots")
     .update({
       snapshot_date: input.snapshot_date,
+      snapshot_at: snapshotAtDesdeFecha(input.snapshot_date),
       exchange_rate: input.exchange_rate,
       total_bob: totalBob,
       total_usd: totalUsd,

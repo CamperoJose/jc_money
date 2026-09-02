@@ -60,6 +60,18 @@ Orden sugerido: **1 → 2 → 3 → 4** desbloquean el arranque (Fase 0/1). El r
 - [ ] Opción B: crear cuenta en https://cron-job.org y programar llamadas a las rutas.
 - [ ] En cualquiera, cargar el **token Bearer** de la API como secret. Yo genero el token y te digo dónde ponerlo.
 
+## 8b. Job de patrimonio diario (autocálculo 00:30 Bolivia) — GRATIS · Fase 2
+Ya está el endpoint `POST /api/jobs/patrimonio-diario` (protegido con `API_BEARER_TOKEN`) y el
+workflow `.github/workflows/patrimonio-diario.yml` (corre 04:30 UTC = 00:30 Bolivia). Falta:
+- [ ] Aplicar migraciones **0004** y **0005** en Supabase (0004 primero y confirmar, luego 0005).
+- [ ] En Vercel, setear `SUPABASE_SERVICE_ROLE_KEY` (la `sb_secret_...`, server-side) y
+      `API_BEARER_TOKEN` (yo genero el token).
+- [ ] En GitHub → Settings → Secrets and variables → Actions, crear:
+      - `APP_URL` = la URL de producción (ej. `https://jc-money.vercel.app`).
+      - `API_BEARER_TOKEN` = el mismo token que en Vercel.
+- [ ] (Opcional) Probarlo a mano: pestaña **Actions → Patrimonio diario → Run workflow**
+      (permite indicar una fecha `YYYY-MM-DD` para recalcular/backfill un día puntual).
+
 ## 9. Google Drive (respaldos) — GRATIS · Fase 2
 - [ ] En Google Cloud crea un **service account** y habilita la **Google Drive API**.
 - [ ] Descarga el JSON de credenciales del service account y pásamelo (va en variable de entorno, no al repo).

@@ -14,14 +14,6 @@ begin
     return;
   end if;
 
-  -- ---- Participante por defecto --------------------------------------------
-  insert into participants (user_id, name, active)
-  select uid, v.name, true
-  from (values ('Yo')) as v(name)
-  where not exists (
-    select 1 from participants p where p.user_id = uid and p.name = v.name
-  );
-
   -- ---- Categorías de inversión ---------------------------------------------
   insert into categories (user_id, name, kind, active)
   select uid, v.name, 'inversion'::category_kind, true

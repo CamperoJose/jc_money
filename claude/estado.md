@@ -7,6 +7,24 @@
 ### Fase actual: 2 (Tracking) — módulo Gastos funcional + ABM de parámetros
 
 ### Sesión 3 — lo hecho ✅
+- **Participantes: ELIMINADOS** de todo el sistema (por pedido). La migración 0004 incluye una
+  limpieza defensiva (`drop table participants`, `drop column participant_id`) por si ya se aplicó.
+- **Job de patrimonio diario (autocálculo)**:
+  - `POST /api/jobs/patrimonio-diario` (token `API_BEARER_TOKEN`) + `.github/workflows/patrimonio-diario.yml`
+    (cron 04:30 UTC = **00:30 Bolivia**). Lógica en `lib/jobs/patrimonio-diario.ts`, admin client
+    (service role) en `lib/supabase/admin.ts`. Middleware ya excluye `api/jobs`.
+  - Cierra **ayer 23:59** (Bolivia): toma la **última foto** (manual o auto, ≤ ese instante) y le suma
+    el **neto (ingresos − gastos) del día**. Copia los saldos de la base para conservar composición.
+    Idempotente por día (no repite si ya existe la foto auto de ese día). `date=YYYY-MM-DD` para backfill.
+- **Patrimonio: manual vs auto** — `net_worth_snapshots` ahora tiene `snapshot_at` (instante exacto,
+  permite varias fotos/día) y `kind` (`manual`|`auto`). getSnapshots ordena por `snapshot_at` y para
+  `auto` **confía en el total almacenado** (ya incluye los gastos); para `manual` recalcula de saldos.
+  Los gastos SOLO impactan patrimonio vía el job; una foto manual es independiente.
+- **Matriz de Patrimonio rediseñada** (estilo Excel: header sticky, zebra, líneas, tabular-nums),
+  con badge **Manual/Auto** y nueva columna **Δ vs. anterior** (BOB + % con flecha/color). Las fotos
+  auto no se editan a mano (candado); sí se pueden borrar.
+- **Lentitud entre tabs**: se agregó el loader que faltaba (`configuracion/parametros/loading.tsx`);
+  ya existen loaders en gastos/patrimonio → la navegación muestra esqueleto instantáneo.
 - **Módulo Gastos** (calca el patrón de Patrimonio):
   - Registro de movimientos (gasto/ingreso) con **fecha+hora** (o botón "En este momento"),
     **hora de Bolivia GMT-4** fija (sin DST). Selección de **cuenta de salida**, **categoría**,

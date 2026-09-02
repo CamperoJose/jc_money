@@ -50,3 +50,18 @@ export function isoAFechaBolivia(iso: string): string {
   const p = partesBolivia(new Date(iso));
   return `${p.year}-${p.month}-${p.day}`;
 }
+
+/** Hoy en Bolivia como "YYYY-MM-DD". */
+export function fechaBoliviaHoy(): string {
+  return isoAFechaBolivia(new Date().toISOString());
+}
+
+/**
+ * snapshot_at para una foto manual con fecha "YYYY-MM-DD":
+ * - si es hoy (Bolivia) → el instante actual (permite varias fotos por día);
+ * - si es una fecha pasada → mediodía de Bolivia de esa fecha.
+ */
+export function snapshotAtDesdeFecha(fecha: string): string {
+  if (fecha === fechaBoliviaHoy()) return new Date().toISOString();
+  return new Date(`${fecha}T12:00:00${BOLIVIA_OFFSET}`).toISOString();
+}

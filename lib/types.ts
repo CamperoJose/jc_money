@@ -34,12 +34,6 @@ export interface Category {
   active: boolean;
 }
 
-export interface Participant {
-  id: string;
-  name: string;
-  active: boolean;
-}
-
 export interface Transaction {
   id: string;
   occurred_at: string; // ISO con zona
@@ -50,7 +44,6 @@ export interface Transaction {
   exchange_rate: number | null;
   account_id: string | null;
   category_id: string | null;
-  participant_id: string | null;
   description: string | null;
   tags: string[];
   source: TxnSource;
@@ -60,14 +53,17 @@ export interface Transaction {
 export interface TransactionUI extends Transaction {
   account: Account | null;
   category: Category | null;
-  participant: Participant | null;
   /** Monto convertido a BOB con el T/C de la transacción (o 1 si es BOB). */
   amount_bob: number;
 }
 
+export type SnapshotKind = "manual" | "auto";
+
 export interface NetWorthSnapshot {
   id: string;
   snapshot_date: string; // YYYY-MM-DD
+  snapshot_at: string; // ISO con zona (instante exacto de la foto)
+  kind: SnapshotKind; // manual (ingresada) | auto (job diario)
   exchange_rate: number;
   total_bob: number | null;
   total_usd: number | null;

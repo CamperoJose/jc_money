@@ -17,19 +17,17 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBob } from "@/lib/format";
 import { ahoraLocalInput, isoALocalInput, localInputAIso } from "@/lib/datetime";
-import type { Account, Category, Currency, Participant, TransactionUI, TxnType } from "@/lib/types";
+import type { Account, Category, Currency, TransactionUI, TxnType } from "@/lib/types";
 
 export function GastoForm({
   cuentas,
   categorias,
-  participantes,
   registro,
   open,
   onOpenChange,
 }: {
   cuentas: Account[];
   categorias: Category[];
-  participantes: Participant[];
   registro?: TransactionUI | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -46,7 +44,6 @@ export function GastoForm({
   const [tc, setTc] = useState(registro?.exchange_rate ? String(registro.exchange_rate) : "9.60");
   const [cuentaId, setCuentaId] = useState(registro?.account_id ?? "");
   const [categoriaId, setCategoriaId] = useState(registro?.category_id ?? "");
-  const [participanteId, setParticipanteId] = useState(registro?.participant_id ?? "");
   const [descripcion, setDescripcion] = useState(registro?.description ?? "");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +82,6 @@ export function GastoForm({
       exchange_rate: moneda === "BOB" ? null : parseFloat(tc),
       account_id: cuentaId || null,
       category_id: categoriaId || null,
-      participant_id: participanteId || null,
       description: descripcion,
     };
 
@@ -234,36 +230,17 @@ export function GastoForm({
           </Select>
         </div>
 
-        {/* Categoría + participante */}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="categoria">Categoría</Label>
-            <Select id="categoria" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
-              <option value="">— Sin categoría —</option>
-              {categoriasFiltradas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="participante">Participante</Label>
-            <Select
-              id="participante"
-              value={participanteId}
-              onChange={(e) => setParticipanteId(e.target.value)}
-            >
-              <option value="">— Sin participante —</option>
-              {participantes
-                .filter((p) => p.active || p.id === participanteId)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-            </Select>
-          </div>
+        {/* Categoría */}
+        <div className="space-y-1.5">
+          <Label htmlFor="categoria">Categoría</Label>
+          <Select id="categoria" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
+            <option value="">— Sin categoría —</option>
+            {categoriasFiltradas.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
         </div>
 
         {/* Descripción */}

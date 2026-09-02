@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Account, Currency } from "@/lib/types";
+import type { Account, Currency, SnapshotKind } from "@/lib/types";
 import {
   calcularTotalBob,
   calcularTotalUsd,
@@ -16,6 +16,8 @@ export interface BalanceUI {
 export interface SnapshotUI {
   id: string;
   snapshot_date: string;
+  snapshot_at: string;
+  kind: SnapshotKind;
   exchange_rate: number;
   note: string | null;
   total_bob: number;
@@ -90,9 +92,9 @@ export async function getSnapshots(
   const { data, error } = await supabase
     .from("net_worth_snapshots")
     .select(
-      "id, snapshot_date, exchange_rate, note, net_worth_balances(id, account_id, amount, accounts(id, name, type, currency, is_liability, active))"
+      "id, snapshot_date, snapshot_at, kind, exchange_rate, note, total_bob, total_usd, net_worth_balances(id, account_id, amount, accounts(id, name, type, currency, is_liability, active))"
     )
-    .order("snapshot_date", { ascending: true });
+    .order("snapshot_at", { ascending: true });
 
   if (error) throw error;
 
@@ -107,12 +109,26 @@ export async function getSnapshots(
     }));
 
     const rate = Number(s.exchange_rate);
-    const totalBob = calcularTotalBob(balances, rate);
-    const totalUsd = calcularTotalUsd(totalBob, rate);
+    const kind = (s.kind as SnapshotKind) ?? "manual";
+
+    // Fotos manuales: el total se recalcula de los saldos (fuente de verdad).
+    // Fotos auto (job diario): se confía en el total almacenado, que ya
+    // incorpora los gastos/ingresos del día sobre la base previa.
+    let totalBob: number;
+    let totalUsd: number;
+    if (kind === "auto" && s.total_bob != null) {
+      totalBob = Number(s.total_bob);
+      totalUsd = s.total_usd != null ? Number(s.total_usd) : calcularTotalUsd(totalBob, rate);
+    } else {
+      totalBob = calcularTotalBob(balances, rate);
+      totalUsd = calcularTotalUsd(totalBob, rate);
+    }
 
     return {
       id: s.id as string,
       snapshot_date: s.snapshot_date as string,
+      snapshot_at: s.snapshot_at as string,
+      kind,
       exchange_rate: rate,
       note: (s.note as string) ?? null,
       total_bob: totalBob,

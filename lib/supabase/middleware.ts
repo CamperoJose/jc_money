@@ -11,9 +11,8 @@ function isPublic(pathname: string) {
 }
 
 /**
- * Refresca la sesión de Supabase y aplica la lista blanca: solo el correo de
- * ALLOWED_EMAIL puede entrar. Cualquier otro usuario se bloquea aunque logre
- * autenticarse con Google.
+ * Refresca la sesión de Supabase y protege las rutas privadas: sin sesión, a
+ * /login. No hay lista blanca por correo; el aislamiento de datos lo da RLS.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -45,25 +44,8 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Lista blanca: uno o varios correos separados por coma en ALLOWED_EMAIL.
-  const allowedEmails = (process.env.ALLOWED_EMAIL ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  const userEmail = user?.email?.toLowerCase();
-
-  // Usuario autenticado pero no autorizado -> cerrar sesión y bloquear.
-  if (
-    user &&
-    allowedEmails.length > 0 &&
-    (!userEmail || !allowedEmails.includes(userEmail))
-  ) {
-    await supabase.auth.signOut();
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("error", "no-autorizado");
-    return NextResponse.redirect(url);
-  }
+  // (Se removió la lista blanca por correo: cualquier usuario autenticado con
+  // Google puede acceder. El control de acceso a datos sigue por RLS.)
 
   // Sin sesión en ruta protegida -> a login.
   if (!user && !isPublic(pathname)) {

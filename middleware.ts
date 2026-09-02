@@ -11,6 +11,6 @@ export const config = {
      * Todas las rutas excepto assets estáticos y la API con token Bearer
      * (esa se protege por su cuenta).
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/ingesta|api/respaldo|api/recordatorios|api/estado).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/ingesta|api/respaldo|api/recordatorios|api/estado|api/jobs).*)",
   ],
 };

@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { getCategorias, getParticipantes } from "@/lib/queries/gastos";
+import { getCategorias } from "@/lib/queries/gastos";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParametrosClient } from "@/components/configuracion/parametros-client";
-import type { Category, Participant } from "@/lib/types";
+import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -10,13 +10,9 @@ export default async function ParametrosPage() {
   const supabase = await createClient();
 
   let categorias: Category[] = [];
-  let participantes: Participant[] = [];
   let errorMsg: string | null = null;
   try {
-    [categorias, participantes] = await Promise.all([
-      getCategorias(supabase),
-      getParticipantes(supabase),
-    ]);
+    categorias = await getCategorias(supabase);
   } catch (e) {
     errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
   }
@@ -34,5 +30,5 @@ export default async function ParametrosPage() {
     );
   }
 
-  return <ParametrosClient categorias={categorias} participantes={participantes} />;
+  return <ParametrosClient categorias={categorias} />;
 }

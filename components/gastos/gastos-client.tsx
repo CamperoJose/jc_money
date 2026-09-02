@@ -26,18 +26,16 @@ import {
 } from "@/components/ui/dialog";
 import { GastoForm } from "@/components/gastos/gasto-form";
 import { formatBob, formatDateTime, formatNumber } from "@/lib/format";
-import type { Account, Category, Participant, TransactionUI } from "@/lib/types";
+import type { Account, Category, TransactionUI } from "@/lib/types";
 
 export function GastosClient({
   transacciones,
   cuentas,
   categorias,
-  participantes,
 }: {
   transacciones: TransactionUI[];
   cuentas: Account[];
   categorias: Category[];
-  participantes: Participant[];
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -56,7 +54,7 @@ export function GastosClient({
       if (filtroTipo !== "todos" && t.type !== filtroTipo) return false;
       if (filtroCategoria && t.category_id !== filtroCategoria) return false;
       if (q) {
-        const hay = [t.description, t.category?.name, t.account?.name, t.participant?.name]
+        const hay = [t.description, t.category?.name, t.account?.name]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -187,7 +185,6 @@ export function GastosClient({
                     <th className="px-3 py-2.5 font-medium">Detalle</th>
                     <th className="px-3 py-2.5 font-medium">Categoría</th>
                     <th className="px-3 py-2.5 font-medium">Cuenta</th>
-                    <th className="px-3 py-2.5 font-medium">Participante</th>
                     <th className="px-3 py-2.5 text-right font-medium">Monto</th>
                     <th className="px-3 py-2.5 text-right font-medium">Acciones</th>
                   </tr>
@@ -214,7 +211,6 @@ export function GastosClient({
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground">{t.account?.name ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{t.participant?.name ?? "—"}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right">
                         <MontoCelda t={t} />
                       </td>
@@ -260,7 +256,6 @@ export function GastosClient({
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {t.category && <Badge variant="secondary">{t.category.name}</Badge>}
                       {t.account && <Badge variant="outline">{t.account.name}</Badge>}
-                      {t.participant && <Badge variant="outline">{t.participant.name}</Badge>}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -295,7 +290,6 @@ export function GastosClient({
           key={editando?.id ?? "nuevo"}
           cuentas={cuentas}
           categorias={categorias}
-          participantes={participantes}
           registro={editando}
           open={formOpen}
           onOpenChange={setFormOpen}

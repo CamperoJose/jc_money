@@ -1,11 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type {
-  Account,
-  Category,
-  Participant,
-  TransactionUI,
-  Currency,
-} from "@/lib/types";
+import type { Account, Category, TransactionUI, Currency } from "@/lib/types";
 
 /** Categorías filtradas por tipo (gasto | ingreso | inversion). */
 export async function getCategorias(
@@ -22,18 +16,6 @@ export async function getCategorias(
   return (data ?? []) as Category[];
 }
 
-/** Participantes del usuario. */
-export async function getParticipantes(
-  supabase: SupabaseClient
-): Promise<Participant[]> {
-  const { data, error } = await supabase
-    .from("participants")
-    .select("id, name, active")
-    .order("name", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Participant[];
-}
-
 function montoBob(amount: number, currency: Currency, rate: number | null): number {
   if (currency === "BOB") return Math.round(amount * 100) / 100;
   const r = rate && rate > 0 ? rate : 1;
@@ -47,7 +29,7 @@ export async function getTransacciones(
   const { data, error } = await supabase
     .from("transactions")
     .select(
-      "id, occurred_at, txn_date, type, amount, currency, exchange_rate, account_id, category_id, participant_id, description, tags, source, accounts(id, name, type, currency, is_liability, active), categories(id, name, kind, parent_id, active), participants(id, name, active)"
+      "id, occurred_at, txn_date, type, amount, currency, exchange_rate, account_id, category_id, description, tags, source, accounts(id, name, type, currency, is_liability, active), categories(id, name, kind, parent_id, active)"
     )
     .order("occurred_at", { ascending: false });
 
@@ -67,13 +49,11 @@ export async function getTransacciones(
       exchange_rate: rate,
       account_id: (t.account_id as string) ?? null,
       category_id: (t.category_id as string) ?? null,
-      participant_id: (t.participant_id as string) ?? null,
       description: (t.description as string) ?? null,
       tags: (t.tags as string[]) ?? [],
       source: t.source as TransactionUI["source"],
       account: (t.accounts as Account) ?? null,
       category: (t.categories as Category) ?? null,
-      participant: (t.participants as Participant) ?? null,
       amount_bob: montoBob(amount, currency, rate),
     };
   });

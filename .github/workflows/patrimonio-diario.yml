@@ -1,0 +1,42 @@
+name: Patrimonio diario (autocálculo)
+
+# Corre a las 00:30 de Bolivia (GMT-4) = 04:30 UTC, todos los días.
+# También se puede disparar a mano desde la pestaña Actions.
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Fecha a cerrar (YYYY-MM-DD). Vacío = ayer."
+        required: false
+        default: ""
+
+jobs:
+  cerrar-dia:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al endpoint del job
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
+          DATE_INPUT: ${{ github.event.inputs.date }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then
+            echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN en el repositorio." >&2
+            exit 1
+          fi
+          URL="$APP_URL/api/jobs/patrimonio-diario"
+          if [ -n "$DATE_INPUT" ]; then
+            URL="$URL?date=$DATE_INPUT"
+          fi
+          echo "POST $URL"
+          codigo=$(curl -sS -o respuesta.json -w "%{http_code}" \
+            -X POST "$URL" \
+            -H "Authorization: Bearer $API_BEARER_TOKEN")
+          echo "HTTP $codigo"
+          cat respuesta.json
+          echo
+          if [ "$codigo" -ge 300 ]; then
+            exit 1
+          fi
