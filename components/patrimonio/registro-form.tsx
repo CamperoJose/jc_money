@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FloppyDisk, Warning } from "@phosphor-icons/react";
+import { FloppyDisk, Warning, ArrowsClockwise } from "@phosphor-icons/react";
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,13 +42,41 @@ export function RegistroForm({
   const editando = !!registro;
 
   const [fecha, setFecha] = useState(registro?.snapshot_date ?? hoyISO());
-  const [tc, setTc] = useState(registro ? String(registro.exchange_rate) : "9.60");
+  const [tc, setTc] = useState(registro ? String(registro.exchange_rate) : "");
   const [nota, setNota] = useState(registro?.note ?? "");
   const [montos, setMontos] = useState<Montos>(() => inicialMontos(cuentas, registro));
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tcInfo, setTcInfo] = useState<string | null>(null);
+  const [tcCargando, setTcCargando] = useState(false);
 
   const rate = parseFloat(tc) || 0;
+
+  // Prellena el T/C con el último registro del BCB de esa fecha (editable).
+  // Solo en alta (no al editar una foto existente).
+  useEffect(() => {
+    if (editando || !fecha) return;
+    let cancelado = false;
+    setTcCargando(true);
+    fetch(`/api/tipo-cambio/ultimo?date=${fecha}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j: { rate: { valor: number; rate_date: string; moneda_desc: string | null } | null }) => {
+        if (cancelado) return;
+        if (j.rate) {
+          setTc(String(j.rate.valor));
+          setTcInfo(
+            `T/C del BCB ${j.rate.rate_date}${j.rate.moneda_desc ? ` · ${j.rate.moneda_desc}` : ""}`
+          );
+        } else {
+          setTcInfo("Sin T/C del BCB para esa fecha; ingrésalo manualmente.");
+        }
+      })
+      .catch(() => !cancelado && setTcInfo(null))
+      .finally(() => !cancelado && setTcCargando(false));
+    return () => {
+      cancelado = true;
+    };
+  }, [fecha, editando]);
 
   // Vista previa del total en BOB con la misma regla del negocio.
   const totalBob = useMemo(() => {
@@ -131,15 +159,20 @@ export function RegistroForm({
             <Input id="fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="tc">T/C (Bs por USD)</Label>
+            <Label htmlFor="tc" className="flex items-center gap-1.5">
+              T/C (Bs por USD)
+              {tcCargando && <ArrowsClockwise weight="bold" className="size-3 animate-spin text-muted-foreground" />}
+            </Label>
             <Input
               id="tc"
               type="number"
-              step="0.01"
+              step="0.00001"
               min="0"
+              placeholder="0.00"
               value={tc}
               onChange={(e) => setTc(e.target.value)}
             />
+            {tcInfo && <p className="text-[11px] text-muted-foreground">{tcInfo}</p>}
           </div>
         </div>
 

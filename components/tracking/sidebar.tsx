@@ -19,6 +19,7 @@ import {
   CaretDoubleLeft,
   CaretDoubleRight,
   CurrencyCircleDollar,
+  CurrencyDollar,
   Vault,
   Flask,
   type Icon,
@@ -45,6 +46,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/tracking/patrimonio", label: "Dashboard", icon: ChartPieSlice },
       { href: "/tracking/patrimonio/registros", label: "Registros", icon: ListBullets },
+      { href: "/tracking/patrimonio/tipo-cambio", label: "Tipo de cambio", icon: CurrencyDollar },
     ],
   },
   {

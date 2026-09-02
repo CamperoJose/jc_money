@@ -22,7 +22,25 @@ jobs:
   cerrar-dia:
     runs-on: ubuntu-latest
     steps:
-      - name: Llamar al endpoint del job
+      - name: Tipo de cambio del día (BCB)
+        continue-on-error: true  # el BCB puede fallar; no debe tumbar el cierre de patrimonio
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then
+            echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN." >&2
+            exit 1
+          fi
+          URL="$APP_URL/api/jobs/tipo-cambio"
+          echo "POST $URL (T/C del día en curso)"
+          codigo=$(curl -sS -o tc.json -w "%{http_code}" \
+            -X POST "$URL" \
+            -H "Authorization: Bearer $API_BEARER_TOKEN")
+          echo "HTTP $codigo"; cat tc.json; echo
+          if [ "$codigo" -ge 300 ]; then exit 1; fi
+
+      - name: Cierre de patrimonio (ayer)
         env:
           APP_URL: ${{ secrets.APP_URL }}
           API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}

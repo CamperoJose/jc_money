@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/queries/gastos";
+import { getTcConfig } from "@/lib/queries/tc";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParametrosClient } from "@/components/configuracion/parametros-client";
-import type { Category } from "@/lib/types";
+import type { Category, TcConfig } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,10 @@ export default async function ParametrosPage() {
   const supabase = await createClient();
 
   let categorias: Category[] = [];
+  let tcConfig: TcConfig = { cod_indicador: 1, cod_moneda: 35 };
   let errorMsg: string | null = null;
   try {
-    categorias = await getCategorias(supabase);
+    [categorias, tcConfig] = await Promise.all([getCategorias(supabase), getTcConfig(supabase)]);
   } catch (e) {
     errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
   }
@@ -30,5 +32,5 @@ export default async function ParametrosPage() {
     );
   }
 
-  return <ParametrosClient categorias={categorias} />;
+  return <ParametrosClient categorias={categorias} tcConfig={tcConfig} />;
 }

@@ -2,7 +2,41 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 5 — unificación de ramas en `main`)
+## Última actualización: 2026-09-02 (sesión 6 — DPF IVA/cobro, floats, tipo de cambio BCB)
+
+### Sesión 6 — lo hecho ✅
+- **DPF · IVA opcional:** switch "¿Cobra IVA (RC-IVA 13%)?" en el form (por defecto **OFF**;
+  hoy ningún DPF cobra IVA). Si OFF, interés líquido = bruto (sin retención); si ON, ×0,87.
+  `cobra_iva` en `dpf_deposits` (migración 0007). El simulador también trae el toggle.
+- **DPF · cobro explícito:** al marcar un DPF como *pagado* se declara **a qué cuenta/banco** se
+  cobró (`paid_account_id`) y la **fecha de cobro** (`paid_at`). Se muestra en registros y dashboard.
+- **Floats:** se mató el ruido de coma flotante (ej. tasa 6.6 → 6.6000000005). `redondeaTasa`
+  (4 dec.) y `redondeaMonto` (2 dec.) en `lib/dpf.ts`; el form muestra la tasa limpia y las
+  mutations redondean tasa/monto/ganancias antes de persistir.
+- **Tipo de cambio (BCB) — NUEVO:**
+  - Cliente SOAP puro `lib/bcb.ts` del servicio de Indicadores del BCB
+    (`obtenerIndicador`, WSDL `indicadores.bcb.gob.bo/ServiciosBCB/indicadores?wsdl`). Descubre el
+    targetNamespace del WSDL, arma el sobre SOAP, parsea tolerante a prefijos. **Tests** en
+    `scripts/test-bcb.ts` (node --experimental-strip-types; todos pasan).
+  - Tabla externa `exchange_rates` + `app_settings` (parámetros) — migración **0008**. RLS.
+  - **Job 12:17** (`/api/jobs/tipo-cambio`): trae el T/C del **día en curso** (no ayer) y lo
+    registra. Se agregó como primer paso del workflow (antes del cierre de patrimonio),
+    `continue-on-error` para no tumbar el cierre si el BCB falla. Mismos secrets.
+  - **Foto de patrimonio manual:** el T/C se **autollena** del último registro del BCB de esa
+    fecha (editable). Endpoint `/api/tipo-cambio/ultimo`.
+  - **Vista visual** `/tracking/patrimonio/tipo-cambio`: KPIs + gráfico de evolución + historial.
+  - **Parámetros → Tipo de cambio:** configura el código de indicador y moneda del BCB
+    (por defecto **USD venta oficial = 35**). Códigos en `lib/bcb.ts`.
+  - ⚠️ El BCB da el dólar **oficial** (~6,96), distinto del paralelo (~9,60) que usa el patrimonio.
+    Por eso el cierre **automático** conserva el T/C de la base (no lo pisa) y el manual queda editable.
+- **Dashboard de patrimonio:** card enriquecido de **DPF** (capital, ganancia líquida, tasa
+  promedio, **próxima liberación** con progreso y días, alerta de vencidos).
+- **Migraciones pendientes de aplicar por el usuario (EN ORDEN):** 0006 (si no se aplicó), **0007**
+  (DPF iva/cobro) y **0008** (tipo de cambio). Nuevo componente UI `components/ui/switch.tsx`.
+
+---
+
+## Update previo: 2026-09-02 (sesión 5 — unificación de ramas en `main`)
 
 ### Sesión 5 — lo hecho ✅
 - **Módulo Inversiones DPF (NUEVO).** Monitoreo de DPF activos y sus liberaciones + simulador.

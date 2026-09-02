@@ -35,6 +35,7 @@ async function getUsuarioId(admin: SupabaseClient): Promise<string | null> {
   return null;
 }
 
+
 /**
  * Crea la foto de patrimonio AUTOCALCULADA que cierra el día `targetDate`
  * (por defecto, ayer en Bolivia), fechada a las 23:59 de ese día.
@@ -84,6 +85,9 @@ export async function ejecutarPatrimonioDiario(
     return { ok: true, skipped: true, reason: "No hay foto base previa para calcular.", target_date: targetDate };
   }
 
+  // T/C del cierre automático: se conserva el de la base (que desciende de la
+  // última foto manual, cuyo T/C se autollena del BCB pero es editable). Así el
+  // cierre auto no altera en silencio la valuación histórica del patrimonio.
   const rate = Number(base.exchange_rate);
   const balancesBase = ((base.net_worth_balances as Record<string, unknown>[]) ?? []).map((b) => ({
     account_id: b.account_id as string,

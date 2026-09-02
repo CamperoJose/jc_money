@@ -78,6 +78,9 @@ total_bob = Σ(amount de cuentas en BOB, no pasivas)
 `nro_dpf`, `pizarra`, `edv`, `id_dpf_externo`, `start_date`, `end_date`, `principal` (BOB),
 `term_days` int, `annual_rate` numeric, `status` (dpf_status), `gcia_economica`, `gcia_financiera`,
 `rc_iva_retencion`, `account_id` FK, `notes`.
+**Sesión 6 (migración 0007):** `cobra_iva` bool (default false — solo entonces se retiene RC-IVA;
+si false, líquido = bruto), `paid_account_id` FK accounts (a qué cuenta se cobró al pagar) y
+`paid_at` date. Los montos/tasas se redondean (tasa 4 dec., dinero 2 dec.) para evitar ruido de float.
 Derivados en lectura (no almacenados): días restantes = end_date − hoy; interés diario informativo.
 **Convención de interés (implementada en `lib/dpf.ts`):** base **365 días** (año que usaba el Excel),
 `bruto = principal · tasa · plazo/365`, `líquido = bruto · 0,87` (RC-IVA 13%). Estado de liberación
@@ -101,6 +104,23 @@ salario bruto/líquido, horizonte meses).
 
 Lógica del simulador: cada periodo abre un depósito = aporte + capital liberado que vence + aporte
 salario. Interés bruto = monto · tasa · plazo/360; líquido = bruto · 0.87.
+
+## Tipo de cambio (BCB) — migración 0008
+
+### `exchange_rates` (tabla externa propia)
+`rate_date` date, `cod_indicador` int (1=T/C), `cod_moneda` int (código BCB, ej. 35=USD venta),
+`moneda_desc`, `valor` numeric(14,5) (Bs por unidad), `source` ('bcb'|'manual'), `fetched_at`.
+Único por (user_id, rate_date, cod_indicador, cod_moneda). RLS.
+
+### `app_settings` (parámetros clave/valor)
+`key`, `value`. Config del T/C: `tc_cod_indicador` (def. '1'), `tc_cod_moneda` (def. '35').
+Opcionales para el SOAP: `tc_bcb_namespace`, `tc_bcb_soap_action`.
+
+**Consumo:** cliente SOAP `lib/bcb.ts` (método `obtenerIndicador`, WSDL del BCB). El **job 12:17**
+(`/api/jobs/tipo-cambio`) trae el T/C del **día en curso** y lo guarda (idempotente). La **foto de
+patrimonio manual** autollena su T/C del último `exchange_rate` de esa fecha (editable). El cierre
+**automático** de patrimonio NO pisa el T/C (conserva el de la base) para no distorsionar el histórico,
+ya que el BCB publica el dólar oficial (~6,96) y el patrimonio usa el paralelo (~9,60).
 
 ## Deudas (hoja DEUDAS)
 
