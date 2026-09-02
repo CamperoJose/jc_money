@@ -2,13 +2,27 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-01 (sesión 4 — deploy, job en vivo, UI/responsive)
+## Última actualización: 2026-09-02 (sesión 5 — unificación de ramas en `main`)
+
+### Sesión 5 — lo hecho ✅
+- **Todo el trabajo unificado en una sola rama `main`.** Se consolidó el contenido de
+  `claude/jc-money-setup-dzuiql` (que era la rama por defecto/producción y contenía todo) en `main`.
+  Las ramas viejas (`claude/jc-money-setup-dzuiql`, `claude/proyecto-google-login-status-yixjuh`,
+  `claude/project-status-review-mj36je`) quedaron obsoletas.
+- **Regla nueva de flujo (ver `CLAUDE.md` §6): se trabaja SIEMPRE y SOLO en `main`.** No más ramas
+  de feature ni de Claude; commit y push directos a `main`.
+- ⚠️ **Pendiente manual del usuario:** en **Vercel**, cambiar la *Production Branch* a `main`
+  (Project → Settings → Git). Antes desplegaba `claude/jc-money-setup-dzuiql`.
+
+---
+
+## Update previo: 2026-09-01 (sesión 4 — deploy, job en vivo, UI/responsive)
 
 ### Fase actual: 2 (Tracking) — Patrimonio + Gastos EN PRODUCCIÓN
 
 ### Sesión 4 — lo hecho ✅
 - **Desplegado a producción**: todo el trabajo (sesiones 2–4) fusionado por fast-forward a la rama
-  por defecto `claude/jc-money-setup-dzuiql` (la que despliega Vercel). `jc-money.vercel.app` en vivo.
+  por defecto (histórico; ahora unificada en `main`). `jc-money.vercel.app` en vivo.
 - **Job diario FUNCIONANDO**. Depuración: el `catch` ocultaba los errores de PostgREST (no son
   `Error` → mostraba "Error en el job"); ahora se expone el detalle real. Causa raíz del fallo:
   se había corrido una versión **vieja** de `0004` sin `snapshot_at`/`kind`; **re-correr `0004`**

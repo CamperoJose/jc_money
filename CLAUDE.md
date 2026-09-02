@@ -24,7 +24,7 @@ salvo que aquí se anote explícitamente una corrección validada (ver `claude/d
 [`claude/estado.md`](./claude/estado.md) para el estado vivo y el punto exacto donde retomar.
 
 Lo que YA existe y está **desplegado en producción** (`jc-money.vercel.app`, rama por defecto
-`claude/jc-money-setup-dzuiql`):
+`main`):
 
 - App Next.js 15 (App Router) + Tailwind v4 + tema tweakcn, shadcn/ui, Phosphor.
 - **Auth** Supabase con Google (sin lista blanca por correo; aislamiento por RLS). Sesiones ~90 días.
@@ -80,7 +80,9 @@ luego Inversiones DPF, y al final Deudas. Ver `claude/roadmap.md`.
 
 ## 6. Cómo trabajar en este repo
 
-- **Rama de trabajo:** `claude/jc-money-setup-dzuiql`. Desarrolla, commitea y pushea ahí.
+- **Rama de trabajo: SIEMPRE `main`, y SOLO `main`.** No se crean ramas de feature ni de
+  Claude: se desarrolla, commitea y pushea directo a `main`. `main` es la rama por defecto del
+  repo y la que despliega Vercel. Cualquier sesión de Claude debe trabajar exclusivamente en `main`.
 - **Antes de codear una fase**, lee su archivo de TODOs en `claude/todos/`.
 - **Al terminar un bloque de trabajo**, actualiza `claude/estado.md` y marca los TODOs cerrados.
 - **Commits** en español, claros y descriptivos.
