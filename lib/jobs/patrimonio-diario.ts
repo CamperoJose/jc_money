@@ -135,14 +135,22 @@ export async function ejecutarPatrimonioDiario(
   const snapId = snap.id as string;
 
   // Copia los saldos de la base para conservar la composición por cuenta.
+  // OJO: con la service role el default `auth.uid()` no aplica, así que el
+  // user_id debe ir explícito en cada fila (si no, viola el not-null de RLS).
   const filas = balancesBase.map((b) => ({
+    user_id: userId,
     snapshot_id: snapId,
     account_id: b.account_id,
     amount: b.amount,
   }));
   if (filas.length) {
     const { error: eBal } = await admin.from("net_worth_balances").insert(filas);
-    if (eBal) throw eBal;
+    if (eBal) {
+      // Rollback manual: sin transacción entre requests, evita dejar una foto
+      // auto sin balances (que la idempotencia luego saltaría, quedando corrupta).
+      await admin.from("net_worth_snapshots").delete().eq("id", snapId);
+      throw eBal;
+    }
   }
 
   return {
