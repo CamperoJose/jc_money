@@ -34,9 +34,21 @@ export interface DistribucionCuenta {
   pct: number;
 }
 
+export interface SerieCuenta {
+  key: string; // account_id
+  nombre: string;
+  is_liability: boolean;
+}
+
 export interface ResumenPatrimonio {
   snapshots: SnapshotUI[];
   serie: { fecha: string; bob: number; usd: number; variacion: number | null }[];
+  // Timeline de crecimiento por cuenta: cada punto trae el valor en BOB de cada
+  // cuenta (por account_id) en esa fecha.
+  serieCuentas: {
+    cuentas: SerieCuenta[];
+    puntos: Array<Record<string, number | string | null>>;
+  };
   ultimo: SnapshotUI | null;
   anterior: SnapshotUI | null;
   primero: SnapshotUI | null;
@@ -47,6 +59,11 @@ export interface ResumenPatrimonio {
   maxBob: number | null;
   minBob: number | null;
   promedioBob: number | null;
+  variacionPromedioBob: number | null;
+  crecimientoMensualPct: number | null;
+  diasDesdeUltima: number | null;
+  mejorPeriodo: { fecha: string; monto: number } | null;
+  peorPeriodo: { fecha: string; monto: number } | null;
   distribucionMoneda: Record<Currency, number> | null;
   distribucionCuentas: DistribucionCuenta[];
 }
@@ -145,6 +162,69 @@ export async function getResumen(
     ? Math.round((totales.reduce((a, b) => a + b, 0) / totales.length) * 100) / 100
     : null;
 
+  // --- Métricas de decisión ---
+  const variaciones = serie.map((p) => p.variacion).filter((v): v is number => v != null);
+  const variacionPromedioBob = variaciones.length
+    ? Math.round((variaciones.reduce((a, b) => a + b, 0) / variaciones.length) * 100) / 100
+    : null;
+
+  let mejorPeriodo: { fecha: string; monto: number } | null = null;
+  let peorPeriodo: { fecha: string; monto: number } | null = null;
+  for (const p of serie) {
+    if (p.variacion == null) continue;
+    if (!mejorPeriodo || p.variacion > mejorPeriodo.monto) mejorPeriodo = { fecha: p.fecha, monto: p.variacion };
+    if (!peorPeriodo || p.variacion < peorPeriodo.monto) peorPeriodo = { fecha: p.fecha, monto: p.variacion };
+  }
+
+  // Crecimiento mensual compuesto entre la primera y la última foto.
+  let crecimientoMensualPct: number | null = null;
+  if (ultimo && primero && ultimo !== primero && primero.total_bob > 0) {
+    const d0 = new Date(primero.snapshot_date + "T00:00:00").getTime();
+    const d1 = new Date(ultimo.snapshot_date + "T00:00:00").getTime();
+    const meses = (d1 - d0) / (1000 * 60 * 60 * 24 * 30.4375);
+    if (meses > 0) {
+      crecimientoMensualPct = Math.pow(ultimo.total_bob / primero.total_bob, 1 / meses) - 1;
+    }
+  }
+
+  let diasDesdeUltima: number | null = null;
+  if (ultimo) {
+    const d1 = new Date(ultimo.snapshot_date + "T00:00:00").getTime();
+    diasDesdeUltima = Math.max(0, Math.round((Date.now() - d1) / (1000 * 60 * 60 * 24)));
+  }
+
+  // --- Timeline por cuenta (valor en BOB de cada cuenta a lo largo del tiempo) ---
+  const cuentasVistas = new Map<string, SerieCuenta>();
+  for (const s of snapshots) {
+    for (const b of s.balances) {
+      if (!cuentasVistas.has(b.account_id)) {
+        cuentasVistas.set(b.account_id, {
+          key: b.account_id,
+          nombre: b.account.name,
+          is_liability: b.account.is_liability,
+        });
+      }
+    }
+  }
+  const puntosCuentas = snapshots.map((s) => {
+    const punto: Record<string, number | string | null> = { fecha: s.snapshot_date };
+    const mapa = new Map(s.balances.map((b) => [b.account_id, b]));
+    for (const [id, meta] of cuentasVistas) {
+      const b = mapa.get(id);
+      if (!b) {
+        punto[id] = null;
+      } else {
+        const bob = b.account.currency === "BOB" ? b.amount : b.amount * s.exchange_rate;
+        punto[id] = Math.round((meta.is_liability ? -bob : bob) * 100) / 100;
+      }
+    }
+    return punto;
+  });
+  const serieCuentas = {
+    cuentas: [...cuentasVistas.values()],
+    puntos: puntosCuentas,
+  };
+
   const distribucionMoneda = ultimo
     ? distribucionPorMoneda(ultimo.balances, ultimo.exchange_rate)
     : null;
@@ -177,6 +257,7 @@ export async function getResumen(
   return {
     snapshots,
     serie,
+    serieCuentas,
     ultimo,
     anterior,
     primero,
@@ -187,6 +268,11 @@ export async function getResumen(
     maxBob,
     minBob,
     promedioBob,
+    variacionPromedioBob,
+    crecimientoMensualPct,
+    diasDesdeUltima,
+    mejorPeriodo,
+    peorPeriodo,
     distribucionMoneda,
     distribucionCuentas,
   };

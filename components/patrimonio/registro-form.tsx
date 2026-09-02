@@ -80,27 +80,34 @@ export function RegistroForm({
     }
 
     setEnviando(true);
+    // Nunca se queda colgado: aborta a los 20s y muestra el error.
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 20000);
     try {
       const url = editando ? `/api/patrimonio/snapshots/${registro!.id}` : "/api/patrimonio/snapshots";
       const res = await fetch(url, {
         method: editando ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          snapshot_date: fecha,
-          exchange_rate: rate,
-          note: nota,
-          balances,
-        }),
+        body: JSON.stringify({ snapshot_date: fecha, exchange_rate: rate, note: nota, balances }),
+        signal: ctrl.signal,
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `Error ${res.status}`);
       }
+      clearTimeout(timeout);
+      setEnviando(false);
       onOpenChange(false);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al guardar.");
-    } finally {
+      clearTimeout(timeout);
+      const msg =
+        e instanceof DOMException && e.name === "AbortError"
+          ? "La solicitud tardó demasiado. Revisa tu conexión con Supabase e inténtalo de nuevo."
+          : e instanceof Error
+            ? e.message
+            : "Error al guardar.";
+      setError(msg);
       setEnviando(false);
     }
   }

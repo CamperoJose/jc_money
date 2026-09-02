@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // El registro de gasto por voz y otras rutas server usan Node APIs.
-  experimental: {},
+  experimental: {
+    // Tree-shaking dirigido: evita cargar el barrel completo de estas libs
+    // (iconos y gráficos), lo que acelera mucho la compilación en dev y
+    // reduce el bundle. Es la causa principal de la lentitud percibida.
+    optimizePackageImports: ["@phosphor-icons/react", "recharts"],
+  },
 };
 
 export default nextConfig;

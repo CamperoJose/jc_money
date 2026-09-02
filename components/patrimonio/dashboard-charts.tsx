@@ -7,6 +7,8 @@ import {
   Bar,
   BarChart,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -17,7 +19,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { formatBob, formatUsd, formatDate, formatNumber } from "@/lib/format";
-import type { DistribucionCuenta } from "@/lib/queries/patrimonio";
+import type { DistribucionCuenta, SerieCuenta } from "@/lib/queries/patrimonio";
 
 // Paleta categórica multi-tono para distinguir cuentas (el tema base solo
 // tiene verdes). Legible en claro y oscuro.
@@ -218,6 +220,99 @@ export function DistribucionCuentasChart({ cuentas }: { cuentas: DistribucionCue
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/** Timeline de crecimiento por cuenta (una línea por cuenta, valores en BOB). */
+export function CrecimientoCuentasChart({
+  cuentas,
+  puntos,
+}: {
+  cuentas: SerieCuenta[];
+  puntos: Array<Record<string, number | string | null>>;
+}) {
+  // Orden por magnitud del último valor, para que la leyenda tenga sentido.
+  const ordenadas = [...cuentas].sort((a, b) => {
+    const ult = puntos.at(-1) ?? {};
+    return Number(ult[b.key] ?? 0) - Number(ult[a.key] ?? 0);
+  });
+  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
+
+  if (puntos.length < 2) {
+    return <Vacio texto="Se necesitan al menos dos fotos para ver el crecimiento por cuenta." />;
+  }
+
+  const colorDe = (key: string) => PALETA[ordenadas.findIndex((c) => c.key === key) % PALETA.length];
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={puntos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+          <XAxis
+            dataKey="fecha"
+            tickFormatter={(v) => formatDate(String(v))}
+            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+            stroke="var(--color-border)"
+            minTickGap={24}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+            stroke="var(--color-border)"
+            width={64}
+            tickFormatter={(v) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(v)}
+          />
+          <Tooltip
+            labelFormatter={(v) => formatDate(String(v))}
+            formatter={(value: number, key) => [
+              formatBob(value),
+              ordenadas.find((c) => c.key === key)?.nombre ?? key,
+            ]}
+            contentStyle={tooltipStyle}
+            itemSorter={(item) => -(item.value as number)}
+          />
+          {ordenadas.map((c) => (
+            <Line
+              key={c.key}
+              type="monotone"
+              dataKey={c.key}
+              stroke={colorDe(c.key)}
+              strokeWidth={2}
+              strokeDasharray={c.is_liability ? "4 3" : undefined}
+              dot={{ r: 1.5 }}
+              activeDot={{ r: 4 }}
+              connectNulls
+              hide={ocultas.has(c.key)}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+        {ordenadas.map((c) => {
+          const off = ocultas.has(c.key);
+          return (
+            <button
+              key={c.key}
+              onClick={() =>
+                setOcultas((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(c.key)) next.delete(c.key);
+                  else next.add(c.key);
+                  return next;
+                })
+              }
+              className={
+                "flex items-center gap-1.5 text-xs font-medium transition-opacity " +
+                (off ? "opacity-40" : "opacity-100")
+              }
+            >
+              <span className="size-2.5 rounded-full" style={{ background: colorDe(c.key) }} />
+              {c.nombre}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
