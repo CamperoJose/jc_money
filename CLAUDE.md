@@ -37,9 +37,13 @@ Lo que YA existe y está **desplegado en producción** (`jc-money.vercel.app`, r
   autocalcula la foto de cierre del día = última foto + neto de gastos/ingresos del día.
 - Migraciones `0001`–`0005` aplicadas en Supabase.
 
+- **Inversiones DPF**: panel de monitoreo (capital, ganancia líquida, liberaciones próximas,
+  vencidos), registros con ABM y **simulador de laddering**. Independiente de patrimonio/gastos.
+  Migración `0006_datos_dpf.sql` con los DPF reales del Excel (pendiente de aplicar por el usuario).
+
 Lo que **todavía NO** existe (por orden de fases):
 
-- Módulos **Inversiones DPF** y **Deudas**.
+- Módulo **Deudas**.
 - Fase 2 restante: voz (Gemini), recordatorios/correos, respaldos a Drive.
 
 ## 3. Stack (decidido, no reabrir sin pedido explícito del usuario)

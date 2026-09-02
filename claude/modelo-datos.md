@@ -79,6 +79,10 @@ total_bob = Σ(amount de cuentas en BOB, no pasivas)
 `term_days` int, `annual_rate` numeric, `status` (dpf_status), `gcia_economica`, `gcia_financiera`,
 `rc_iva_retencion`, `account_id` FK, `notes`.
 Derivados en lectura (no almacenados): días restantes = end_date − hoy; interés diario informativo.
+**Convención de interés (implementada en `lib/dpf.ts`):** base **365 días** (año que usaba el Excel),
+`bruto = principal · tasa · plazo/365`, `líquido = bruto · 0,87` (RC-IVA 13%). Estado de liberación
+derivado: activo / por liberar (≤7 d) / vencido / cobrado. Módulo **independiente** de patrimonio y
+gastos (por pedido del usuario; integración futura opcional).
 
 ### Panel de indicadores (agregación, todo derivado en lectura)
 Monto en DPF (Σ principal activos − liberado), Ganancia económica (Σ gcia_economica), Ganancia

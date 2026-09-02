@@ -57,6 +57,45 @@ export interface TransactionUI extends Transaction {
   amount_bob: number;
 }
 
+// --- Inversiones DPF (hoja DPF LADDERING REAL) ------------------------------
+
+export type DpfStatus = "activo" | "pagado";
+
+/** Estado de liberación derivado (para la UI, no se almacena). */
+export type DpfLiberacion = "activo" | "por_liberar" | "vencido" | "pagado";
+
+export interface DpfDeposit {
+  id: string;
+  nro_dpf: string | null; // orden/etiqueta libre del usuario
+  pizarra: string | null; // entidad financiera (Banco SOL, Fortaleza, …)
+  edv: string | null; // registro EDV (opcional)
+  id_dpf_externo: string | null; // Nº de DPF del banco
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+  principal: number; // capital en BOB
+  term_days: number; // plazo (ej. 90)
+  annual_rate: number; // tasa anual (ej. 0.077)
+  status: DpfStatus;
+  gcia_economica: number | null; // ganancia bruta realizada (override opcional)
+  gcia_financiera: number | null; // ganancia líquida realizada (override opcional)
+  rc_iva_retencion: number | null; // retención realizada (override opcional)
+  notes: string | null;
+}
+
+/** DPF con todos los derivados calculados para la UI. */
+export interface DpfDepositUI extends DpfDeposit {
+  interesDiario: number;
+  interesBruto: number; // proyectado a fin de plazo
+  interesLiquido: number; // bruto · (1 − RC-IVA)
+  rcIva: number; // bruto · RC-IVA
+  montoAlVencimiento: number; // principal + interés líquido
+  diasRestantes: number; // end_date − hoy (negativo si venció)
+  diasTotales: number; // end_date − start_date
+  diasTranscurridos: number;
+  progreso: number; // 0..1
+  liberacion: DpfLiberacion;
+}
+
 export type SnapshotKind = "manual" | "auto";
 
 export interface NetWorthSnapshot {

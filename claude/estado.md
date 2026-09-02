@@ -5,6 +5,26 @@
 ## Última actualización: 2026-09-02 (sesión 5 — unificación de ramas en `main`)
 
 ### Sesión 5 — lo hecho ✅
+- **Módulo Inversiones DPF (NUEVO).** Monitoreo de DPF activos y sus liberaciones + simulador.
+  - **Panel** `/tracking/inversiones/dpf`: KPIs (capital en DPF, ganancia líquida proyectada,
+    tasa promedio ponderada, activos/vencidos), **próximas liberaciones** con barra de progreso y
+    días restantes, capital por entidad (donut) y liberación por mes (barras). Alerta de vencidos.
+  - **Registros** `/tracking/inversiones/dpf/registros`: lista/ABM con filtros por estado, tabla en
+    desktop y tarjetas en móvil. Estado de liberación derivado: activo / por liberar (≤7 d) /
+    vencido / cobrado.
+  - **Simulador** `/tracking/inversiones/simulador`: laddering interactivo (capital inicial, aporte
+    por periodo, cadencia, plazo, tasa, nº de aportes, reinversión). KPIs + gráfico de crecimiento +
+    tabla por periodo. 100% cliente, no persiste nada.
+  - **Independiente de patrimonio y gastos** (por pedido): solo lee/escribe `dpf_deposits`.
+  - Código: `lib/dpf.ts` (cálculo puro + simulador, base **365 días**, RC-IVA 13%),
+    `lib/queries/dpf.ts`, `lib/mutations/dpf.ts`, `app/api/inversiones/dpf/{,[id]}`,
+    componentes en `components/dpf/*`. Sidebar: grupo **Inversiones** activado.
+  - **Migración `0006_datos_dpf.sql`** (pendiente de aplicar por el usuario): 5 DPF reales del Excel
+    (4 cobrados + 1 activo), idempotente. La tabla `dpf_deposits` ya existía desde 0001.
+- **Fix job patrimonio (bug en prod):** el insert en `net_worth_balances` iba **sin `user_id`** y con
+  la service role el default `auth.uid()` es null → violaba el not-null. Ahora va explícito + rollback
+  de la foto si falla el insert de balances. Cron movido de :30 a **:17** (menos encolado); el retraso
+  de GitHub Actions no afecta la exactitud (cierra "ayer" idempotente).
 - **Todo el trabajo unificado en una sola rama `main`.** Se consolidó el contenido de
   `claude/jc-money-setup-dzuiql` (que era la rama por defecto/producción y contenía todo) en `main`.
   Las ramas viejas (`claude/jc-money-setup-dzuiql`, `claude/proyecto-google-login-status-yixjuh`,
@@ -192,10 +212,11 @@ DB password, Google Client ID/Secret, project ref. Falta: `sb_secret_...` (serve
   se resta como pasivo. Discrepa de la spec §7.2 → decisión abierta C1 en `decisiones.md`.
 
 ### Punto de retome (próximo paso)
-1. **Inversiones DPF** (siguiente módulo por roadmap): API + panel de indicadores + grid de depósitos.
-   Ya existen las categorías de inversión (parámetros) y la tabla `dpf_deposits`.
-2. Luego **Deudas** (grid simple sobre `debts`).
+1. ~~**Inversiones DPF**~~ ✅ hecho en sesión 5 (panel + registros/ABM + simulador). Falta aplicar
+   `0006_datos_dpf.sql` en Supabase para ver los 5 DPF reales.
+2. **Deudas** (grid simple sobre `debts`) — siguiente módulo por roadmap.
 3. Fase 2 restante: voz (Gemini), recordatorios/correos (Nodemailer), respaldos a Drive.
+4. (Opcional DPF) integrar DPF con patrimonio/cuentas cuando el usuario lo pida (hoy independiente).
 
 ### Notas para el usuario (operación)
 - El job de patrimonio corre solo a las 00:30 (Bolivia). Para probar a mano: GitHub → Actions →

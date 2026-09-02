@@ -19,6 +19,8 @@ import {
   CaretDoubleLeft,
   CaretDoubleRight,
   CurrencyCircleDollar,
+  Vault,
+  Flask,
   type Icon,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -54,7 +56,16 @@ const GROUPS: NavGroup[] = [
       { href: "/tracking/gastos/registros", label: "Movimientos", icon: Receipt },
     ],
   },
-  { label: "Inversiones", icon: Bank, ready: false },
+  {
+    label: "Inversiones",
+    icon: Bank,
+    ready: true,
+    items: [
+      { href: "/tracking/inversiones/dpf", label: "DPF", icon: Vault },
+      { href: "/tracking/inversiones/dpf/registros", label: "Registros", icon: ListBullets },
+      { href: "/tracking/inversiones/simulador", label: "Simulador", icon: Flask },
+    ],
+  },
   { label: "Deudas", icon: HandCoins, ready: false },
   {
     label: "Configuración",
