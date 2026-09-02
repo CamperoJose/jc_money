@@ -12,10 +12,11 @@ export default async function TrackingLayout({
   } = await supabase.auth.getUser();
 
   return (
-    <div className="flex min-h-screen bg-background">
+    // block en móvil (barra superior + contenido apilados), fila en desktop.
+    <div className="min-h-screen bg-background lg:flex">
       <Sidebar email={user?.email} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>

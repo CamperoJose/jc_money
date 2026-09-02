@@ -133,11 +133,11 @@ export function RegistrosClient({
                   <th className="w-8" />
                   <th>Fecha y hora</th>
                   <th>Tipo</th>
-                  <th className="text-right">T/C</th>
+                  <th className="hidden text-right md:table-cell">T/C</th>
                   <th className="text-right">Total BOB</th>
-                  <th className="text-right">Total USD</th>
+                  <th className="hidden text-right lg:table-cell">Total USD</th>
                   <th className="text-right">Δ vs. anterior</th>
-                  <th className="text-center">Cuentas</th>
+                  <th className="hidden text-center sm:table-cell">Cuentas</th>
                   <th className="text-right">Acciones</th>
                 </tr>
               </thead>
@@ -272,17 +272,17 @@ function FilaSnapshot({
             </span>
           )}
         </td>
-        <td className={cn(celda, "text-right tabular-nums text-muted-foreground")}>
+        <td className={cn(celda, "hidden text-right tabular-nums text-muted-foreground md:table-cell")}>
           {formatNumber(s.exchange_rate, 2)}
         </td>
         <td className={cn(celda, "text-right font-semibold tabular-nums")}>{formatBob(s.total_bob)}</td>
-        <td className={cn(celda, "text-right tabular-nums text-muted-foreground")}>
+        <td className={cn(celda, "hidden text-right tabular-nums text-muted-foreground lg:table-cell")}>
           {formatUsd(s.total_usd)}
         </td>
         <td className={cn(celda, "text-right")}>
           <DiffCelda diffBob={diffBob} diffPct={diffPct} />
         </td>
-        <td className={cn(celda, "text-center tabular-nums text-muted-foreground")}>
+        <td className={cn(celda, "hidden text-center tabular-nums text-muted-foreground sm:table-cell")}>
           {s.balances.length}
         </td>
         <td className={celda}>

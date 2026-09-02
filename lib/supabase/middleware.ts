@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+// Sesiones largas (~90 días): persistimos las cookies de sesión ese periodo.
+const NOVENTA_DIAS = 60 * 60 * 24 * 90;
+
 /** Rutas accesibles sin sesión. */
 const PUBLIC_PATHS = ["/login", "/auth"];
 
@@ -31,7 +34,7 @@ export async function updateSession(request: NextRequest) {
           );
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, { ...options, maxAge: NOVENTA_DIAS })
           );
         },
       },

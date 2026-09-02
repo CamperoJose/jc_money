@@ -3,6 +3,13 @@ import { cookies } from "next/headers";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+// Sesiones largas: las cookies de sesión persisten ~90 días (el refresh token
+// se rota solo mientras la sesión siga activa dentro de ese periodo).
+const NOVENTA_DIAS = 60 * 60 * 24 * 90;
+function conMaxAgeLargo(options: CookieOptions): CookieOptions {
+  return { ...options, maxAge: NOVENTA_DIAS };
+}
+
 /**
  * Cliente de Supabase para el servidor (Route Handlers, Server Components,
  * Server Actions). Usa las cookies de la sesión del usuario, de modo que el
@@ -22,7 +29,7 @@ export async function createClient() {
         setAll(cookiesToSet: CookieToSet[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, conMaxAgeLargo(options))
             );
           } catch {
             // Llamado desde un Server Component: lo maneja el middleware.

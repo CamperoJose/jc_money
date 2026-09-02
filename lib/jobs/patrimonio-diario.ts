@@ -21,12 +21,18 @@ function ayerBolivia(): string {
   return isoAFechaBolivia(d.toISOString());
 }
 
-/** Determina el único usuario de la app (app monousuario). */
+/**
+ * Determina el único usuario de la app (app monousuario) leyendo de tablas con
+ * la service role (evita el endpoint admin de auth, que exige la key exacta).
+ * Con la service role, RLS se omite y estas lecturas devuelven la fila.
+ */
 async function getUsuarioId(admin: SupabaseClient): Promise<string | null> {
-  const { data, error } = await admin.auth.admin.listUsers();
-  if (error) throw error;
-  const u = data.users?.[0];
-  return u?.id ?? null;
+  for (const tabla of ["net_worth_snapshots", "accounts", "transactions"]) {
+    const { data, error } = await admin.from(tabla).select("user_id").limit(1);
+    if (error) throw error;
+    if (data && data.length > 0) return (data[0] as { user_id: string }).user_id;
+  }
+  return null;
 }
 
 /**
