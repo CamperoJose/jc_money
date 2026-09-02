@@ -2,9 +2,47 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-01
+## Última actualización: 2026-09-01 (sesión 2 — auth + rediseño Patrimonio)
 
-### Fase actual: 0 → 1 (scaffold hecho, esperando datos en Supabase)
+### Fase actual: 1 (Tracking) — módulo Patrimonio funcional con ABM y dashboard
+
+### Sesión 2 — lo hecho ✅
+- **Auth arreglada:** el login daba `Invalid API key` porque `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  tenía una *secret key* mal pegada (y sin la `s` inicial). Debe ser la **publishable key**
+  (`sb_publishable_...`). El usuario corrigió el `.env` y ya entra.
+- **Importación de datos (patrimonio):** además del script Python, se generó un **exportable SQL**
+  idempotente `supabase/migrations/0003_datos_conteos.sql` con las **15 fotos** de CONTEOS
+  (5 filas sucias descartadas). Se pega en el SQL Editor de Supabase — no requiere red desde el sandbox.
+  Total validado contra el Excel (fila 1 = 22.004,52 Bs). `Debts` suma como activo (Por Cobrar).
+- **Rediseño completo de Patrimonio:**
+  - **Sidebar izquierdo** colapsable (recuerda preferencia en localStorage) + drawer móvil.
+    `components/tracking/sidebar.tsx`. El layout `app/tracking/layout.tsx` ya lo usa.
+  - **Dos vistas:** `/tracking/patrimonio` (Dashboard) y `/tracking/patrimonio/registros` (lista + ABM).
+  - **ABM de fotos:** formulario popup crear/editar (`components/patrimonio/registro-form.tsx`) con
+    total calculado en vivo; tabla con detalle por cuenta expandible y borrado con confirmación
+    (`components/patrimonio/registros-client.tsx`).
+  - **API mutaciones:** `POST /api/patrimonio/snapshots`, `PATCH`+`DELETE /api/patrimonio/snapshots/[id]`,
+    `GET /api/patrimonio/cuentas`. Lógica en `lib/mutations/patrimonio.ts` (valida y calcula totales server-side).
+  - **Dashboard enriquecido:** KPIs sin desborde (formato compacto), 6 métricas de decisión
+    (crecimiento mensual compuesto, variación promedio, mejor/peor período, promedio, días desde última),
+    evolución (área, toggle BOB/USD), **timeline de crecimiento por cuenta** (multi-línea con leyenda toggle),
+    variación por período (barras), distribución por moneda y por cuenta (donut, paleta multi-tono).
+    `components/patrimonio/dashboard-charts.tsx`. Se quitó la tarjeta "Fotos registradas".
+  - **Perf:** `optimizePackageImports` (phosphor/recharts) en `next.config.ts` — la lentitud en dev era
+    barrel imports. Latencia en caliente ~80 ms.
+  - **Loaders:** `loading.tsx` con skeletons en ambas rutas (feedback instantáneo al navegar).
+    `components/ui/skeleton.tsx`. Nuevos primitivos UI: dialog, input, label, badge.
+- Nuevos primitivos UI sin dependencias extra (dialog es portal propio, sin Radix salvo slot).
+- `tsc --noEmit` limpio; `npm run build` verde (con el código de sesión 1; sesión 2 validada por tsc).
+
+### ⚠️ Gotcha de entorno (sesión 2)
+No correr `next build` mientras `next dev` está activo: comparten `.next` y lo corrompen
+(el login empezó a dar 500). Para verificar usar `tsc --noEmit`. Si se hace build, parar el dev,
+`rm -rf .next` y reiniciar. (También en memoria de Claude.)
+
+---
+
+### Fase previa: 0 → 1 (scaffold hecho, esperando datos en Supabase)
 
 ### App Next.js scaffoldeada (build verde) ✅
 - Next.js 15 (App Router) + Tailwind v4 + tema de tweakcn del usuario aplicado en `app/globals.css`.
@@ -26,9 +64,12 @@
 5. (Seguridad, no urgente) Rotar `GOOGLE_CLIENT_SECRET` y contraseña de DB (pasaron por chat).
 
 ### Pendiente de Claude (próxima sesión — priorizado)
-1. **Patrimonio – completar:** grid editable AG Grid (saldos por cuenta × fecha), alta/edición de
-   fotos desde la web (formularios + `POST/PUT/DELETE`), distribución por cuenta.
-2. **Extender la migración** a GASTOS, DPF y DEUDAS (hoy solo CONTEOS) + bandera `import_batch`.
+1. ~~Patrimonio – ABM y distribución~~ ✅ hecho en sesión 2 (formularios web, POST/PATCH/DELETE,
+   distribución por cuenta, timeline por cuenta). Falta opcional: grid tipo AG Grid para edición masiva.
+2. **Verificación visual con datos reales:** el usuario debe cargar `0003` y revisar el dashboard;
+   ajustar gráficos/métricas según feedback.
+3. **Despliegue en Vercel** (ver `claude/despliegue-vercel.md`): conectar repo, env vars, rama de producción.
+4. **Extender la migración** a GASTOS, DPF y DEUDAS (hoy solo CONTEOS) + bandera `import_batch`.
 3. **Módulo Gastos** (Fase 1): API + grid con filtros + dashboard categoría/mes, ingreso vs gasto.
 4. **Módulo Inversiones DPF** (Fase 1): API + panel de indicadores + grid de depósitos.
 5. **Módulo Deudas** (Fase 1): API + grid simple.
