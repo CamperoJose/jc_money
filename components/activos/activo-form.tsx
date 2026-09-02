@@ -17,7 +17,12 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBob, formatPercent } from "@/lib/format";
-import type { AssetStatus, AssetUI, Currency } from "@/lib/types";
+import type { Account, AssetStatus, AssetUI, Currency } from "@/lib/types";
+
+/** Cuentas destino válidas para el ingreso de una venta (reales, no derivadas). */
+function cuentasDestino(cuentas: Account[]): Account[] {
+  return cuentas.filter((c) => c.active && !c.is_liability && c.type !== "dpf" && c.type !== "por_cobrar");
+}
 
 function hoyInput(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -30,15 +35,18 @@ function hoyInput(): string {
 
 export function ActivoForm({
   registro,
+  cuentas,
   open,
   onOpenChange,
 }: {
   registro?: AssetUI | null;
+  cuentas: Account[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
   const router = useRouter();
   const editando = !!registro;
+  const destinos = useMemo(() => cuentasDestino(cuentas), [cuentas]);
 
   const [nombre, setNombre] = useState(registro?.name ?? "");
   const [categoria, setCategoria] = useState(registro?.category ?? "");
@@ -51,6 +59,7 @@ export function ActivoForm({
   const [estado, setEstado] = useState<AssetStatus>(registro?.status ?? "activo");
   const [fechaVenta, setFechaVenta] = useState(registro?.sold_date ?? hoyInput());
   const [precioVenta, setPrecioVenta] = useState(registro?.sold_price != null ? String(registro.sold_price) : "");
+  const [cuentaVenta, setCuentaVenta] = useState(registro?.sold_account_id ?? "");
   const [notas, setNotas] = useState(registro?.notes ?? "");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +93,7 @@ export function ActivoForm({
       status: estado,
       sold_date: vendido ? fechaVenta : null,
       sold_price: vendido ? parseFloat(precioVenta) : null,
+      sold_account_id: vendido ? cuentaVenta || null : null,
       notes: notas,
     };
 
@@ -197,6 +207,18 @@ export function ActivoForm({
             <div className="space-y-1.5">
               <Label htmlFor="precioVenta">Precio de venta ({moneda})</Label>
               <Input id="precioVenta" type="number" step="0.01" min="0" inputMode="decimal" value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="cuentaVenta">Cuenta destino (dónde ingresó el dinero)</Label>
+              <Select id="cuentaVenta" value={cuentaVenta} onChange={(e) => setCuentaVenta(e.target.value)}>
+                <option value="">— Sin cuenta (solo registrar) —</option>
+                {destinos.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.currency})</option>
+                ))}
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                El job de medianoche mueve el importe a esta cuenta el día de la venta.
+              </p>
             </div>
           </div>
         )}

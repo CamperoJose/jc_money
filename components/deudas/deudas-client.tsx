@@ -25,9 +25,9 @@ import {
 import { DeudaForm } from "@/components/deudas/deuda-form";
 import { formatBob, formatDate, formatBobCompact } from "@/lib/format";
 import type { ResumenDeudas } from "@/lib/deudas";
-import type { DebtUI } from "@/lib/types";
+import type { Account, DebtUI } from "@/lib/types";
 
-export function DeudasClient({ resumen }: { resumen: ResumenDeudas }) {
+export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cuentas: Account[] }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<DebtUI | null>(null);
@@ -192,7 +192,7 @@ export function DeudasClient({ resumen }: { resumen: ResumenDeudas }) {
       )}
 
       {formOpen && (
-        <DeudaForm key={editando?.id ?? "nuevo"} registro={editando} open={formOpen} onOpenChange={setFormOpen} />
+        <DeudaForm key={editando?.id ?? "nuevo"} registro={editando} cuentas={cuentas} open={formOpen} onOpenChange={setFormOpen} />
       )}
 
       <Dialog open={!!borrar} onOpenChange={(v) => !v && setBorrar(null)}>

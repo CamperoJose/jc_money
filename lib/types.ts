@@ -135,12 +135,15 @@ export interface Debt {
   counterparty: string | null; // quién me debe
   status: DebtStatus;
   due_date: string | null; // fecha de cobro esperada (opcional)
+  paid_account_id: string | null; // cuenta a la que ingresó el cobro
+  collected_date: string | null; // fecha en que me pagaron (YYYY-MM-DD)
 }
 
 export interface DebtUI extends Debt {
   outstanding: number; // por cobrar = amount − paid_amount (≥ 0)
   vencida: boolean; // due_date pasada y aún no pagada
   diasVencida: number | null; // días desde due_date (si venció)
+  paidAccount?: Account | null; // cuenta de cobro resuelta (opcional)
 }
 
 // --- Activos (bienes vendibles) ---------------------------------------------
@@ -160,6 +163,7 @@ export interface Asset {
   status: AssetStatus;
   sold_date: string | null;
   sold_price: number | null;
+  sold_account_id: string | null; // cuenta a la que ingresó la venta
   notes: string | null;
 }
 
@@ -169,6 +173,7 @@ export interface AssetUI extends Asset {
   resultadoPct: number | null; // resultado / costo
   realizado: boolean; // status === 'vendido'
   diasTenencia: number | null; // (sold_date | hoy) − acquired_date
+  soldAccount?: Account | null; // cuenta de venta resuelta (opcional)
 }
 
 // --- Tipo de cambio (BCB) ---------------------------------------------------

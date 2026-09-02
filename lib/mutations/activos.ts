@@ -13,6 +13,7 @@ export interface AssetInput {
   status?: AssetStatus;
   sold_date?: string | null;
   sold_price?: number | null;
+  sold_account_id?: string | null;
   notes?: string | null;
 }
 
@@ -56,6 +57,7 @@ function filaDesde(input: AssetInput) {
     // Datos de venta solo si está vendido.
     sold_date: vendido ? input.sold_date || null : null,
     sold_price: vendido ? money(input.sold_price) : null,
+    sold_account_id: vendido ? input.sold_account_id || null : null,
     notes: limpiar(input.notes),
   };
 }

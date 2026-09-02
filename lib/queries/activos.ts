@@ -3,7 +3,7 @@ import type { Asset } from "@/lib/types";
 import { resumenActivos, type ResumenActivos } from "@/lib/activos";
 
 const CAMPOS =
-  "id, name, category, acquired_date, acquisition_cost, currency, current_value, sellable, counts_in_patrimonio, status, sold_date, sold_price, notes";
+  "id, name, category, acquired_date, acquisition_cost, currency, current_value, sellable, counts_in_patrimonio, status, sold_date, sold_price, sold_account_id, notes";
 
 function aAsset(r: Record<string, unknown>): Asset {
   return {
@@ -19,6 +19,7 @@ function aAsset(r: Record<string, unknown>): Asset {
     status: (r.status as Asset["status"]) ?? "activo",
     sold_date: (r.sold_date as string) ?? null,
     sold_price: r.sold_price != null ? Number(r.sold_price) : null,
+    sold_account_id: (r.sold_account_id as string) ?? null,
     notes: (r.notes as string) ?? null,
   };
 }

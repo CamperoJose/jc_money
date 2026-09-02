@@ -9,6 +9,8 @@ export interface DebtInput {
   counterparty?: string | null;
   status?: DebtStatus;
   due_date?: string | null;
+  paid_account_id?: string | null;
+  collected_date?: string | null;
 }
 
 export function validarDeuda(input: DebtInput): string | null {
@@ -27,6 +29,9 @@ export function validarDeuda(input: DebtInput): string | null {
   if (input.due_date && Number.isNaN(Date.parse(`${input.due_date}T00:00:00Z`))) {
     return "La fecha de cobro es inválida.";
   }
+  if (input.collected_date && Number.isNaN(Date.parse(`${input.collected_date}T00:00:00Z`))) {
+    return "La fecha de cobro registrada es inválida.";
+  }
   return null;
 }
 
@@ -41,6 +46,8 @@ function filaDesde(input: DebtInput) {
   // Estado derivado si no viene explícito: pagado si saldó, parcial si algo, pendiente si nada.
   const status: DebtStatus =
     input.status ?? (paid >= amount ? "pagado" : paid > 0 ? "parcial" : "pendiente");
+  // Datos del cobro solo si ya se cobró algo.
+  const cobrado = paid > 0;
   return {
     debt_date: input.debt_date,
     amount,
@@ -49,6 +56,8 @@ function filaDesde(input: DebtInput) {
     counterparty: limpiar(input.counterparty),
     status,
     due_date: input.due_date || null,
+    paid_account_id: cobrado ? input.paid_account_id || null : null,
+    collected_date: cobrado ? input.collected_date || null : null,
   };
 }
 

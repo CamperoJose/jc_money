@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getResumenDeudas } from "@/lib/queries/deudas";
+import { getCuentas } from "@/lib/queries/patrimonio";
 import type { ResumenDeudas } from "@/lib/deudas";
+import type { Account } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { DeudasClient } from "@/components/deudas/deudas-client";
 
@@ -10,9 +12,11 @@ export default async function DeudasPage() {
   const supabase = await createClient();
 
   let resumen: ResumenDeudas | null = null;
+  let cuentas: Account[] = [];
   let errorMsg: string | null = null;
   try {
     resumen = await getResumenDeudas(supabase);
+    cuentas = await getCuentas(supabase);
   } catch (e) {
     errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
   }
@@ -30,5 +34,5 @@ export default async function DeudasPage() {
     );
   }
 
-  return <DeudasClient resumen={resumen} />;
+  return <DeudasClient resumen={resumen} cuentas={cuentas} />;
 }

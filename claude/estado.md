@@ -2,7 +2,32 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 12 — presupuestos, tema, correos periódicos)
+## Última actualización: 2026-09-02 (sesión 13 — venta de activos y cobro de deudas hacia cuenta destino)
+
+### Sesión 13 — lo hecho ✅
+- **Registro de venta de activos con cuenta destino y plusvalía** y **registro de cobro de deudas con
+  cuenta y fecha**: el registro solo se guarda; el **job diario** contabiliza el movimiento hacia la
+  cuenta destino el día del evento.
+  - Migración `0013_venta_activos_cobro_deudas.sql` (pendiente de aplicar por el usuario):
+    `assets.sold_account_id`, `debts.paid_account_id`, `debts.collected_date`.
+  - Formularios: en Activos, al marcar "Vendido" se elige **cuenta destino** (además de fecha y
+    precio, con plusvalía calculada en vivo). En Deudas, si hay monto cobrado aparece la sección
+    **Cobro** (fecha + cuenta destino). Cuentas destino = reales activas (no DPF/por_cobrar/pasivos).
+  - Types/mutations/queries actualizados (`Asset.sold_account_id`, `Debt.paid_account_id` +
+    `collected_date`). Páginas `activos`/`deudas` inyectan `getCuentas`.
+  - **Job (`lib/jobs/patrimonio-diario.ts`) → `getMovimientosDelDia`:** por cada venta/cobro cuyo
+    `sold_date`/`collected_date` cae en `(base.snapshot_date, targetDate]`, inyecta el importe (a BOB
+    para el total; a la moneda nativa de la cuenta para el saldo) en la cuenta destino. El activo/
+    deuda ya salió de su cuenta derivada (Activos/Por Cobrar), así que el efecto neto = resultado
+    realizado (venta) o cero (cobro solo mueve valor de «por cobrar» a una cuenta real). Se inyecta
+    **una sola vez** (el día que el cierre cruza el evento; después el saldo queda copiado de la base).
+  - Limitación asumida (app monousuario): el modelo de deuda usa una sola `collected_date`, así que un
+    cobro parcial seguido de otro con fecha distinta podría recontabilizar; para el uso real (un evento
+    de cobro) es correcto.
+
+---
+
+## Update previo: 2026-09-02 (sesión 12 — presupuestos, tema, correos periódicos)
 
 ### Sesión 12 — lo hecho ✅
 - **Operativo:** migraciones 0010/0011/0012 aplicadas por el usuario; repo con UNA sola rama `main`

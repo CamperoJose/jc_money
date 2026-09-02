@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FloppyDisk, Warning } from "@phosphor-icons/react";
 import {
@@ -16,7 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBob } from "@/lib/format";
-import type { DebtStatus, DebtUI } from "@/lib/types";
+import type { Account, DebtStatus, DebtUI } from "@/lib/types";
+
+/** Cuentas destino válidas para el ingreso de un cobro (reales, no derivadas). */
+function cuentasDestino(cuentas: Account[]): Account[] {
+  return cuentas.filter((c) => c.active && !c.is_liability && c.type !== "dpf" && c.type !== "por_cobrar");
+}
 
 function hoyInput(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -29,15 +34,18 @@ function hoyInput(): string {
 
 export function DeudaForm({
   registro,
+  cuentas,
   open,
   onOpenChange,
 }: {
   registro?: DebtUI | null;
+  cuentas: Account[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
   const router = useRouter();
   const editando = !!registro;
+  const destinos = useMemo(() => cuentasDestino(cuentas), [cuentas]);
 
   const [quien, setQuien] = useState(registro?.counterparty ?? "");
   const [fecha, setFecha] = useState(registro?.debt_date ?? hoyInput());
@@ -46,12 +54,15 @@ export function DeudaForm({
   const [motivo, setMotivo] = useState(registro?.reason ?? "");
   const [vence, setVence] = useState(registro?.due_date ?? "");
   const [estado, setEstado] = useState<DebtStatus>(registro?.status ?? "pendiente");
+  const [cuentaCobro, setCuentaCobro] = useState(registro?.paid_account_id ?? "");
+  const [fechaCobro, setFechaCobro] = useState(registro?.collected_date ?? hoyInput());
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const montoN = parseFloat(monto) || 0;
   const cobradoN = parseFloat(cobrado) || 0;
   const porCobrar = Math.max(0, Math.round((montoN - cobradoN) * 100) / 100);
+  const hayCobro = cobradoN > 0;
 
   async function guardar() {
     setError(null);
@@ -67,6 +78,8 @@ export function DeudaForm({
       counterparty: quien,
       status: estado,
       due_date: vence || null,
+      paid_account_id: hayCobro ? cuentaCobro || null : null,
+      collected_date: hayCobro ? fechaCobro || null : null,
     };
 
     setEnviando(true);
@@ -144,6 +157,30 @@ export function DeudaForm({
             <option value="pagado">Pagado (cobrado)</option>
           </Select>
         </div>
+
+        {hayCobro && (
+          <div className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Cobro</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fechaCobro">¿Cuándo te pagaron?</Label>
+              <Input id="fechaCobro" type="date" value={fechaCobro} onChange={(e) => setFechaCobro(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cuentaCobro">Cuenta destino</Label>
+              <Select id="cuentaCobro" value={cuentaCobro} onChange={(e) => setCuentaCobro(e.target.value)}>
+                <option value="">— Sin cuenta (solo registrar) —</option>
+                {destinos.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.currency})</option>
+                ))}
+              </Select>
+            </div>
+            <p className="text-[11px] text-muted-foreground sm:col-span-2">
+              El job de medianoche mueve lo cobrado a esta cuenta el día del cobro.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="motivo">Motivo (opcional)</Label>

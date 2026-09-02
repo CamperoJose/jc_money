@@ -25,9 +25,9 @@ import {
 import { ActivoForm } from "@/components/activos/activo-form";
 import { formatBob, formatDate, formatPercent } from "@/lib/format";
 import type { ResumenActivos } from "@/lib/activos";
-import type { AssetUI } from "@/lib/types";
+import type { Account, AssetUI } from "@/lib/types";
 
-export function ActivosClient({ resumen }: { resumen: ResumenActivos }) {
+export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; cuentas: Account[] }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<AssetUI | null>(null);
@@ -180,7 +180,7 @@ export function ActivosClient({ resumen }: { resumen: ResumenActivos }) {
       )}
 
       {formOpen && (
-        <ActivoForm key={editando?.id ?? "nuevo"} registro={editando} open={formOpen} onOpenChange={setFormOpen} />
+        <ActivoForm key={editando?.id ?? "nuevo"} registro={editando} cuentas={cuentas} open={formOpen} onOpenChange={setFormOpen} />
       )}
 
       <Dialog open={!!borrar} onOpenChange={(v) => !v && setBorrar(null)}>
