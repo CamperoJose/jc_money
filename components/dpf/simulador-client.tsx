@@ -40,8 +40,8 @@ function hoyInput(): string {
 export function SimuladorClient() {
   const [montoInicial, setMontoInicial] = useState("10000");
   const [aportePeriodico, setAportePeriodico] = useState("2000");
-  const [cadenciaDias, setCadenciaDias] = useState("30");
-  const [plazoDias, setPlazoDias] = useState("90");
+  const [cadenciaMeses, setCadenciaMeses] = useState("1");
+  const [plazoMeses, setPlazoMeses] = useState("3");
   const [tasa, setTasa] = useState("7.7");
   const [periodos, setPeriodos] = useState("24");
   const [reinvertir, setReinvertir] = useState("si");
@@ -52,15 +52,15 @@ export function SimuladorClient() {
     () => ({
       montoInicial: Math.max(0, parseFloat(montoInicial) || 0),
       aportePeriodico: Math.max(0, parseFloat(aportePeriodico) || 0),
-      cadenciaDias: Math.max(1, parseInt(cadenciaDias, 10) || 30),
-      plazoDias: Math.max(1, parseInt(plazoDias, 10) || 90),
+      cadenciaMeses: Math.max(1, parseInt(cadenciaMeses, 10) || 1),
+      plazoMeses: Math.max(1, parseInt(plazoMeses, 10) || 3),
       tasaAnual: Math.max(0, (parseFloat(tasa) || 0) / 100),
       periodos: Math.max(1, Math.min(240, parseInt(periodos, 10) || 12)),
       reinvertirInteres: reinvertir === "si",
       cobraIva: cobraIva === "si",
       fechaInicio,
     }),
-    [montoInicial, aportePeriodico, cadenciaDias, plazoDias, tasa, periodos, reinvertir, cobraIva, fechaInicio]
+    [montoInicial, aportePeriodico, cadenciaMeses, plazoMeses, tasa, periodos, reinvertir, cobraIva, fechaInicio]
   );
 
   const r = useMemo(() => simularLaddering(params), [params]);
@@ -97,11 +97,11 @@ export function SimuladorClient() {
               <Input type="number" min="0" step="100" value={aportePeriodico} onChange={(e) => setAportePeriodico(e.target.value)} />
             </Campo>
             <div className="grid grid-cols-2 gap-3">
-              <Campo label="Cada (días)">
-                <Input type="number" min="1" step="1" value={cadenciaDias} onChange={(e) => setCadenciaDias(e.target.value)} />
+              <Campo label="Cada (meses)">
+                <Input type="number" min="1" step="1" value={cadenciaMeses} onChange={(e) => setCadenciaMeses(e.target.value)} />
               </Campo>
-              <Campo label="Plazo (días)">
-                <Input type="number" min="1" step="1" value={plazoDias} onChange={(e) => setPlazoDias(e.target.value)} />
+              <Campo label="Plazo (meses)">
+                <Input type="number" min="1" step="1" value={plazoMeses} onChange={(e) => setPlazoMeses(e.target.value)} />
               </Campo>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -204,7 +204,7 @@ export function SimuladorClient() {
           </Card>
 
           <p className="text-xs text-muted-foreground">
-            Interés bruto = capital · tasa · plazo/365. Interés líquido = bruto{" "}
+            Interés bruto = capital · tasa · (meses/12). Interés líquido = bruto{" "}
             {cobraIva === "si" ? "· 0,87 (retención RC-IVA 13%)" : "(sin retención de IVA)"}. El
             simulador asume que cada depósito se renueva con el capital liberado más el aporte del periodo.
           </p>

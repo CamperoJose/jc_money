@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DpfStatus } from "@/lib/types";
-import { sumarDias, interesBruto, interesLiquido, redondeaTasa, redondeaMonto } from "@/lib/dpf";
+import { sumarMeses, diasEntre, interesBruto, interesLiquido, redondeaTasa, redondeaMonto } from "@/lib/dpf";
 
 export interface DpfInput {
   pizarra?: string | null; // entidad financiera
@@ -8,8 +8,8 @@ export interface DpfInput {
   edv?: string | null;
   nro_dpf?: string | null;
   start_date: string; // YYYY-MM-DD
-  term_days: number; // plazo (ej. 90)
-  end_date?: string | null; // opcional; si falta se calcula = start + term
+  term_months: number; // plazo en MESES (ej. 3)
+  end_date?: string | null; // fecha de liberación (manual); si falta = start + meses
   principal: number; // capital BOB
   annual_rate: number; // ej. 0.077 (fracción, no %)
   status?: DpfStatus;
@@ -26,8 +26,11 @@ export function validarDpf(input: DpfInput): string | null {
   if (!input.start_date || Number.isNaN(Date.parse(`${input.start_date}T00:00:00Z`))) {
     return "La fecha de inicio es inválida.";
   }
-  if (!Number.isFinite(input.term_days) || input.term_days <= 0) {
-    return "El plazo (días) debe ser mayor a 0.";
+  if (!Number.isFinite(input.term_months) || input.term_months <= 0) {
+    return "El plazo (meses) debe ser mayor a 0.";
+  }
+  if (input.end_date && Number.isNaN(Date.parse(`${input.end_date}T00:00:00Z`))) {
+    return "La fecha de liberación es inválida.";
   }
   if (!Number.isFinite(input.principal) || input.principal <= 0) {
     return "El monto (capital) debe ser mayor a 0.";
@@ -47,14 +50,17 @@ function limpiar(v?: string | null): string | null {
 }
 
 function filaDesde(input: DpfInput) {
-  const term = Math.round(input.term_days);
+  const meses = Math.round(input.term_months);
   const principal = redondeaMonto(input.principal);
   const rate = redondeaTasa(input.annual_rate); // mata el ruido de float (6.6% → 0.066)
   const cobraIva = input.cobra_iva ?? false;
   const status = input.status ?? "activo";
-  const endDate = input.end_date || sumarDias(input.start_date, term);
-  // Ganancia realizada: si el usuario no la entrega, se proyecta desde el capital.
-  const bruto = redondeaMonto(input.gcia_economica ?? interesBruto(principal, rate, term));
+  // Fecha de liberación: manual si se entrega; si no, start + plazo (meses).
+  const endDate = input.end_date || sumarMeses(input.start_date, meses);
+  // term_days se conserva como span real (referencia), derivado de las fechas.
+  const termDays = Math.max(1, diasEntre(input.start_date, endDate));
+  // Interés anual prorrateado por meses invertidos: capital · tasa · meses/12.
+  const bruto = redondeaMonto(input.gcia_economica ?? interesBruto(principal, rate, meses));
   const liquido = redondeaMonto(input.gcia_financiera ?? interesLiquido(bruto, cobraIva));
   const pagado = status === "pagado";
   return {
@@ -65,7 +71,8 @@ function filaDesde(input: DpfInput) {
     start_date: input.start_date,
     end_date: endDate,
     principal,
-    term_days: term,
+    term_months: meses,
+    term_days: termDays,
     annual_rate: rate,
     status,
     cobra_iva: cobraIva,

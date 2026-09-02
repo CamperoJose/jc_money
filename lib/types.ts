@@ -71,9 +71,9 @@ export interface DpfDeposit {
   edv: string | null; // registro EDV (opcional)
   id_dpf_externo: string | null; // Nº de DPF del banco
   start_date: string; // YYYY-MM-DD
-  end_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD (fecha de liberación, editable manualmente)
   principal: number; // capital en BOB
-  term_days: number; // plazo (ej. 90)
+  term_months: number; // plazo en MESES (ej. 3)
   annual_rate: number; // tasa anual (ej. 0.077)
   status: DpfStatus;
   cobra_iva: boolean; // si retiene RC-IVA (13%). Por defecto false.
@@ -87,7 +87,7 @@ export interface DpfDeposit {
 
 /** Cuenta a la que se cobró un DPF (resuelta para la UI). */
 export interface DpfDepositUI extends DpfDeposit {
-  interesDiario: number;
+  interesMensual: number; // capital · tasa / 12 (informativo)
   interesBruto: number; // proyectado a fin de plazo
   interesLiquido: number; // cobra_iva ? bruto·0,87 : bruto
   rcIva: number; // cobra_iva ? bruto·0,13 : 0

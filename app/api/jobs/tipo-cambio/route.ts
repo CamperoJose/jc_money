@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ejecutarTipoCambioBCB } from "@/lib/jobs/tipo-cambio";
+import { ejecutarTipoCambioBCB, diagnosticarTC } from "@/lib/jobs/tipo-cambio";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -42,8 +42,15 @@ async function manejar(request: Request) {
     return NextResponse.json({ error: "Parámetro date inválido (YYYY-MM-DD)." }, { status: 400 });
   }
 
+  const debug = url.searchParams.get("debug") === "1";
+
   try {
     const admin = createAdminClient();
+    if (debug) {
+      // Diagnóstico: no persiste, devuelve sobre + XML crudo para depurar el BCB.
+      const diag = await diagnosticarTC(admin, { targetDate });
+      return NextResponse.json({ ok: true, debug: true, ...diag }, { status: 200 });
+    }
     const resultado = await ejecutarTipoCambioBCB(admin, { targetDate });
     return NextResponse.json(resultado, { status: resultado.ok ? 200 : 500 });
   } catch (e) {

@@ -2,7 +2,30 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 6 — DPF IVA/cobro, floats, tipo de cambio BCB)
+## Última actualización: 2026-09-02 (sesión 7 — DPF plazo en meses, fecha liberación manual, debug BCB)
+
+### Sesión 7 — lo hecho ✅
+- **DPF · plazo en MESES:** el interés es anual y se prorratea por meses invertidos
+  (`bruto = capital · tasa · meses/12`). `term_months` reemplaza a `term_days` como base
+  (migración **0009**, que además recalcula las ganancias existentes con esta base). El form usa
+  plazos en meses (1/2/3/6/9/12/18/24/36).
+- **DPF · fecha de liberación manual:** el `end_date` es ahora un input editable (default = inicio +
+  plazo; botón "Auto" para volver a calcularlo). El simulador también pasó a meses (cadencia y plazo).
+- **BCB · diagnóstico (para el T/C que no cargaba):** el cliente ahora **descubre del WSDL** tanto el
+  namespace como los **nombres de parámetro** (JAX-WS a veces usa `arg0/arg1/arg2` en vez de
+  `codIndicador/codMoneda/fecha`). Nuevo endpoint de depuración `GET /api/jobs/tipo-cambio?debug=1`
+  (con token): devuelve el sobre SOAP enviado, el HTTP status y el **XML crudo** del BCB, sin
+  persistir. Overrides opcionales en `app_settings`: `tc_bcb_namespace`, `tc_bcb_param_names`,
+  `tc_bcb_soap_action`. Tests de `descubrirParamNames` en `scripts/test-bcb.ts` (todos pasan).
+- **Sobre el "no cargó el T/C":** en GitHub Actions **no hace falta configurar nada** aparte de los
+  secrets ya existentes (APP_URL, API_BEARER_TOKEN). El paso de T/C es `continue-on-error`, así que un
+  run **verde no significa** que el T/C se cargó — hay que abrir el step "Tipo de cambio del día (BCB)"
+  y leer el JSON. Causas típicas: (a) migración 0008 aún no aplicada, (b) el deploy con el endpoint no
+  está en vivo / Vercel apunta a otra rama, (c) el formato SOAP; para (c) usar `?debug=1`.
+
+---
+
+## Update previo: 2026-09-02 (sesión 6 — DPF IVA/cobro, floats, tipo de cambio BCB)
 
 ### Sesión 6 — lo hecho ✅
 - **DPF · IVA opcional:** switch "¿Cobra IVA (RC-IVA 13%)?" en el form (por defecto **OFF**;

@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fechaBoliviaHoy } from "@/lib/datetime";
-import { obtenerTipoCambioBCB, descripcionMoneda } from "@/lib/bcb";
+import {
+  obtenerTipoCambioBCB,
+  diagnosticarTipoCambioBCB,
+  descripcionMoneda,
+  type DiagnosticoBCB,
+} from "@/lib/bcb";
 
 export interface ResultadoTcJob {
   ok: boolean;
@@ -26,15 +31,47 @@ async function leerConfig(admin: SupabaseClient, userId: string) {
     .from("app_settings")
     .select("key, value")
     .eq("user_id", userId)
-    .in("key", ["tc_cod_indicador", "tc_cod_moneda", "tc_bcb_namespace", "tc_bcb_soap_action"]);
+    .in("key", [
+      "tc_cod_indicador",
+      "tc_cod_moneda",
+      "tc_bcb_namespace",
+      "tc_bcb_soap_action",
+      "tc_bcb_param_names",
+    ]);
   if (error) throw error;
   const map = new Map((data ?? []).map((r) => [r.key as string, r.value as string]));
+  const paramsRaw = map.get("tc_bcb_param_names");
   return {
     codIndicador: Number(map.get("tc_cod_indicador") ?? 1),
     codMoneda: Number(map.get("tc_cod_moneda") ?? 35),
     namespace: map.get("tc_bcb_namespace") || undefined,
     soapAction: map.get("tc_bcb_soap_action") || undefined,
+    paramNames: paramsRaw ? paramsRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
   };
+}
+
+/**
+ * Diagnóstico: ejecuta la consulta al BCB y devuelve el sobre enviado, el XML
+ * crudo y el parseo, sin persistir nada. Para depurar el servicio en prod.
+ */
+export async function diagnosticarTC(
+  admin: SupabaseClient,
+  opts?: { targetDate?: string; fetchImpl?: typeof fetch }
+): Promise<DiagnosticoBCB & { rate_date: string; cod_indicador: number; cod_moneda: number }> {
+  const fetchImpl = opts?.fetchImpl ?? fetch;
+  const targetDate = opts?.targetDate ?? fechaBoliviaHoy();
+  const userId = await getUsuarioId(admin);
+  if (!userId) throw new Error("No hay usuarios en la app.");
+  const cfg = await leerConfig(admin, userId);
+  const diag = await diagnosticarTipoCambioBCB(fetchImpl, {
+    codIndicador: cfg.codIndicador,
+    codMoneda: cfg.codMoneda,
+    fechaISO: targetDate,
+    namespace: cfg.namespace,
+    paramNames: cfg.paramNames,
+    soapAction: cfg.soapAction,
+  });
+  return { ...diag, rate_date: targetDate, cod_indicador: cfg.codIndicador, cod_moneda: cfg.codMoneda };
 }
 
 /**
@@ -59,6 +96,7 @@ export async function ejecutarTipoCambioBCB(
     codMoneda: cfg.codMoneda,
     fechaISO: targetDate,
     namespace: cfg.namespace,
+    paramNames: cfg.paramNames,
     soapAction: cfg.soapAction,
   });
 

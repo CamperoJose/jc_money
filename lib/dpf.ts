@@ -5,12 +5,8 @@
 import type { Account, DpfDeposit, DpfDepositUI, DpfLiberacion } from "@/lib/types";
 import { fechaBoliviaHoy } from "@/lib/datetime";
 
-/**
- * Base de días del año para el interés. El Excel del usuario calculaba el
- * "interés diario" como capital · tasa / 365, así que se conserva esa base para
- * que los números coincidan con lo que venía usando.
- */
-export const DIAS_ANIO = 365;
+/** Meses del año (base del cálculo de interés). */
+export const MESES_ANIO = 12;
 
 /** Retención RC-IVA en Bolivia sobre rendimientos financieros (13%). */
 export const RC_IVA = 0.13;
@@ -33,9 +29,24 @@ export function sumarDias(fecha: string, dias: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Interés bruto proyectado a fin de plazo: capital · tasa · plazo / 365. */
-export function interesBruto(principal: number, annualRate: number, termDays: number): number {
-  return redondea((principal * annualRate * termDays) / DIAS_ANIO);
+/**
+ * Suma `meses` a una fecha "YYYY-MM-DD" (clampeando el día al fin de mes cuando
+ * corresponde, ej. 31 ene + 1 mes = 28/29 feb). Devuelve "YYYY-MM-DD".
+ */
+export function sumarMeses(fecha: string, meses: number): string {
+  const [y, m, dd] = fecha.split("-").map(Number);
+  const base = new Date(Date.UTC(y, m - 1 + meses, 1));
+  const ultimoDia = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 1, 0)).getUTCDate();
+  const dia = Math.min(dd, ultimoDia);
+  return new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), dia)).toISOString().slice(0, 10);
+}
+
+/**
+ * Interés bruto proyectado a fin de plazo. El interés es anual y se prorratea
+ * por los MESES invertidos: capital · tasa · (meses / 12).
+ */
+export function interesBruto(principal: number, annualRate: number, termMonths: number): number {
+  return redondea((principal * annualRate * termMonths) / MESES_ANIO);
 }
 
 /**
@@ -73,10 +84,10 @@ export function enriquecerDpf(
   hoy: string = fechaBoliviaHoy(),
   cuentas?: Map<string, Account>
 ): DpfDepositUI {
-  const bruto = interesBruto(d.principal, d.annual_rate, d.term_days);
+  const bruto = interesBruto(d.principal, d.annual_rate, d.term_months);
   const liquido = interesLiquido(bruto, d.cobra_iva);
   const rcIva = redondea(bruto - liquido);
-  const interesDiario = redondea((d.principal * d.annual_rate) / DIAS_ANIO);
+  const interesMensual = redondea((d.principal * d.annual_rate) / MESES_ANIO);
 
   const diasTotales = Math.max(1, diasEntre(d.start_date, d.end_date));
   const diasRestantes = diasEntre(hoy, d.end_date);
@@ -91,7 +102,7 @@ export function enriquecerDpf(
 
   return {
     ...d,
-    interesDiario,
+    interesMensual,
     interesBruto: bruto,
     interesLiquido: liquido,
     rcIva,
@@ -185,8 +196,8 @@ function redondea4(n: number): number {
 export interface ParamsSimulador {
   montoInicial: number; // capital de arranque (Bs)
   aportePeriodico: number; // aporte fresco por periodo (Bs)
-  cadenciaDias: number; // cada cuántos días se abre un DPF
-  plazoDias: number; // plazo de cada DPF
+  cadenciaMeses: number; // cada cuántos meses se abre un DPF
+  plazoMeses: number; // plazo de cada DPF (meses)
   tasaAnual: number; // ej. 0.077
   periodos: number; // cuántos DPF se abren
   reinvertirInteres: boolean; // reinvertir el interés líquido al vencer
@@ -244,7 +255,7 @@ export function simularLaddering(p: ParamsSimulador): ResultadoSimulador {
   let fechaPrev = "";
 
   for (let i = 0; i < periodos; i++) {
-    const fecha = sumarDias(p.fechaInicio, i * p.cadenciaDias);
+    const fecha = sumarMeses(p.fechaInicio, i * p.cadenciaMeses);
 
     // Libera los DPF que vencieron en (fechaPrev, fecha].
     let liberadoCapital = 0;
@@ -263,9 +274,9 @@ export function simularLaddering(p: ParamsSimulador): ResultadoSimulador {
     const reinversion = liberadoCapital + (p.reinvertirInteres ? liberadoInteres : 0);
     const principal = redondea(aporteFresco + reinversion);
 
-    const bruto = interesBruto(principal, p.tasaAnual, p.plazoDias);
+    const bruto = interesBruto(principal, p.tasaAnual, p.plazoMeses);
     const liquido = interesLiquido(bruto, p.cobraIva);
-    const vencimiento = sumarDias(fecha, p.plazoDias);
+    const vencimiento = sumarMeses(fecha, p.plazoMeses);
 
     deposits.push({ apertura: fecha, vencimiento, principal, interesLiquido: liquido, interesBruto: bruto, liberado: false });
 

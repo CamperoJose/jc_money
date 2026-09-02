@@ -81,6 +81,10 @@ total_bob = Σ(amount de cuentas en BOB, no pasivas)
 **Sesión 6 (migración 0007):** `cobra_iva` bool (default false — solo entonces se retiene RC-IVA;
 si false, líquido = bruto), `paid_account_id` FK accounts (a qué cuenta se cobró al pagar) y
 `paid_at` date. Los montos/tasas se redondean (tasa 4 dec., dinero 2 dec.) para evitar ruido de float.
+**Sesión 7 (migración 0009):** `term_months` (plazo en MESES) es la base del cálculo. El interés es
+**anual y se prorratea por meses**: `bruto = capital · tasa · meses/12`. `end_date` (fecha de
+liberación) es **editable manualmente** en el form (default = inicio + meses). `term_days` se conserva
+como span real derivado de las fechas (referencia).
 Derivados en lectura (no almacenados): días restantes = end_date − hoy; interés diario informativo.
 **Convención de interés (implementada en `lib/dpf.ts`):** base **365 días** (año que usaba el Excel),
 `bruto = principal · tasa · plazo/365`, `líquido = bruto · 0,87` (RC-IVA 13%). Estado de liberación

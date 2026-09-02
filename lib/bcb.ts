@@ -59,28 +59,53 @@ export function fechaISOaConsulta(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
+/** Nombres de parámetro por defecto del método (según el documento del BCB). */
+export const PARAM_NAMES_DEFAULT = ["codIndicador", "codMoneda", "fecha"] as const;
+
 /** Extrae el targetNamespace del WSDL. */
 export function extraerTargetNamespace(wsdl: string): string | null {
   const m = wsdl.match(/targetNamespace\s*=\s*"([^"]+)"/);
   return m ? m[1] : null;
 }
 
-/** Construye el sobre SOAP 1.1 para obtenerIndicador. */
+/**
+ * Descubre los nombres de los 3 parámetros de `obtenerIndicador` a partir del
+ * WSDL/XSD (JAX-WS a veces los expone como arg0/arg1/arg2 en vez de los nombres
+ * del documento). Devuelve null si no logra determinarlos.
+ */
+export function descubrirParamNames(wsdl: string): string[] | null {
+  // Busca el complexType asociado al request (por nombre) o el element inline.
+  const ct = wsdl.match(
+    /<(?:\w+:)?complexType[^>]*\bname="obtenerIndicador"[^>]*>([\s\S]*?)<\/(?:\w+:)?complexType>/i
+  );
+  let bloque = ct?.[1] ?? null;
+  if (!bloque) {
+    const el = wsdl.match(
+      /<(?:\w+:)?element[^>]*\bname="obtenerIndicador"[^>]*>([\s\S]*?)<\/(?:\w+:)?element>/i
+    );
+    bloque = el?.[1] ?? null;
+  }
+  if (!bloque) return null;
+  const nombres = [...bloque.matchAll(/<(?:\w+:)?element[^>]*\bname="([^"]+)"/gi)].map((m) => m[1]);
+  return nombres.length >= 3 ? nombres.slice(0, 3) : null;
+}
+
+/** Construye el sobre SOAP 1.1 para obtenerIndicador con nombres de param dados. */
 export function construirEnvelope(
   namespace: string,
-  codIndicador: number,
-  codMoneda: number,
-  fechaDDMMYYYY: string
+  paramNames: readonly string[],
+  valores: [number | string, number | string, string]
 ): string {
+  const [p1, p2, p3] = paramNames;
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:web="${namespace}">` +
     `<soapenv:Header/>` +
     `<soapenv:Body>` +
     `<web:obtenerIndicador>` +
-    `<codIndicador>${codIndicador}</codIndicador>` +
-    `<codMoneda>${codMoneda}</codMoneda>` +
-    `<fecha>${fechaDDMMYYYY}</fecha>` +
+    `<${p1}>${valores[0]}</${p1}>` +
+    `<${p2}>${valores[1]}</${p2}>` +
+    `<${p3}>${valores[2]}</${p3}>` +
     `</web:obtenerIndicador>` +
     `</soapenv:Body>` +
     `</soapenv:Envelope>`
@@ -119,6 +144,7 @@ export interface ConsultaBCB {
   codMoneda: number;
   fechaISO: string; // "YYYY-MM-DD"
   namespace?: string; // si no se da, se descubre del WSDL
+  paramNames?: string[]; // si no se da, se descubre del WSDL (o default)
   soapAction?: string;
 }
 
@@ -128,44 +154,78 @@ type FetchLike = (url: string, init?: {
   body?: string;
 }) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>;
 
+/** Resuelve namespace y nombres de parámetro (del WSDL si hace falta). */
+async function resolverServicio(
+  fetchImpl: FetchLike,
+  consulta: ConsultaBCB
+): Promise<{ namespace: string; paramNames: string[] }> {
+  let namespace = consulta.namespace;
+  let paramNames = consulta.paramNames;
+  if (!namespace || !paramNames) {
+    const wsdlRes = await fetchImpl(BCB_WSDL_URL, { method: "GET" });
+    if (!wsdlRes.ok) throw new Error(`No se pudo leer el WSDL del BCB (HTTP ${wsdlRes.status}).`);
+    const wsdl = await wsdlRes.text();
+    namespace = namespace ?? extraerTargetNamespace(wsdl) ?? undefined;
+    paramNames = paramNames ?? descubrirParamNames(wsdl) ?? [...PARAM_NAMES_DEFAULT];
+  }
+  if (!namespace) throw new Error("No se pudo determinar el namespace del servicio BCB.");
+  return { namespace, paramNames: paramNames ?? [...PARAM_NAMES_DEFAULT] };
+}
+
+export interface DiagnosticoBCB {
+  namespace: string;
+  paramNames: string[];
+  envelope: string;
+  status: number;
+  raw: string;
+  parsed: RespuestaBCB;
+}
+
 /**
- * Consulta el T/C al BCB. Descubre el targetNamespace del WSDL si no se
- * provee, arma el sobre SOAP, hace el POST y parsea la respuesta.
+ * Ejecuta la consulta y devuelve TODO (sobre enviado, HTTP status, XML crudo y
+ * parseo) sin lanzar por codError. Útil para diagnosticar el servicio en prod.
+ */
+export async function diagnosticarTipoCambioBCB(
+  fetchImpl: FetchLike,
+  consulta: ConsultaBCB
+): Promise<DiagnosticoBCB> {
+  const { namespace, paramNames } = await resolverServicio(fetchImpl, consulta);
+  const fecha = fechaISOaConsulta(consulta.fechaISO);
+  const envelope = construirEnvelope(namespace, paramNames, [
+    consulta.codIndicador,
+    consulta.codMoneda,
+    fecha,
+  ]);
+  const res = await fetchImpl(BCB_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction: consulta.soapAction ?? "" },
+    body: envelope,
+  });
+  const raw = await res.text();
+  return { namespace, paramNames, envelope, status: res.status, raw, parsed: parseRespuestaBCB(raw) };
+}
+
+/**
+ * Consulta el T/C al BCB. Descubre namespace y nombres de parámetro del WSDL si
+ * no se proveen, arma el sobre SOAP, hace el POST y parsea la respuesta.
  * Lanza Error con mensaje claro ante fallos de red o codError != 0.
  */
 export async function obtenerTipoCambioBCB(
   fetchImpl: FetchLike,
   consulta: ConsultaBCB
 ): Promise<RespuestaBCB> {
-  let namespace = consulta.namespace;
-  if (!namespace) {
-    const wsdlRes = await fetchImpl(BCB_WSDL_URL, { method: "GET" });
-    if (!wsdlRes.ok) throw new Error(`No se pudo leer el WSDL del BCB (HTTP ${wsdlRes.status}).`);
-    const wsdl = await wsdlRes.text();
-    namespace = extraerTargetNamespace(wsdl) ?? undefined;
-    if (!namespace) throw new Error("No se pudo determinar el namespace del servicio BCB.");
+  const d = await diagnosticarTipoCambioBCB(fetchImpl, consulta);
+  if (d.status < 200 || d.status >= 300) {
+    throw new Error(`El servicio del BCB respondió HTTP ${d.status}.`);
   }
-
-  const fecha = fechaISOaConsulta(consulta.fechaISO);
-  const envelope = construirEnvelope(namespace, consulta.codIndicador, consulta.codMoneda, fecha);
-
-  const res = await fetchImpl(BCB_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/xml; charset=UTF-8",
-      SOAPAction: consulta.soapAction ?? "",
-    },
-    body: envelope,
-  });
-  if (!res.ok) throw new Error(`El servicio del BCB respondió HTTP ${res.status}.`);
-  const xml = await res.text();
-  const r = parseRespuestaBCB(xml);
-
+  const r = d.parsed;
   if (r.codError && r.codError !== "0") {
     throw new Error(`BCB codError ${r.codError}: ${BCB_ERRORES[r.codError] ?? "error desconocido"}`);
   }
   if (r.valor == null) {
-    throw new Error("La respuesta del BCB no incluyó un valor de tipo de cambio.");
+    throw new Error(
+      `La respuesta del BCB no incluyó un valor. Revisa el formato (namespace ${d.namespace}, params ${d.paramNames.join("/")}). Fragmento: ${d.raw.slice(0, 300)}`
+    );
   }
   return r;
 }

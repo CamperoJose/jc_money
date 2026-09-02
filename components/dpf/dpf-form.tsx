@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FloppyDisk, Warning, CalendarBlank } from "@phosphor-icons/react";
+import { FloppyDisk, Warning } from "@phosphor-icons/react";
 import {
   Dialog,
   DialogHeader,
@@ -16,11 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatBob, formatDate } from "@/lib/format";
-import { sumarDias, interesBruto, interesLiquido, redondeaTasa } from "@/lib/dpf";
+import { formatBob } from "@/lib/format";
+import { sumarMeses, interesBruto, interesLiquido, redondeaTasa } from "@/lib/dpf";
 import type { Account, DpfDeposit, DpfStatus } from "@/lib/types";
 
-const PLAZOS = [30, 60, 90, 120, 180, 270, 360, 720];
+const PLAZOS_MESES = [1, 2, 3, 6, 9, 12, 18, 24, 36];
 
 /** Convierte una fracción (0.066) a texto de % sin ruido de float ("6.6"). */
 function tasaAInput(fraccion: number): string {
@@ -46,7 +46,11 @@ export function DpfForm({
   const [pizarra, setPizarra] = useState(registro?.pizarra ?? "");
   const [idDpf, setIdDpf] = useState(registro?.id_dpf_externo ?? "");
   const [inicio, setInicio] = useState(registro?.start_date ?? hoyInput());
-  const [plazo, setPlazo] = useState(String(registro?.term_days ?? 90));
+  const [plazoMeses, setPlazoMeses] = useState(String(registro?.term_months ?? 3));
+  const [fin, setFin] = useState(
+    registro?.end_date ?? sumarMeses(registro?.start_date ?? hoyInput(), registro?.term_months ?? 3)
+  );
+  const [finTocado, setFinTocado] = useState(false);
   const [monto, setMonto] = useState(registro ? String(registro.principal) : "");
   const [tasa, setTasa] = useState(registro ? tasaAInput(registro.annual_rate) : "");
   const [estado, setEstado] = useState<DpfStatus>(registro?.status ?? "activo");
@@ -57,11 +61,14 @@ export function DpfForm({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const plazoNum = parseInt(plazo, 10) || 0;
-  const finCalculado = useMemo(
-    () => (inicio && plazoNum > 0 ? sumarDias(inicio, plazoNum) : null),
-    [inicio, plazoNum]
-  );
+  const plazoNum = parseInt(plazoMeses, 10) || 0;
+
+  // Autocalcula la fecha de liberación desde inicio + plazo, salvo que el
+  // usuario la haya editado a mano (finTocado).
+  useEffect(() => {
+    if (finTocado || !inicio || plazoNum <= 0) return;
+    setFin(sumarMeses(inicio, plazoNum));
+  }, [inicio, plazoNum, finTocado]);
 
   const proyeccion = useMemo(() => {
     const principal = parseFloat(monto);
@@ -80,12 +87,15 @@ export function DpfForm({
     if (!(rate > 0 && rate <= 1)) return setError("Ingresa una tasa anual válida (ej. 7.7).");
     if (!(plazoNum > 0)) return setError("Selecciona un plazo válido.");
     if (!inicio) return setError("Ingresa la fecha de inicio.");
+    if (!fin) return setError("Ingresa la fecha de liberación.");
+    if (fin < inicio) return setError("La fecha de liberación no puede ser anterior al inicio.");
 
     const payload = {
       pizarra,
       id_dpf_externo: idDpf,
       start_date: inicio,
-      term_days: plazoNum,
+      term_months: plazoNum,
+      end_date: fin,
       principal,
       annual_rate: rate,
       status: estado,
@@ -166,26 +176,50 @@ export function DpfForm({
             <Input id="inicio" type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="plazo">Plazo (días)</Label>
-            <Select id="plazo" value={plazo} onChange={(e) => setPlazo(e.target.value)}>
-              {PLAZOS.map((p) => (
+            <Label htmlFor="plazo">Plazo (meses)</Label>
+            <Select id="plazo" value={plazoMeses} onChange={(e) => setPlazoMeses(e.target.value)}>
+              {PLAZOS_MESES.map((p) => (
                 <option key={p} value={p}>
-                  {p} días
+                  {p} {p === 1 ? "mes" : "meses"}
                 </option>
               ))}
-              {!PLAZOS.includes(plazoNum) && plazoNum > 0 && (
-                <option value={plazoNum}>{plazoNum} días</option>
+              {!PLAZOS_MESES.includes(plazoNum) && plazoNum > 0 && (
+                <option value={plazoNum}>{plazoNum} meses</option>
               )}
             </Select>
           </div>
         </div>
 
-        {finCalculado && (
-          <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-            <CalendarBlank weight="duotone" className="size-4" />
-            Vence el <span className="font-medium text-foreground">{formatDate(finCalculado)}</span>
+        {/* Fecha de liberación (editable) */}
+        <div className="space-y-1.5">
+          <Label htmlFor="fin">Fecha de liberación (vencimiento)</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="fin"
+              type="date"
+              value={fin}
+              min={inicio}
+              onChange={(e) => {
+                setFin(e.target.value);
+                setFinTocado(true);
+              }}
+              className="flex-1"
+            />
+            {finTocado && (
+              <button
+                type="button"
+                onClick={() => setFinTocado(false)}
+                className="shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                title="Volver a calcularla desde el plazo"
+              >
+                Auto
+              </button>
+            )}
           </div>
-        )}
+          <p className="text-[11px] text-muted-foreground">
+            Se calcula desde el inicio + plazo, pero puedes ajustarla a mano.
+          </p>
+        </div>
 
         {/* Monto + Tasa */}
         <div className="grid gap-3 sm:grid-cols-2">

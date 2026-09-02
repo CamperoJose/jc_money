@@ -5,9 +5,11 @@
 import {
   fechaISOaConsulta,
   extraerTargetNamespace,
+  descubrirParamNames,
   construirEnvelope,
   parseRespuestaBCB,
   obtenerTipoCambioBCB,
+  PARAM_NAMES_DEFAULT,
 } from "../lib/bcb.ts";
 
 let fallos = 0;
@@ -23,21 +25,45 @@ function chk(nombre: string, cond: boolean, extra?: unknown) {
 // 1) Formato de fecha
 chk("fechaISOaConsulta 2026-09-02 → 02/09/2026", fechaISOaConsulta("2026-09-02") === "02/09/2026");
 
-// 2) targetNamespace del WSDL
-const wsdlFake = `<?xml version="1.0"?><wsdl:definitions targetNamespace="http://webservices.bcb.gob.bo/" xmlns:wsdl="...">`;
+// 2) targetNamespace + descubrimiento de nombres de parámetro del WSDL
+const wsdlFake = `<?xml version="1.0"?><wsdl:definitions targetNamespace="http://webservices.bcb.gob.bo/" xmlns:wsdl="...">
+  <xsd:complexType name="obtenerIndicador">
+    <xsd:sequence>
+      <xsd:element name="codIndicador" type="xsd:int" minOccurs="0"/>
+      <xsd:element name="codMoneda" type="xsd:int" minOccurs="0"/>
+      <xsd:element name="fecha" type="xsd:string" minOccurs="0"/>
+    </xsd:sequence>
+  </xsd:complexType>
+</wsdl:definitions>`;
 chk(
   "extraerTargetNamespace",
   extraerTargetNamespace(wsdlFake) === "http://webservices.bcb.gob.bo/",
   extraerTargetNamespace(wsdlFake)
 );
+chk(
+  "descubrirParamNames (nombres del doc)",
+  JSON.stringify(descubrirParamNames(wsdlFake)) === JSON.stringify(["codIndicador", "codMoneda", "fecha"]),
+  descubrirParamNames(wsdlFake)
+);
+const wsdlArgs = `<definitions targetNamespace="http://ws/"><complexType name="obtenerIndicador"><sequence>
+  <element name="arg0" type="int"/><element name="arg1" type="int"/><element name="arg2" type="string"/>
+</sequence></complexType></definitions>`;
+chk(
+  "descubrirParamNames (arg0/arg1/arg2)",
+  JSON.stringify(descubrirParamNames(wsdlArgs)) === JSON.stringify(["arg0", "arg1", "arg2"]),
+  descubrirParamNames(wsdlArgs)
+);
 
 // 3) Envelope contiene los parámetros
-const env = construirEnvelope("http://webservices.bcb.gob.bo/", 1, 35, "02/09/2026");
+const env = construirEnvelope("http://webservices.bcb.gob.bo/", [...PARAM_NAMES_DEFAULT], [1, 35, "02/09/2026"]);
 chk("envelope tiene obtenerIndicador", env.includes("obtenerIndicador"));
 chk("envelope tiene codIndicador 1", env.includes("<codIndicador>1</codIndicador>"));
 chk("envelope tiene codMoneda 35", env.includes("<codMoneda>35</codMoneda>"));
 chk("envelope tiene fecha", env.includes("<fecha>02/09/2026</fecha>"));
 chk("envelope declara namespace", env.includes('xmlns:web="http://webservices.bcb.gob.bo/"'));
+// Envelope con nombres arg0/arg1/arg2
+const envArgs = construirEnvelope("http://ws/", ["arg0", "arg1", "arg2"], [1, 35, "02/09/2026"]);
+chk("envelope arg0/arg1/arg2", envArgs.includes("<arg0>1</arg0>") && envArgs.includes("<arg2>02/09/2026</arg2>"));
 
 // 4) Parseo de la respuesta de ejemplo del documento (5.2.2.1), con prefijos SOAP.
 const soapOk = `<?xml version="1.0" encoding="ISO-8859-1"?>
@@ -97,8 +123,9 @@ async function testNamespaceProvisto() {
     codMoneda: 35,
     fechaISO: "2026-09-02",
     namespace: "http://webservices.bcb.gob.bo/",
+    paramNames: ["codIndicador", "codMoneda", "fecha"],
   });
-  chk("con namespace provisto NO consulta el WSDL", getWsdl === false);
+  chk("con namespace+params provistos NO consulta el WSDL", getWsdl === false);
 }
 
 // 9) Error del BCB lanza excepción

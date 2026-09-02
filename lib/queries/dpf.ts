@@ -4,7 +4,7 @@ import { resumenDpf, type ResumenDpf } from "@/lib/dpf";
 import { getCuentas } from "@/lib/queries/patrimonio";
 
 const CAMPOS =
-  "id, nro_dpf, pizarra, edv, id_dpf_externo, start_date, end_date, principal, term_days, annual_rate, status, cobra_iva, gcia_economica, gcia_financiera, rc_iva_retencion, paid_account_id, paid_at, notes";
+  "id, nro_dpf, pizarra, edv, id_dpf_externo, start_date, end_date, principal, term_months, term_days, annual_rate, status, cobra_iva, gcia_economica, gcia_financiera, rc_iva_retencion, paid_account_id, paid_at, notes";
 
 function aDeposit(r: Record<string, unknown>): DpfDeposit {
   return {
@@ -16,7 +16,12 @@ function aDeposit(r: Record<string, unknown>): DpfDeposit {
     start_date: r.start_date as string,
     end_date: r.end_date as string,
     principal: Number(r.principal),
-    term_days: Number(r.term_days),
+    // term_months es la base del cálculo; si aún es null (fila previa a 0009),
+    // se estima desde term_days (≈30 días/mes) para no romper.
+    term_months:
+      r.term_months != null
+        ? Number(r.term_months)
+        : Math.max(1, Math.round(Number(r.term_days ?? 90) / 30)),
     annual_rate: Number(r.annual_rate),
     status: (r.status as DpfDeposit["status"]) ?? "activo",
     cobra_iva: Boolean(r.cobra_iva),
