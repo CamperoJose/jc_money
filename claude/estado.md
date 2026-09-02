@@ -2,7 +2,31 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 7 — DPF plazo en meses, fecha liberación manual, debug BCB)
+## Última actualización: 2026-09-02 (sesión 8 — job usa capital DPF activo, dashboard DPF enriquecido)
+
+### Sesión 8 — lo hecho ✅
+- **Job de patrimonio · valor DPF dinámico:** el saldo de la cuenta de tipo `dpf` (ej. "DPF
+  Congelado") en el cierre automático ya NO se copia de la base: se toma de **Σ principal de los DPF
+  activos** (`status='activo'`). Todo lo demás sigue igual (copy-paste de la última foto ± gastos del
+  día). El total se ajusta por `(capital DPF activo − DPF en la base)`. Si no hay cuenta de tipo dpf,
+  no toca nada. El resultado del job expone `dpf_activo_bob` y `dpf_ajuste_bob`.
+- **Dashboard de DPF enriquecido:** KPIs hero (capital en DPF, **ganancia total** = realizada +
+  proyectada, **capital rotado**, rendimiento activo/realizado) + 6 métricas (ganancia realizada,
+  proyectada, **interés mensual/flujo**, tasa promedio con rango, DPFs cobrados/activos, RC-IVA),
+  **rotación de capital** (barras abierto/mes + línea acumulada), capital por entidad, **ganancia
+  realizada vs proyectada**, liberación por mes, próximas liberaciones. Nuevos indicadores en
+  `resumenDpf` (capitalRotado, gananciaTotal, interesMensualActivo, rendimientoRealizado,
+  diasInvertido, porEntidad, serieRotacion, etc.).
+- **T/C no aparecía:** el run del workflow que compartió el usuario **solo mostraba el paso de
+  patrimonio, no el de T/C** → GitHub Actions está usando el **workflow viejo** (de la rama por
+  defecto, aún no `main`). Los cron y "Run workflow" leen el YAML de la **rama por defecto**. Fix
+  operativo: poner `main` como rama por defecto (y Production Branch de Vercel = main), o al usar "Run
+  workflow" elegir la rama **main** en el desplegable. La tabla `exchange_rates` sí existe (0008
+  aplicada); solo falta que el paso de T/C corra. Se puede cargar ya llamando el endpoint directo.
+
+---
+
+## Update previo: 2026-09-02 (sesión 7 — DPF plazo en meses, fecha liberación manual, debug BCB)
 
 ### Sesión 7 — lo hecho ✅
 - **DPF · plazo en MESES:** el interés es anual y se prorratea por meses invertidos

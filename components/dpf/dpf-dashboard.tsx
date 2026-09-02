@@ -2,18 +2,25 @@
 
 import Link from "next/link";
 import {
-  Bank,
   Percent,
   Vault,
   Warning,
   CalendarCheck,
   ArrowRight,
   TrendUp,
+  Recycle,
+  Coins,
+  CalendarBlank,
+  ChartLineUp,
+  HandCoins,
+  CheckCircle,
 } from "@phosphor-icons/react";
 import {
   Bar,
   BarChart,
   Cell,
+  Line,
+  ComposedChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -21,6 +28,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,22 +63,24 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
     gananciaBruta,
     rcIva,
     tasaPromedio,
+    tasaMax,
+    tasaMin,
     dpfsActivos,
     dpfsVencidos,
+    dpfsCobrados,
     rendimientoNeto,
+    rendimientoRealizado,
+    gananciaRealizadaLiquida,
+    gananciaTotal,
+    capitalRotado,
+    capitalPagado,
+    interesMensualActivo,
+    diasInvertido,
+    porEntidad,
+    serieRotacion,
     proximasLiberaciones,
     totalHistorico,
   } = resumen;
-
-  // Capital vigente por entidad (pizarra) para el donut.
-  const porEntidadMap = new Map<string, number>();
-  for (const d of proximasLiberaciones) {
-    const nombre = d.pizarra || "Sin entidad";
-    porEntidadMap.set(nombre, (porEntidadMap.get(nombre) ?? 0) + d.principal);
-  }
-  const porEntidad = [...porEntidadMap.entries()]
-    .map(([nombre, monto]) => ({ nombre, monto }))
-    .sort((a, b) => b.monto - a.monto);
 
   // Capital que se libera por mes (vencimientos futuros).
   const porMesMap = new Map<string, number>();
@@ -82,13 +92,22 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([periodo, monto]) => ({ periodo, nombre: nombreMes(periodo), monto }));
 
+  const dataRotacion = serieRotacion.map((r) => ({ ...r, nombre: nombreMes(r.periodo) }));
+
+  const gananciaData = [
+    { nombre: "Realizada", valor: gananciaRealizadaLiquida },
+    { nombre: "Proyectada", valor: gananciaLiquida },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Inversiones · DPF</h1>
           <p className="text-sm text-muted-foreground">
-            {dpfsActivos} {dpfsActivos === 1 ? "depósito activo" : "depósitos activos"} · {totalHistorico} en total
+            {dpfsActivos} {dpfsActivos === 1 ? "activo" : "activos"} · {dpfsCobrados} cobrados ·{" "}
+            {totalHistorico} en total
+            {diasInvertido != null ? ` · invirtiendo hace ${diasInvertido} días` : ""}
           </p>
         </div>
         <Link
@@ -100,7 +119,6 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
         </Link>
       </div>
 
-      {/* Alerta de vencidos */}
       {dpfsVencidos > 0 && (
         <div className="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
           <Warning weight="fill" className="size-5 shrink-0 text-destructive" />
@@ -111,31 +129,77 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
         </div>
       )}
 
-      {/* KPIs */}
+      {/* Hero KPIs */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi
-          icon={<Vault weight="duotone" className="size-5 text-primary" />}
+        <KpiHero
+          icon={<Vault weight="fill" className="size-5" />}
           label="Capital en DPF"
           valor={formatBob(montoEnDpf)}
+          sub={`${dpfsActivos} ${dpfsActivos === 1 ? "depósito activo" : "depósitos activos"}`}
         />
-        <Kpi
-          icon={<TrendUp weight="duotone" className="size-5 text-primary" />}
-          label="Ganancia líquida proyectada"
-          valor={formatBob(gananciaLiquida)}
-          sub={`Bruta ${formatBob(gananciaBruta)} · RC-IVA ${formatBob(rcIva)}`}
+        <KpiHero
+          icon={<TrendUp weight="fill" className="size-5" />}
+          label="Ganancia total"
+          valor={formatBob(gananciaTotal)}
+          sub={`Realizada ${formatBobCompact(gananciaRealizadaLiquida)} + proy. ${formatBobCompact(gananciaLiquida)}`}
         />
-        <Kpi
-          icon={<Percent weight="duotone" className="size-5 text-muted-foreground" />}
-          label="Tasa promedio (ponderada)"
+        <KpiHero
+          icon={<Recycle weight="fill" className="size-5" />}
+          label="Capital rotado"
+          valor={formatBob(capitalRotado)}
+          sub={`Dinero que ha pasado por DPF (${totalHistorico})`}
+        />
+        <KpiHero
+          icon={<Percent weight="fill" className="size-5" />}
+          label="Rendimiento activo"
+          valor={rendimientoNeto == null ? "—" : formatPercent(rendimientoNeto, 2)}
+          sub={rendimientoRealizado == null ? "Sobre capital vigente" : `Realizado ${formatPercent(rendimientoRealizado, 2)}`}
+        />
+      </div>
+
+      {/* Métricas secundarias */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <Metric
+          icon={HandCoins}
+          label="Ganancia realizada"
+          valor={formatBobCompact(gananciaRealizadaLiquida)}
+          hint={`Capital cobrado ${formatBobCompact(capitalPagado)}`}
+          tone="pos"
+        />
+        <Metric
+          icon={ChartLineUp}
+          label="Ganancia proyectada"
+          valor={formatBobCompact(gananciaLiquida)}
+          hint={`Bruta ${formatBobCompact(gananciaBruta)}`}
+          tone="pos"
+        />
+        <Metric
+          icon={Coins}
+          label="Interés mensual"
+          valor={formatBobCompact(interesMensualActivo)}
+          hint="Flujo de los activos / mes"
+          tone="neutral"
+        />
+        <Metric
+          icon={Percent}
+          label="Tasa promedio"
           valor={tasaPromedio == null ? "—" : formatPercent(tasaPromedio, 2)}
-          sub={rendimientoNeto == null ? undefined : `Rendimiento neto ${formatPercent(rendimientoNeto, 2)}`}
+          hint={tasaMin != null && tasaMax != null ? `${formatPercent(tasaMin, 2)}–${formatPercent(tasaMax, 2)}` : undefined}
+          tone="neutral"
         />
-        <Kpi
-          icon={<Bank weight="duotone" className="size-5 text-muted-foreground" />}
-          label="Depósitos activos"
-          valor={String(dpfsActivos)}
-          sub={dpfsVencidos > 0 ? `${dpfsVencidos} vencido(s)` : "Al día"}
-          tono={dpfsVencidos > 0 ? "malo" : undefined}
+        <Metric
+          icon={CheckCircle}
+          label="DPFs cobrados"
+          valor={String(dpfsCobrados)}
+          hint={`${dpfsActivos} activos`}
+          tone="neutral"
+        />
+        <Metric
+          icon={CalendarBlank}
+          label="RC-IVA proyectado"
+          valor={formatBobCompact(rcIva)}
+          hint={rcIva > 0 ? "13% sobre interés" : "Sin retención"}
+          tone={rcIva > 0 ? "neg" : "neutral"}
         />
       </div>
 
@@ -160,6 +224,37 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
         </CardContent>
       </Card>
 
+      {/* Rotación de capital */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Rotación de capital</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {dataRotacion.length === 0 ? (
+            <Vacio texto="Sin datos de rotación." />
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={dataRotacion} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                  tickFormatter={(v) => formatBobCompact(v)}
+                  width={70}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(v: number, n) => [formatBob(v), n === "abierto" ? "Abierto en el mes" : "Acumulado"]}
+                />
+                <Legend formatter={(v) => (v === "abierto" ? "Abierto en el mes" : "Acumulado")} wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="abierto" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                <Line type="monotone" dataKey="acumulado" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Capital por entidad */}
         <Card>
@@ -168,14 +263,14 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
           </CardHeader>
           <CardContent>
             {porEntidad.length === 0 ? (
-              <Vacio texto="Sin datos." />
+              <Vacio texto="Sin capital activo." />
             ) : (
               <div className="flex flex-col items-center gap-4 sm:flex-row">
                 <ResponsiveContainer width="100%" height={200} className="max-w-[220px]">
                   <PieChart>
                     <Pie
                       data={porEntidad}
-                      dataKey="monto"
+                      dataKey="capital"
                       nameKey="nombre"
                       innerRadius={45}
                       outerRadius={80}
@@ -191,12 +286,11 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
                 <div className="w-full flex-1 space-y-1.5">
                   {porEntidad.map((c, i) => (
                     <div key={c.nombre} className="flex items-center gap-2 text-sm">
-                      <span
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ background: PALETA[i % PALETA.length] }}
-                      />
-                      <span className="flex-1 truncate">{c.nombre}</span>
-                      <span className="w-24 text-right font-medium tabular-nums">{formatBob(c.monto)}</span>
+                      <span className="size-2.5 shrink-0 rounded-full" style={{ background: PALETA[i % PALETA.length] }} />
+                      <span className="flex-1 truncate">
+                        {c.nombre} <span className="text-xs text-muted-foreground">({c.dpfs})</span>
+                      </span>
+                      <span className="w-24 text-right font-medium tabular-nums">{formatBob(c.capital)}</span>
                     </div>
                   ))}
                 </div>
@@ -205,17 +299,17 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
           </CardContent>
         </Card>
 
-        {/* Vencimientos por mes */}
+        {/* Ganancia realizada vs proyectada */}
         <Card>
           <CardHeader>
-            <CardTitle>Liberación por mes</CardTitle>
+            <CardTitle>Ganancia realizada vs. proyectada</CardTitle>
           </CardHeader>
           <CardContent>
-            {porMes.length === 0 ? (
-              <Vacio texto="Sin vencimientos futuros." />
+            {gananciaRealizadaLiquida === 0 && gananciaLiquida === 0 ? (
+              <Vacio texto="Sin ganancias todavía." />
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={porMes} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <BarChart data={gananciaData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                   <YAxis
@@ -223,17 +317,44 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
                     tickFormatter={(v) => formatBobCompact(v)}
                     width={70}
                   />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(v: number) => [formatBob(v), "Al vencimiento"]}
-                  />
-                  <Bar dataKey="monto" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatBob(v), "Ganancia líquida"]} />
+                  <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
+                    {gananciaData.map((_, i) => (
+                      <Cell key={i} fill={i === 0 ? "var(--color-chart-1)" : "var(--color-chart-3)"} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Liberación por mes */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Liberación por mes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {porMes.length === 0 ? (
+            <Vacio texto="Sin vencimientos futuros." />
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={porMes} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                  tickFormatter={(v) => formatBobCompact(v)}
+                  width={70}
+                />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatBob(v), "Al vencimiento"]} />
+                <Bar dataKey="monto" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -253,17 +374,15 @@ function FilaLiberacion({ d }: { d: DpfDepositUI }) {
             <Badge variant={color}>{texto}</Badge>
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
-            Vence {formatDate(d.end_date)} · {formatPercent(d.annual_rate, 2)} anual
+            Vence {formatDate(d.end_date)} · {formatPercent(d.annual_rate, 2)} anual · {d.term_months}{" "}
+            {d.term_months === 1 ? "mes" : "meses"}
           </div>
         </div>
         <div className="shrink-0 text-right">
           <div className="text-sm font-bold tabular-nums text-primary">{formatBob(d.montoAlVencimiento)}</div>
-          <div className="text-xs text-muted-foreground tabular-nums">
-            capital {formatBob(d.principal)}
-          </div>
+          <div className="text-xs text-muted-foreground tabular-nums">capital {formatBob(d.principal)}</div>
         </div>
       </div>
-      {/* Barra de progreso */}
       <div className="mt-2.5 flex items-center gap-2">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div
@@ -299,36 +418,56 @@ export function etiquetaLiberacion(d: DpfDepositUI): {
   }
 }
 
-function Kpi({
+function KpiHero({
   icon,
   label,
   valor,
   sub,
-  tono,
 }: {
   icon: React.ReactNode;
   label: string;
   valor: string;
   sub?: string;
-  tono?: "bueno" | "malo";
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div
-            className={`text-lg font-bold tabular-nums ${
-              tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""
-            }`}
-          >
-            {valor}
-          </div>
-          {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
+    <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary/80">{label}</span>
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            {icon}
+          </span>
         </div>
+        <div className="mt-2 truncate text-2xl font-bold text-primary tabular-nums">{valor}</div>
+        {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
       </CardContent>
     </Card>
+  );
+}
+
+function Metric({
+  icon: Icon,
+  label,
+  valor,
+  hint,
+  tone,
+}: {
+  icon: React.ComponentType<{ className?: string; weight?: "duotone" }>;
+  label: string;
+  valor: string;
+  hint?: string;
+  tone: "pos" | "neg" | "neutral";
+}) {
+  const texto = tone === "pos" ? "text-primary" : tone === "neg" ? "text-destructive" : "text-foreground";
+  return (
+    <div className="rounded-xl border bg-card p-3 shadow-sm">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon weight="duotone" className="size-3.5 shrink-0" />
+        <span className="truncate">{label}</span>
+      </div>
+      <div className={`mt-1 truncate text-lg font-semibold tabular-nums ${texto}`}>{valor}</div>
+      {hint && <div className="truncate text-xs text-muted-foreground">{hint}</div>}
+    </div>
   );
 }
 

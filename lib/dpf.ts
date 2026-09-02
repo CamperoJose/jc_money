@@ -131,8 +131,20 @@ export interface ResumenDpf {
   dpfsVencidos: number; // count vencidos sin cobrar (requieren acción)
   totalHistorico: number; // count total
   rendimientoNeto: number | null; // gananciaLiquida / montoEnDpf
-  gananciaRealizadaLiquida: number; // Σ de los pagados (realizada o proyectada)
+  gananciaRealizadaLiquida: number; // Σ líquida de los pagados (realizada)
+  gananciaRealizadaBruta: number; // Σ bruta de los pagados
   capitalPagado: number; // Σ principal de los pagados
+  dpfsCobrados: number; // count pagados
+  capitalRotado: number; // Σ principal de TODOS (dinero que ha pasado por DPF)
+  gananciaTotal: number; // realizada (líquida) + proyectada (líquida, activos)
+  interesMensualActivo: number; // Σ interés mensual de los activos (flujo/mes)
+  rendimientoRealizado: number | null; // gananciaRealizadaLiquida / capitalPagado
+  diasInvertido: number | null; // hoy − primera fecha de inicio
+  primerInicio: string | null; // fecha del primer DPF
+  tasaMax: number | null; // mayor tasa entre activos
+  tasaMin: number | null; // menor tasa entre activos
+  porEntidad: { nombre: string; capital: number; dpfs: number }[]; // activos por entidad
+  serieRotacion: { periodo: string; abierto: number; acumulado: number }[]; // capital abierto por mes
   proximo: DpfDepositUI | null; // próximo a vencer (no pagado, con fecha futura o vencido)
   proximasLiberaciones: DpfDepositUI[]; // no pagados ordenados por vencimiento
 }
@@ -161,7 +173,49 @@ export function resumenDpf(
   const gananciaRealizadaLiquida = redondea(
     pagados.reduce((s, d) => s + (d.gcia_financiera ?? d.interesLiquido), 0)
   );
+  const gananciaRealizadaBruta = redondea(
+    pagados.reduce((s, d) => s + (d.gcia_economica ?? d.interesBruto), 0)
+  );
   const capitalPagado = redondea(pagados.reduce((s, d) => s + d.principal, 0));
+  const capitalRotado = redondea(dpfs.reduce((s, d) => s + d.principal, 0));
+  const gananciaTotal = redondea(gananciaRealizadaLiquida + gananciaLiquida);
+  const interesMensualActivo = redondea(noPagados.reduce((s, d) => s + d.interesMensual, 0));
+  const rendimientoRealizado = capitalPagado > 0 ? redondea4(gananciaRealizadaLiquida / capitalPagado) : null;
+
+  const tasasActivas = noPagados.map((d) => d.annual_rate);
+  const tasaMax = tasasActivas.length ? Math.max(...tasasActivas) : null;
+  const tasaMin = tasasActivas.length ? Math.min(...tasasActivas) : null;
+
+  const inicios = dpfs.map((d) => d.start_date).filter(Boolean).sort();
+  const primerInicio = inicios[0] ?? null;
+  const diasInvertido = primerInicio ? Math.max(0, diasEntre(primerInicio, hoy)) : null;
+
+  // Capital activo por entidad (pizarra).
+  const entidadMap = new Map<string, { capital: number; dpfs: number }>();
+  for (const d of noPagados) {
+    const nombre = d.pizarra || "Sin entidad";
+    const cur = entidadMap.get(nombre) ?? { capital: 0, dpfs: 0 };
+    cur.capital += d.principal;
+    cur.dpfs += 1;
+    entidadMap.set(nombre, cur);
+  }
+  const porEntidad = [...entidadMap.entries()]
+    .map(([nombre, v]) => ({ nombre, capital: redondea(v.capital), dpfs: v.dpfs }))
+    .sort((a, b) => b.capital - a.capital);
+
+  // Serie de rotación: capital abierto por mes (por fecha de inicio) + acumulado.
+  const rotMap = new Map<string, number>();
+  for (const d of dpfs) {
+    const periodo = d.start_date.slice(0, 7);
+    rotMap.set(periodo, (rotMap.get(periodo) ?? 0) + d.principal);
+  }
+  let acumulado = 0;
+  const serieRotacion = [...rotMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([periodo, abierto]) => {
+      acumulado = redondea(acumulado + abierto);
+      return { periodo, abierto: redondea(abierto), acumulado };
+    });
 
   // Próximas liberaciones: no pagados ordenados por fecha de vencimiento.
   const proximasLiberaciones = [...noPagados].sort((a, b) => a.end_date.localeCompare(b.end_date));
@@ -179,7 +233,19 @@ export function resumenDpf(
     totalHistorico: dpfs.length,
     rendimientoNeto: montoEnDpf > 0 ? redondea4(gananciaLiquida / montoEnDpf) : null,
     gananciaRealizadaLiquida,
+    gananciaRealizadaBruta,
     capitalPagado,
+    dpfsCobrados: pagados.length,
+    capitalRotado,
+    gananciaTotal,
+    interesMensualActivo,
+    rendimientoRealizado,
+    diasInvertido,
+    primerInicio,
+    tasaMax,
+    tasaMin,
+    porEntidad,
+    serieRotacion,
     proximo,
     proximasLiberaciones,
   };

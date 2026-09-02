@@ -11,6 +11,8 @@ export interface ResultadoJob {
   base_date?: string;
   base_total_bob?: number;
   neto_dia_bob?: number;
+  dpf_activo_bob?: number;
+  dpf_ajuste_bob?: number;
   total_bob?: number;
 }
 
@@ -33,6 +35,38 @@ async function getUsuarioId(admin: SupabaseClient): Promise<string | null> {
     if (data && data.length > 0) return (data[0] as { user_id: string }).user_id;
   }
   return null;
+}
+
+/**
+ * Cuenta de tipo `dpf` (ej. "DPF Congelado") y el capital vigente en DPF
+ * (Σ principal de los DPF con status 'activo'). Devuelve null si no hay cuenta
+ * de tipo dpf, en cuyo caso el job no toca ese saldo.
+ */
+async function getDpfCuentaYCapital(
+  admin: SupabaseClient,
+  userId: string
+): Promise<{ accountId: string; capital: number } | null> {
+  const { data: cuentas, error: eAcc } = await admin
+    .from("accounts")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("type", "dpf")
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (eAcc) throw eAcc;
+  const accountId = (cuentas?.[0] as { id: string } | undefined)?.id;
+  if (!accountId) return null;
+
+  const { data: dpfs, error: eDpf } = await admin
+    .from("dpf_deposits")
+    .select("principal")
+    .eq("user_id", userId)
+    .eq("status", "activo");
+  if (eDpf) throw eDpf;
+  const capital = redondear(
+    (dpfs ?? []).reduce((s, d) => s + Number((d as { principal: number }).principal), 0)
+  );
+  return { accountId, capital };
 }
 
 
@@ -117,7 +151,17 @@ export async function ejecutarPatrimonioDiario(
   }
   netoDia = redondear(netoDia);
 
-  const totalBob = redondear(baseTotalBob + netoDia);
+  // Valor de la cuenta DPF: se toma del capital vigente en DPF activos (no se
+  // copia de la base). El resto de cuentas sí se copian tal cual. El ajuste al
+  // total = (capital DPF activo − DPF que traía la base).
+  const dpfInfo = await getDpfCuentaYCapital(admin, userId);
+  let dpfAjuste = 0;
+  if (dpfInfo) {
+    const dpfEnBase = balancesBase.find((b) => b.account_id === dpfInfo.accountId)?.amount ?? 0;
+    dpfAjuste = redondear(dpfInfo.capital - dpfEnBase);
+  }
+
+  const totalBob = redondear(baseTotalBob + netoDia + dpfAjuste);
   const totalUsd = rate ? redondear(totalBob / rate) : null;
 
   // Inserta la foto auto.
@@ -131,22 +175,31 @@ export async function ejecutarPatrimonioDiario(
       exchange_rate: rate,
       total_bob: totalBob,
       total_usd: totalUsd,
-      note: `Autocalculado: base del ${base.snapshot_date} (${baseTotalBob}) ${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto del día.`,
+      note:
+        `Autocalculado: base del ${base.snapshot_date} (${baseTotalBob}) ` +
+        `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto del día` +
+        (dpfInfo ? ` ${dpfAjuste >= 0 ? "+" : "−"} ${Math.abs(dpfAjuste)} de ajuste DPF (capital activo ${dpfInfo.capital})` : "") +
+        ".",
     })
     .select("id")
     .single();
   if (eIns) throw eIns;
   const snapId = snap.id as string;
 
-  // Copia los saldos de la base para conservar la composición por cuenta.
+  // Copia los saldos de la base para conservar la composición por cuenta, pero
+  // el saldo de la cuenta DPF se reemplaza por el capital vigente en DPF activos.
   // OJO: con la service role el default `auth.uid()` no aplica, así que el
   // user_id debe ir explícito en cada fila (si no, viola el not-null de RLS).
   const filas = balancesBase.map((b) => ({
     user_id: userId,
     snapshot_id: snapId,
     account_id: b.account_id,
-    amount: b.amount,
+    amount: dpfInfo && b.account_id === dpfInfo.accountId ? dpfInfo.capital : b.amount,
   }));
+  // Si la base no tenía saldo para la cuenta DPF, se agrega con el capital activo.
+  if (dpfInfo && !balancesBase.some((b) => b.account_id === dpfInfo.accountId)) {
+    filas.push({ user_id: userId, snapshot_id: snapId, account_id: dpfInfo.accountId, amount: dpfInfo.capital });
+  }
   if (filas.length) {
     const { error: eBal } = await admin.from("net_worth_balances").insert(filas);
     if (eBal) {
@@ -164,6 +217,8 @@ export async function ejecutarPatrimonioDiario(
     base_date: base.snapshot_date as string,
     base_total_bob: baseTotalBob,
     neto_dia_bob: netoDia,
+    dpf_activo_bob: dpfInfo?.capital,
+    dpf_ajuste_bob: dpfInfo ? dpfAjuste : undefined,
     total_bob: totalBob,
   };
 }
