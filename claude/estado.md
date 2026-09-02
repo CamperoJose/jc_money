@@ -2,9 +2,34 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-01 (sesión 2 — auth + rediseño Patrimonio)
+## Última actualización: 2026-09-01 (sesión 3 — módulo Gastos + Configuración/Parámetros)
 
-### Fase actual: 1 (Tracking) — módulo Patrimonio funcional con ABM y dashboard
+### Fase actual: 2 (Tracking) — módulo Gastos funcional + ABM de parámetros
+
+### Sesión 3 — lo hecho ✅
+- **Módulo Gastos** (calca el patrón de Patrimonio):
+  - Registro de movimientos (gasto/ingreso) con **fecha+hora** (o botón "En este momento"),
+    **hora de Bolivia GMT-4** fija (sin DST). Selección de **cuenta de salida**, **categoría**,
+    **participante**, monto + moneda (BOB/USD/USDT con T/C) y descripción.
+    ⚠️ De momento NO impacta cuentas/patrimonio: es independiente (por pedido del usuario).
+  - `/tracking/gastos` (dashboard: KPIs, gasto vs ingreso por mes, gasto por categoría, top gastos)
+    y `/tracking/gastos/registros` (lista con filtros, tabla en desktop / tarjetas en móvil, ABM).
+  - API: `app/api/gastos/transacciones/{,[id]}`. Queries/mutations en `lib/{queries,mutations}/gastos.ts`.
+  - Helpers de zona horaria: `lib/datetime.ts` (datetime-local ↔ ISO, ancla -04:00).
+- **Configuración → Parámetros** (`/tracking/configuracion/parametros`): ABM de **participantes**,
+  **categorías de gasto**, **de ingreso** y **de inversión** (tabs). API en `app/api/parametros/*`.
+- **Nuevas primitivas UI**: `components/ui/select.tsx`, `components/ui/textarea.tsx`.
+- **Sidebar**: Gastos activado (Dashboard + Movimientos) y nuevo grupo Configuración → Parámetros.
+- **Migraciones** (pendientes de aplicar por el usuario, EN ORDEN):
+  `0004_gastos_parametros.sql` (enum `inversion`, tabla `participants`, `transactions.occurred_at`
+  + `participant_id`) y luego `0005_seed_gastos_parametros.sql` (participante "Yo" + categorías de
+  inversión). ⚠️ 0004 debe confirmarse ANTES de 0005 (enum recién creado no se usa en la misma tx).
+- **SSH**: remoto de este repo cambiado a `git@github.com:CamperoJose/jc_money.git` (la clave
+  `~/.ssh/id_ed25519` ya autentica con GitHub).
+- **Decisión de diseño**: "participante" = catálogo simple; un movimiento tiene **un** participante
+  opcional (ampliable a varios más adelante sin romper el esquema).
+
+### Fase 1 previa — módulo Patrimonio funcional con ABM y dashboard
 
 ### Sesión 2 — lo hecho ✅
 - **Auth arreglada:** el login daba `Invalid API key` porque `NEXT_PUBLIC_SUPABASE_ANON_KEY`

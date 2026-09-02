@@ -62,6 +62,40 @@ export function formatDate(iso: string | null | undefined): string {
   }).format(d);
 }
 
+// --- Fecha + hora con zona de Bolivia (America/La_Paz, fijo GMT-4) -----------
+// Bolivia no observa horario de verano, así que el offset es siempre -04:00.
+export const BOLIVIA_OFFSET = "-04:00";
+const BOLIVIA_TZ = "America/La_Paz";
+
+/** ISO instantáneo → texto legible "01 sep 2026, 14:30" en hora Bolivia. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("es-BO", {
+    timeZone: BOLIVIA_TZ,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+/** Solo la hora "14:30" en zona Bolivia. */
+export function formatTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-BO", {
+    timeZone: BOLIVIA_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
 export function formatPercent(n: number | null | undefined, decimals = 1): string {
   if (n == null || Number.isNaN(n)) return "—";
   return new Intl.NumberFormat("es-BO", {

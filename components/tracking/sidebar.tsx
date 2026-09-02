@@ -10,6 +10,9 @@ import {
   Wallet,
   Bank,
   HandCoins,
+  Gear,
+  Faders,
+  Receipt,
   SignOut,
   List as ListIcon,
   X,
@@ -41,9 +44,23 @@ const GROUPS: NavGroup[] = [
       { href: "/tracking/patrimonio/registros", label: "Registros", icon: ListBullets },
     ],
   },
-  { label: "Gastos", icon: Wallet, ready: false },
+  {
+    label: "Gastos",
+    icon: Wallet,
+    ready: true,
+    items: [
+      { href: "/tracking/gastos", label: "Dashboard", icon: ChartPieSlice },
+      { href: "/tracking/gastos/registros", label: "Movimientos", icon: Receipt },
+    ],
+  },
   { label: "Inversiones", icon: Bank, ready: false },
   { label: "Deudas", icon: HandCoins, ready: false },
+  {
+    label: "Configuración",
+    icon: Gear,
+    ready: true,
+    items: [{ href: "/tracking/configuracion/parametros", label: "Parámetros", icon: Faders }],
+  },
 ];
 
 const STORAGE_KEY = "mymoney.sidebar.collapsed";
