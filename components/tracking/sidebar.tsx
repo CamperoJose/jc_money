@@ -22,6 +22,7 @@ import {
   CurrencyDollar,
   Vault,
   Flask,
+  Package,
   type Icon,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -68,7 +69,18 @@ const GROUPS: NavGroup[] = [
       { href: "/tracking/inversiones/simulador", label: "Simulador", icon: Flask },
     ],
   },
-  { label: "Deudas", icon: HandCoins, ready: false },
+  {
+    label: "Activos",
+    icon: Package,
+    ready: true,
+    items: [{ href: "/tracking/activos", label: "Bienes vendibles", icon: Package }],
+  },
+  {
+    label: "Deudas",
+    icon: HandCoins,
+    ready: true,
+    items: [{ href: "/tracking/deudas", label: "Que me deben", icon: HandCoins }],
+  },
   {
     label: "Configuración",
     icon: Gear,

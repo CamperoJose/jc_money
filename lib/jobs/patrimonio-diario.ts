@@ -11,8 +11,8 @@ export interface ResultadoJob {
   base_date?: string;
   base_total_bob?: number;
   neto_dia_bob?: number;
-  dpf_activo_bob?: number;
-  dpf_ajuste_bob?: number;
+  ajuste_derivadas_bob?: number;
+  derivadas?: Record<string, number>;
   total_bob?: number;
 }
 
@@ -37,36 +37,98 @@ async function getUsuarioId(admin: SupabaseClient): Promise<string | null> {
   return null;
 }
 
-/**
- * Cuenta de tipo `dpf` (ej. "DPF Congelado") y el capital vigente en DPF
- * (Σ principal de los DPF con status 'activo'). Devuelve null si no hay cuenta
- * de tipo dpf, en cuyo caso el job no toca ese saldo.
- */
-async function getDpfCuentaYCapital(
-  admin: SupabaseClient,
-  userId: string
-): Promise<{ accountId: string; capital: number } | null> {
-  const { data: cuentas, error: eAcc } = await admin
-    .from("accounts")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("type", "dpf")
-    .order("created_at", { ascending: true })
-    .limit(1);
-  if (eAcc) throw eAcc;
-  const accountId = (cuentas?.[0] as { id: string } | undefined)?.id;
-  if (!accountId) return null;
+interface CuentaDerivada {
+  accountId: string;
+  label: string;
+  value: number;
+}
 
-  const { data: dpfs, error: eDpf } = await admin
-    .from("dpf_deposits")
-    .select("principal")
-    .eq("user_id", userId)
-    .eq("status", "activo");
-  if (eDpf) throw eDpf;
-  const capital = redondear(
-    (dpfs ?? []).reduce((s, d) => s + Number((d as { principal: number }).principal), 0)
-  );
-  return { accountId, capital };
+/** Busca el id de una cuenta por tipo o por nombre. */
+async function cuentaIdPor(
+  admin: SupabaseClient,
+  userId: string,
+  match: { type?: string; name?: string }
+): Promise<string | null> {
+  let q = admin.from("accounts").select("id").eq("user_id", userId);
+  if (match.type) q = q.eq("type", match.type);
+  if (match.name) q = q.eq("name", match.name);
+  const { data } = await q.order("created_at", { ascending: true }).limit(1);
+  return (data?.[0] as { id: string } | undefined)?.id ?? null;
+}
+
+/**
+ * Cuentas cuyo saldo el job AUTOCALCULA (no las copia de la base):
+ *  - DPF (Σ principal de DPF activos)
+ *  - Por Cobrar (Σ saldo de deudas no pagadas)
+ *  - Activos (Σ valor de activos que cuentan en patrimonio, en BOB)
+ * Cada fuente es resiliente: si su tabla/columna aún no existe (migración sin
+ * aplicar), se omite y el job conserva el saldo de la base para esa cuenta.
+ */
+async function getCuentasDerivadas(
+  admin: SupabaseClient,
+  userId: string,
+  rate: number
+): Promise<CuentaDerivada[]> {
+  const out: CuentaDerivada[] = [];
+
+  // DPF
+  try {
+    const accountId = await cuentaIdPor(admin, userId, { type: "dpf" });
+    if (accountId) {
+      const { data, error } = await admin
+        .from("dpf_deposits")
+        .select("principal")
+        .eq("user_id", userId)
+        .eq("status", "activo");
+      if (error) throw error;
+      const value = redondear((data ?? []).reduce((s, d) => s + Number((d as { principal: number }).principal), 0));
+      out.push({ accountId, label: "DPF", value });
+    }
+  } catch { /* tabla no lista: se omite */ }
+
+  // Por Cobrar (deudas)
+  try {
+    const accountId = await cuentaIdPor(admin, userId, { type: "por_cobrar" });
+    if (accountId) {
+      const { data, error } = await admin
+        .from("debts")
+        .select("amount, paid_amount, status")
+        .eq("user_id", userId)
+        .neq("status", "pagado");
+      if (error) throw error;
+      const value = redondear(
+        (data ?? []).reduce((s, d) => {
+          const r = d as { amount: number; paid_amount?: number };
+          return s + Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0));
+        }, 0)
+      );
+      out.push({ accountId, label: "Por Cobrar", value });
+    }
+  } catch { /* tabla/columna no lista: se omite */ }
+
+  // Activos
+  try {
+    const accountId = await cuentaIdPor(admin, userId, { name: "Activos" });
+    if (accountId) {
+      const { data, error } = await admin
+        .from("assets")
+        .select("acquisition_cost, current_value, currency")
+        .eq("user_id", userId)
+        .eq("status", "activo")
+        .eq("counts_in_patrimonio", true);
+      if (error) throw error;
+      const value = redondear(
+        (data ?? []).reduce((s, a) => {
+          const r = a as { acquisition_cost: number; current_value: number | null; currency: string };
+          const val = r.current_value != null ? Number(r.current_value) : Number(r.acquisition_cost);
+          return s + (r.currency === "BOB" ? val : val * rate);
+        }, 0)
+      );
+      out.push({ accountId, label: "Activos", value });
+    }
+  } catch { /* tabla no lista: se omite */ }
+
+  return out;
 }
 
 
@@ -151,18 +213,22 @@ export async function ejecutarPatrimonioDiario(
   }
   netoDia = redondear(netoDia);
 
-  // Valor de la cuenta DPF: se toma del capital vigente en DPF activos (no se
-  // copia de la base). El resto de cuentas sí se copian tal cual. El ajuste al
-  // total = (capital DPF activo − DPF que traía la base).
-  const dpfInfo = await getDpfCuentaYCapital(admin, userId);
-  let dpfAjuste = 0;
-  if (dpfInfo) {
-    const dpfEnBase = balancesBase.find((b) => b.account_id === dpfInfo.accountId)?.amount ?? 0;
-    dpfAjuste = redondear(dpfInfo.capital - dpfEnBase);
+  // Cuentas derivadas (DPF, Por Cobrar, Activos): su saldo se AUTOCALCULA (no se
+  // copia de la base). El resto de cuentas se copian tal cual. El ajuste al total
+  // = Σ (valor autocalculado − saldo que traía la base) por cada cuenta derivada.
+  const derivadas = await getCuentasDerivadas(admin, userId, rate);
+  const overrides = new Map(derivadas.map((d) => [d.accountId, d.value]));
+  let ajusteDerivadas = 0;
+  for (const d of derivadas) {
+    const enBase = balancesBase.find((b) => b.account_id === d.accountId)?.amount ?? 0;
+    ajusteDerivadas += d.value - enBase;
   }
+  ajusteDerivadas = redondear(ajusteDerivadas);
 
-  const totalBob = redondear(baseTotalBob + netoDia + dpfAjuste);
+  const totalBob = redondear(baseTotalBob + netoDia + ajusteDerivadas);
   const totalUsd = rate ? redondear(totalBob / rate) : null;
+
+  const detalleDerivadas = derivadas.map((d) => `${d.label}=${d.value}`).join(", ");
 
   // Inserta la foto auto.
   const { data: snap, error: eIns } = await admin
@@ -178,7 +244,7 @@ export async function ejecutarPatrimonioDiario(
       note:
         `Autocalculado: base del ${base.snapshot_date} (${baseTotalBob}) ` +
         `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto del día` +
-        (dpfInfo ? ` ${dpfAjuste >= 0 ? "+" : "−"} ${Math.abs(dpfAjuste)} de ajuste DPF (capital activo ${dpfInfo.capital})` : "") +
+        (derivadas.length ? ` ${ajusteDerivadas >= 0 ? "+" : "−"} ${Math.abs(ajusteDerivadas)} de ajuste derivadas (${detalleDerivadas})` : "") +
         ".",
     })
     .select("id")
@@ -186,19 +252,20 @@ export async function ejecutarPatrimonioDiario(
   if (eIns) throw eIns;
   const snapId = snap.id as string;
 
-  // Copia los saldos de la base para conservar la composición por cuenta, pero
-  // el saldo de la cuenta DPF se reemplaza por el capital vigente en DPF activos.
-  // OJO: con la service role el default `auth.uid()` no aplica, así que el
-  // user_id debe ir explícito en cada fila (si no, viola el not-null de RLS).
+  // Copia los saldos de la base, pero reemplaza los de las cuentas derivadas por
+  // su valor autocalculado. OJO: con la service role el default `auth.uid()` no
+  // aplica, así que el user_id debe ir explícito en cada fila (RLS not-null).
   const filas = balancesBase.map((b) => ({
     user_id: userId,
     snapshot_id: snapId,
     account_id: b.account_id,
-    amount: dpfInfo && b.account_id === dpfInfo.accountId ? dpfInfo.capital : b.amount,
+    amount: overrides.has(b.account_id) ? overrides.get(b.account_id)! : b.amount,
   }));
-  // Si la base no tenía saldo para la cuenta DPF, se agrega con el capital activo.
-  if (dpfInfo && !balancesBase.some((b) => b.account_id === dpfInfo.accountId)) {
-    filas.push({ user_id: userId, snapshot_id: snapId, account_id: dpfInfo.accountId, amount: dpfInfo.capital });
+  // Agrega las cuentas derivadas que la base no tenía.
+  for (const d of derivadas) {
+    if (!balancesBase.some((b) => b.account_id === d.accountId)) {
+      filas.push({ user_id: userId, snapshot_id: snapId, account_id: d.accountId, amount: d.value });
+    }
   }
   if (filas.length) {
     const { error: eBal } = await admin.from("net_worth_balances").insert(filas);
@@ -217,8 +284,8 @@ export async function ejecutarPatrimonioDiario(
     base_date: base.snapshot_date as string,
     base_total_bob: baseTotalBob,
     neto_dia_bob: netoDia,
-    dpf_activo_bob: dpfInfo?.capital,
-    dpf_ajuste_bob: dpfInfo ? dpfAjuste : undefined,
+    ajuste_derivadas_bob: derivadas.length ? ajusteDerivadas : undefined,
+    derivadas: derivadas.length ? Object.fromEntries(derivadas.map((d) => [d.label, d.value])) : undefined,
     total_bob: totalBob,
   };
 }

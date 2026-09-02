@@ -121,6 +121,8 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
     distribucionMoneda,
     distribucionCuentas,
     serieCuentas,
+    disponibilidadRapida,
+    disponibilidadPct,
   } = resumen;
   const sube = (variacionBob ?? 0) >= 0;
   const subeTotal = (variacionTotalBob ?? 0) >= 0;
@@ -177,6 +179,33 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
           icon={Trophy}
         />
       </section>
+
+      {/* Disponibilidad rápida (dinero líquido) */}
+      {disponibilidadRapida != null && (
+        <Card className="overflow-hidden border-primary/25 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                <Wallet weight="fill" className="size-5" />
+              </span>
+              <div>
+                <div className="text-sm font-semibold">Disponibilidad rápida</div>
+                <div className="text-xs text-muted-foreground">
+                  Efectivo, banco y stablecoins (sin DPF, activos ni por cobrar)
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-primary tabular-nums">{formatBob(disponibilidadRapida)}</div>
+              {disponibilidadPct != null && (
+                <div className="text-xs text-muted-foreground tabular-nums">
+                  {formatPercent(disponibilidadPct)} del patrimonio
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Métricas de decisión */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">

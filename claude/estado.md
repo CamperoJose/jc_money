@@ -2,7 +2,36 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 9 — BCB: formato real de respuesta + reintento de params)
+## Última actualización: 2026-09-02 (sesión 10 — Deudas, Activos, disponibilidad rápida, ícono)
+
+### Sesión 10 — lo hecho ✅
+- **BCB (fix definitivo):** con el cliente de referencia del usuario se confirmó: namespace fijo
+  `http://ws.bcb.gob.bo`, params `codIndicador/codMoneda/fecha`, y **USD = código 12** (34/35 dan 1003).
+  Se quitó el reintento arg0 (causaba HTTP 500). Migración `0010` pasa la config 35→12.
+- **Módulo Deudas ("que me deben"):** ABM + KPIs (por cobrar, cobrado, vencidas, por deudor) sobre la
+  tabla `debts` (+ `paid_amount`, migración 0011 para parciales). El job copia cada día su total a la
+  cuenta **Por Cobrar** = Σ saldo de deudas no pagadas (igual que DPF).
+- **Módulo Activos (bienes vendibles):** tabla `assets` (migración 0012) — costo, moneda, valor actual,
+  vendible, cuenta-en-patrimonio, y al **vender** (fecha+precio) calcula el **resultado/rendimiento**.
+  KPIs: en patrimonio, plusvalía no realizada, ganancia realizada, rendimiento. El job suma al
+  patrimonio (cuenta **Activos**, type 'otro') = Σ valor de activos contables activos (en BOB).
+- **Job genérico:** las cuentas derivadas (DPF, Por Cobrar, Activos) ahora se autocalculan de forma
+  unificada y **resiliente** (si una tabla/migración no está, se omite sin romper el job).
+- **Disponibilidad rápida:** card en el dashboard de patrimonio = efectivo + banco + stablecoins de la
+  última foto (sin DPF, activos ni por cobrar), con % del patrimonio.
+- **Ícono de la app:** moneda verde con flecha de crecimiento (`app/icon.svg` favicon + `app/apple-icon.png`
+  para iOS).
+- **Sidebar:** grupos **Activos** y **Deudas** activados.
+- **Migraciones pendientes de aplicar (en orden):** 0010, 0011, 0012.
+
+### PENDIENTE (necesita input del usuario) — Correos
+- Envío de correo diario de patrimonio con mini-dash HTML, y correo aparte de alerta cuando un DPF
+  vence ese día. Stack: Nodemailer + SMTP Gmail (App Password). **Falta que el usuario genere la App
+  Password y setee `SMTP_USER`/`SMTP_PASS`/`MAIL_TO` en Vercel + GitHub secrets.** Con eso se construye.
+
+---
+
+## Update previo: 2026-09-02 (sesión 9 — BCB: formato real de respuesta + reintento de params)
 
 ### Sesión 9 — lo hecho ✅ (T/C del BCB, con la respuesta REAL de producción)
 - **El debug reveló la respuesta real del BCB:** no es `<codError>/<valor>`, sino una **lista de

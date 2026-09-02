@@ -68,7 +68,13 @@ export interface ResumenPatrimonio {
   peorPeriodo: { fecha: string; monto: number } | null;
   distribucionMoneda: Record<Currency, number> | null;
   distribucionCuentas: DistribucionCuenta[];
+  // Disponibilidad rápida: efectivo/banco/stablecoin de la última foto (líquido).
+  disponibilidadRapida: number | null;
+  disponibilidadPct: number | null; // sobre el patrimonio total
 }
+
+/** Tipos de cuenta considerados de disposición inmediata (líquidos). */
+const TIPOS_LIQUIDOS = new Set(["banco", "efectivo", "stablecoin"]);
 
 /** Lista de cuentas/billeteras del usuario (para el formulario de registro). */
 export async function getCuentas(supabase: SupabaseClient): Promise<Account[]> {
@@ -245,6 +251,21 @@ export async function getResumen(
     ? distribucionPorMoneda(ultimo.balances, ultimo.exchange_rate)
     : null;
 
+  // Disponibilidad rápida: solo cuentas líquidas (efectivo/banco/stablecoin),
+  // valuadas en BOB. Excluye DPF, Por Cobrar, Activos y pasivos.
+  let disponibilidadRapida: number | null = null;
+  let disponibilidadPct: number | null = null;
+  if (ultimo) {
+    const r = ultimo.exchange_rate;
+    const liquido = ultimo.balances.reduce((acc, b) => {
+      if (b.account.is_liability || !TIPOS_LIQUIDOS.has(b.account.type)) return acc;
+      const bob = b.account.currency === "BOB" ? b.amount : b.amount * r;
+      return acc + bob;
+    }, 0);
+    disponibilidadRapida = Math.round(liquido * 100) / 100;
+    disponibilidadPct = ultimo.total_bob > 0 ? disponibilidadRapida / ultimo.total_bob : null;
+  }
+
   // Distribución por cuenta (última foto), ordenada de mayor a menor en BOB.
   let distribucionCuentas: DistribucionCuenta[] = [];
   if (ultimo) {
@@ -291,5 +312,7 @@ export async function getResumen(
     peorPeriodo,
     distribucionMoneda,
     distribucionCuentas,
+    disponibilidadRapida,
+    disponibilidadPct,
   };
 }

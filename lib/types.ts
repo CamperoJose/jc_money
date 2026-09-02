@@ -100,6 +100,55 @@ export interface DpfDepositUI extends DpfDeposit {
   liberacion: DpfLiberacion;
 }
 
+// --- Deudas (que me deben) --------------------------------------------------
+
+export type DebtStatus = "pendiente" | "parcial" | "pagado";
+
+export interface Debt {
+  id: string;
+  debt_date: string; // YYYY-MM-DD (fecha del préstamo)
+  amount: number; // monto total prestado
+  paid_amount: number; // cuánto ya me pagaron
+  reason: string | null; // motivo
+  counterparty: string | null; // quién me debe
+  status: DebtStatus;
+  due_date: string | null; // fecha de cobro esperada (opcional)
+}
+
+export interface DebtUI extends Debt {
+  outstanding: number; // por cobrar = amount − paid_amount (≥ 0)
+  vencida: boolean; // due_date pasada y aún no pagada
+  diasVencida: number | null; // días desde due_date (si venció)
+}
+
+// --- Activos (bienes vendibles) ---------------------------------------------
+
+export type AssetStatus = "activo" | "vendido";
+
+export interface Asset {
+  id: string;
+  name: string;
+  category: string | null;
+  acquired_date: string | null; // YYYY-MM-DD
+  acquisition_cost: number;
+  currency: Currency;
+  current_value: number | null; // valor estimado actual
+  sellable: boolean;
+  counts_in_patrimonio: boolean;
+  status: AssetStatus;
+  sold_date: string | null;
+  sold_price: number | null;
+  notes: string | null;
+}
+
+export interface AssetUI extends Asset {
+  valorActual: number; // current_value ?? acquisition_cost (en su moneda)
+  resultado: number; // vendido: sold_price − costo; activo: valorActual − costo
+  resultadoPct: number | null; // resultado / costo
+  realizado: boolean; // status === 'vendido'
+  diasTenencia: number | null; // (sold_date | hoy) − acquired_date
+}
+
 // --- Tipo de cambio (BCB) ---------------------------------------------------
 
 export interface ExchangeRate {
