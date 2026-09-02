@@ -1,22 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="MyMoney">
   <defs>
-    <linearGradient id="coin" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#34d17a"/>
-      <stop offset="1" stop-color="#15803d"/>
-    </linearGradient>
+    <radialGradient id="face" cx="38%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#5ee08f"/>
+      <stop offset="55%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#12833b"/>
+    </radialGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#8ef0b4"/>
-      <stop offset="1" stop-color="#0f5c2e"/>
+      <stop offset="0%" stop-color="#bff3d1"/>
+      <stop offset="100%" stop-color="#0c6b30"/>
     </linearGradient>
   </defs>
   <!-- coin body -->
   <circle cx="32" cy="32" r="30" fill="url(#rim)"/>
-  <circle cx="32" cy="32" r="27" fill="url(#coin)"/>
-  <!-- inner emboss ring -->
-  <circle cx="32" cy="32" r="22.5" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5"/>
-  <!-- growth arrow (up-right) -->
-  <g fill="none" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="20,40 29,31 35,37 44,24"/>
-    <polyline points="44,32 44,24 36,24"/>
-  </g>
+  <circle cx="32" cy="32" r="26.5" fill="url(#face)"/>
+  <!-- inner engraved ring -->
+  <circle cx="32" cy="32" r="21.5" fill="none" stroke="#0c6b30" stroke-opacity="0.35" stroke-width="1.4"/>
+  <!-- top highlight -->
+  <ellipse cx="26" cy="20" rx="12" ry="7" fill="#ffffff" opacity="0.18"/>
+  <!-- growth trend line -->
+  <polyline points="19,40 27,32 34,37 43,26" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- arrow head -->
+  <path d="M39.5 24.5 L46 21.5 L44.5 28.5 Z" fill="#ffffff"/>
 </svg>

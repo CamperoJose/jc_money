@@ -46,6 +46,7 @@ const GROUPS: NavGroup[] = [
     ready: true,
     items: [
       { href: "/tracking/patrimonio", label: "Dashboard", icon: ChartPieSlice },
+      { href: "/tracking/patrimonio/tendencias", label: "Tendencias", icon: ChartLineUp },
       { href: "/tracking/patrimonio/registros", label: "Registros", icon: ListBullets },
       { href: "/tracking/patrimonio/tipo-cambio", label: "Tipo de cambio", icon: CurrencyDollar },
     ],

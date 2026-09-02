@@ -69,6 +69,10 @@ export interface ResumenGastos {
   porCategoria: { nombre: string; montoBob: number; pct: number }[];
   porMes: { periodo: string; gastoBob: number; ingresoBob: number }[];
   topGastos: TransactionUI[];
+  // Últimos 7 días (incluye hoy), en zona Bolivia.
+  gasto7dias: number;
+  promedio7dias: number;
+  serie7dias: { fecha: string; etiqueta: string; gastoBob: number }[];
 }
 
 /** Resumen para el dashboard de gastos (mes actual en zona Bolivia). */
@@ -132,6 +136,34 @@ export async function getResumenGastos(
 
   const topGastos = [...delMes].sort((a, b) => b.amount_bob - a.amount_bob).slice(0, 5);
 
+  // --- Últimos 7 días (incluye hoy) ---
+  const hoyStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/La_Paz",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const dias7: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(`${hoyStr}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - i);
+    dias7.push(d.toISOString().slice(0, 10));
+  }
+  const gastoPorDia = new Map<string, number>();
+  for (const t of gastos) {
+    const dia = (t.txn_date || t.occurred_at).slice(0, 10);
+    if (dias7.includes(dia)) gastoPorDia.set(dia, (gastoPorDia.get(dia) ?? 0) + t.amount_bob);
+  }
+  const serie7dias = dias7.map((fecha) => {
+    const [y, m, dd] = fecha.split("-").map(Number);
+    const etiqueta = new Intl.DateTimeFormat("es-BO", { weekday: "short", day: "2-digit" }).format(
+      new Date(Date.UTC(y, m - 1, dd))
+    );
+    return { fecha, etiqueta, gastoBob: redondea(gastoPorDia.get(fecha) ?? 0) };
+  });
+  const gasto7dias = redondea(serie7dias.reduce((a, s) => a + s.gastoBob, 0));
+  const promedio7dias = redondea(gasto7dias / 7);
+
   return {
     transacciones,
     totalMesBob,
@@ -142,6 +174,9 @@ export async function getResumenGastos(
     porCategoria,
     porMes,
     topGastos,
+    gasto7dias,
+    promedio7dias,
+    serie7dias,
   };
 }
 

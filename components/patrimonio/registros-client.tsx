@@ -170,6 +170,7 @@ export function RegistrosClient({
           key={editando?.id ?? "nuevo"}
           cuentas={cuentas}
           registro={editando}
+          ultimo={snapshots.at(-1) ?? null}
           open={formOpen}
           onOpenChange={setFormOpen}
         />

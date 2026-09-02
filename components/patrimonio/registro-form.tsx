@@ -14,11 +14,17 @@ import type { SnapshotUI } from "@/lib/queries/patrimonio";
 
 type Montos = Record<string, string>; // account_id -> valor de texto
 
-function inicialMontos(cuentas: Account[], registro?: SnapshotUI | null): Montos {
+function inicialMontos(
+  cuentas: Account[],
+  registro?: SnapshotUI | null,
+  ultimo?: SnapshotUI | null
+): Montos {
   const m: Montos = {};
   for (const c of cuentas) m[c.id] = "";
-  if (registro) {
-    for (const b of registro.balances) m[b.account_id] = String(b.amount);
+  // Al editar: valores de esa foto. Al crear: copia los del último registro.
+  const fuente = registro ?? ultimo;
+  if (fuente) {
+    for (const b of fuente.balances) m[b.account_id] = String(b.amount);
   }
   return m;
 }
@@ -30,11 +36,13 @@ function hoyISO() {
 export function RegistroForm({
   cuentas,
   registro,
+  ultimo,
   open,
   onOpenChange,
 }: {
   cuentas: Account[];
   registro?: SnapshotUI | null;
+  ultimo?: SnapshotUI | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -42,9 +50,13 @@ export function RegistroForm({
   const editando = !!registro;
 
   const [fecha, setFecha] = useState(registro?.snapshot_date ?? hoyISO());
-  const [tc, setTc] = useState(registro ? String(registro.exchange_rate) : "");
+  // Al crear, arranca con el T/C del último registro (luego el efecto lo refresca
+  // con el T/C del BCB de esa fecha, si existe). Editando: el de esa foto.
+  const [tc, setTc] = useState(
+    registro ? String(registro.exchange_rate) : ultimo ? String(ultimo.exchange_rate) : ""
+  );
   const [nota, setNota] = useState(registro?.note ?? "");
-  const [montos, setMontos] = useState<Montos>(() => inicialMontos(cuentas, registro));
+  const [montos, setMontos] = useState<Montos>(() => inicialMontos(cuentas, registro, ultimo));
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tcInfo, setTcInfo] = useState<string | null>(null);
@@ -149,6 +161,7 @@ export function RegistroForm({
         <DialogTitle>{editando ? "Editar foto de patrimonio" : "Nueva foto de patrimonio"}</DialogTitle>
         <DialogDescription>
           Registra los saldos por cuenta en una fecha. El total se calcula automáticamente.
+          {!editando && ultimo ? " Se copiaron los valores del último registro; ajusta lo que cambió." : ""}
         </DialogDescription>
       </DialogHeader>
 

@@ -2,7 +2,28 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 10 — Deudas, Activos, disponibilidad rápida, ícono)
+## Última actualización: 2026-09-02 (sesión 11 — Tendencias, gastos 7 días, autofill, UI polish)
+
+### Sesión 11 — lo hecho ✅
+- **Correos:** probados en producción por el usuario, funcionan. ✅
+- **Tab Tendencias** (`/tracking/patrimonio/tendencias`): regresión lineal + crecimiento compuesto
+  sobre la serie de patrimonio. KPIs (ritmo mensual, crecimiento compuesto, **R²/confianza**, valor
+  actual), gráfico histórico + **línea proyectada**, proyecciones a 1/3/6/12/24 meses (lineal y
+  compuesto), y **metas** ("¿cuándo llego a 75k/100k/…?" con fecha estimada). Narrativa tipo
+  "si sigues así, el {fecha} tendrás {X}". Lógica pura en `lib/tendencias.ts`.
+- **Gastos últimos 7 días:** en el dashboard de gastos, card con total, promedio/día y **mini-gráfico
+  de barras por día**. Nuevos campos en `getResumenGastos`.
+- **Autollenar registro manual de patrimonio:** al crear una foto nueva, se copian los saldos por
+  cuenta y el T/C del **último registro** (editable; el T/C se refresca del BCB si hay dato del día).
+- **UI polish:** fondo del área de tracking con **difuminados/blobs** verdes suaves (fixed, -z-10) y
+  **sombras más suaves y con hover** en todas las tarjetas (base `Card`).
+- **Ícono rehecho:** moneda con degradado radial, anillo grabado, realce superior y flecha de
+  tendencia con cabeza sólida (favicon SVG + apple-icon PNG). Se ve mucho mejor.
+- **Sidebar:** Patrimonio ahora incluye **Tendencias**.
+
+---
+
+## Update previo: 2026-09-02 (sesión 10 — Deudas, Activos, disponibilidad rápida, ícono)
 
 ### Sesión 10 — lo hecho ✅
 - **BCB (fix definitivo):** con el cliente de referencia del usuario se confirmó: namespace fijo

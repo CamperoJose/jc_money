@@ -48,6 +48,9 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
     porCategoria,
     porMes,
     topGastos,
+    gasto7dias,
+    promedio7dias,
+    serie7dias,
   } = resumen;
 
   const mesActual = new Intl.DateTimeFormat("es-BO", {
@@ -99,6 +102,30 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
           valor={String(conteoMes)}
         />
       </div>
+
+      {/* Gasto de los últimos 7 días */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Gasto de los últimos 7 días</CardTitle>
+            <div className="text-right">
+              <div className="text-lg font-bold tabular-nums text-destructive">{formatBob(gasto7dias)}</div>
+              <div className="text-[11px] text-muted-foreground">promedio {formatBob(promedio7dias)}/día</div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={serie7dias} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis dataKey="etiqueta" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => formatBobCompact(v)} width={64} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatBob(v), "Gasto"]} cursor={{ fill: "var(--color-muted)", opacity: 0.4 }} />
+              <Bar dataKey="gastoBob" fill="var(--color-destructive)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Gasto vs ingreso por mes */}
