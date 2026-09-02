@@ -1,21 +1,19 @@
-import { TrendUp, TrendDown, CurrencyDollar, Coins } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
+import { TrendUp, TrendDown, Trophy, ListBullets, Wallet } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getResumen, type ResumenPatrimonio } from "@/lib/queries/patrimonio";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { CurvaPatrimonio } from "@/components/patrimonio/curva-chart";
+  EvolucionChart,
+  VariacionChart,
+  DistribucionCuentasChart,
+} from "@/components/patrimonio/dashboard-charts";
 import { formatBob, formatUsd, formatNumber, formatDate, formatPercent } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function PatrimonioPage() {
+export default async function PatrimonioDashboard() {
   const supabase = await createClient();
 
   let resumen: ResumenPatrimonio | null = null;
@@ -28,11 +26,19 @@ export default async function PatrimonioPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Patrimonio</h1>
-        <p className="text-sm text-muted-foreground">
-          Evolución de tu patrimonio neto en BOB y USD.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard de Patrimonio</h1>
+          <p className="text-sm text-muted-foreground">
+            Tu patrimonio neto, su evolución y en qué está distribuido.
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/tracking/patrimonio/registros">
+            <ListBullets weight="bold" className="size-4" />
+            Ver registros
+          </Link>
+        </Button>
       </div>
 
       {errorMsg && (
@@ -40,159 +46,201 @@ export default async function PatrimonioPage() {
           <CardContent className="pt-6 text-sm">
             <p className="font-medium text-destructive">No se pudieron leer los datos.</p>
             <p className="mt-1 text-muted-foreground">
-              Verifica que aplicaste el esquema SQL en Supabase
-              (<code>supabase/migrations/0001_schema_inicial.sql</code>) y las
-              semillas. Detalle: {errorMsg}
+              Verifica que aplicaste el esquema SQL en Supabase y las semillas. Detalle: {errorMsg}
             </p>
           </CardContent>
         </Card>
       )}
 
-      {resumen && (resumen.snapshots.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            Todavía no hay fotos de patrimonio. Cuando migres el Excel o registres
-            una foto, aparecerán aquí.
-          </CardContent>
-        </Card>
-      ) : (
-        <PatrimonioContenido resumen={resumen} />
-      ))}
+      {resumen &&
+        (resumen.snapshots.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              Todavía no hay fotos de patrimonio. Ve a{" "}
+              <Link href="/tracking/patrimonio/registros" className="font-medium text-primary underline">
+                Registros
+              </Link>{" "}
+              para crear la primera, o migra el Excel.
+            </CardContent>
+          </Card>
+        ) : (
+          <Contenido resumen={resumen} />
+        ))}
     </div>
   );
 }
 
-function PatrimonioContenido({ resumen }: { resumen: ResumenPatrimonio }) {
-  const { ultimo, variacionBob, variacionPct, distribucionMoneda } = resumen;
+function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
+  const {
+    ultimo,
+    variacionBob,
+    variacionPct,
+    variacionTotalBob,
+    variacionTotalPct,
+    maxBob,
+    distribucionMoneda,
+    distribucionCuentas,
+  } = resumen;
   const sube = (variacionBob ?? 0) >= 0;
+  const subeTotal = (variacionTotalBob ?? 0) >= 0;
+
+  const totalMoneda = distribucionMoneda
+    ? distribucionMoneda.BOB + distribucionMoneda.USD + distribucionMoneda.USDT
+    : 0;
 
   return (
     <>
+      {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Acento: el patrimonio neto usa el color primario del tema */}
-        <Card className="border-primary/30">
+        <Card className="border-primary/40 bg-gradient-to-br from-primary/10 to-primary/0 sm:col-span-2 lg:col-span-1">
           <CardHeader className="pb-2">
-            <CardDescription>Patrimonio neto</CardDescription>
-            <CardTitle className="text-2xl text-primary">
-              {formatBob(ultimo?.total_bob)}
-            </CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <CardDescription className="font-medium text-primary/80">Patrimonio neto</CardDescription>
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Wallet weight="fill" className="size-4" />
+              </span>
+            </div>
+            <CardTitle className="text-3xl text-primary tabular-nums">{formatBob(ultimo?.total_bob)}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {formatUsd(ultimo?.total_usd)}
+            {formatUsd(ultimo?.total_usd)} · al {formatDate(ultimo?.snapshot_date)}
+          </CardContent>
+        </Card>
+
+        <Kpi
+          label="Variación vs. anterior"
+          valor={variacionBob == null ? "—" : formatBob(Math.abs(variacionBob))}
+          sub={variacionPct == null ? "Sin comparación" : formatPercent(variacionPct)}
+          color={sube ? "pos" : "neg"}
+          icon={sube ? TrendUp : TrendDown}
+        />
+
+        <Kpi
+          label="Crecimiento total"
+          valor={variacionTotalBob == null ? "—" : formatBob(Math.abs(variacionTotalBob))}
+          sub={
+            variacionTotalPct == null
+              ? "Desde la 1ª foto"
+              : `${formatPercent(variacionTotalPct)} desde el inicio`
+          }
+          color={subeTotal ? "pos" : "neg"}
+          icon={subeTotal ? TrendUp : TrendDown}
+        />
+
+        <Kpi
+          label="Máximo histórico"
+          valor={formatBob(maxBob)}
+          sub={`${resumen.snapshots.length} fotos · T/C ${formatNumber(ultimo?.exchange_rate, 2)}`}
+          color="neutral"
+          icon={Trophy}
+        />
+      </div>
+
+      {/* Evolución */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Evolución del patrimonio</CardTitle>
+          <CardDescription>Serie histórica. Cambia entre BOB y USD.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EvolucionChart serie={resumen.serie} />
+        </CardContent>
+      </Card>
+
+      {/* Variación + Distribución moneda */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Variación por período</CardTitle>
+            <CardDescription>Cuánto cambió entre fotos consecutivas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <VariacionChart serie={resumen.serie} />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Variación vs. foto anterior</CardDescription>
-            <CardTitle
-              className={"flex items-center gap-1 text-2xl " + (sube ? "text-primary" : "text-destructive")}
-            >
-              {variacionBob == null ? (
-                "—"
-              ) : (
-                <>
-                  {sube ? <TrendUp className="size-5" /> : <TrendDown className="size-5" />}
-                  {formatBob(Math.abs(variacionBob))}
-                </>
-              )}
-            </CardTitle>
+          <CardHeader>
+            <CardTitle>Distribución por moneda</CardTitle>
+            <CardDescription>Valor en BOB de cada moneda (última foto).</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {variacionPct == null ? "Sin comparación" : formatPercent(variacionPct)}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Tipo de cambio (T/C)</CardDescription>
-            <CardTitle className="flex items-center gap-1 text-2xl">
-              <CurrencyDollar weight="duotone" className="size-5 text-muted-foreground" />
-              {formatNumber(ultimo?.exchange_rate, 2)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Bs por USD</CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Fotos registradas</CardDescription>
-            <CardTitle className="flex items-center gap-1 text-2xl">
-              <Coins weight="duotone" className="size-5 text-muted-foreground" />
-              {resumen.snapshots.length}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Última: {formatDate(ultimo?.snapshot_date)}
+          <CardContent className="space-y-3">
+            {distribucionMoneda &&
+              (["BOB", "USD", "USDT"] as const).map((m, i) => {
+                const val = distribucionMoneda[m];
+                const pct = totalMoneda ? val / totalMoneda : 0;
+                return (
+                  <div key={m}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="font-medium">{m}</span>
+                      <span className="tabular-nums">
+                        {formatBob(val)}{" "}
+                        <span className="text-muted-foreground">({formatNumber(pct * 100, 1)}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.max(pct * 100, 0)}%`,
+                          background: `var(--color-chart-${i + 1})`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
           </CardContent>
         </Card>
       </div>
 
+      {/* Distribución por cuenta */}
       <Card>
         <CardHeader>
-          <CardTitle>Evolución del patrimonio</CardTitle>
-          <CardDescription>Serie histórica en bolivianos.</CardDescription>
+          <CardTitle>Distribución por cuenta</CardTitle>
+          <CardDescription>Dónde está tu patrimonio ahora mismo (última foto).</CardDescription>
         </CardHeader>
         <CardContent>
-          <CurvaPatrimonio serie={resumen.serie} />
-        </CardContent>
-      </Card>
-
-      {distribucionMoneda && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribución por moneda (última foto)</CardTitle>
-            <CardDescription>Valor en BOB de cada moneda.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
-            {(["BOB", "USD", "USDT"] as const).map((m) => (
-              <div key={m} className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">{m}</div>
-                <div className="text-lg font-semibold">
-                  {formatBob(distribucionMoneda[m])}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Fotos de patrimonio</CardTitle>
-          <CardDescription>Cada fila es una foto por fecha.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead className="text-right">T/C</TableHead>
-                <TableHead className="text-right">Total BOB</TableHead>
-                <TableHead className="text-right">Total USD</TableHead>
-                <TableHead>Nota</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...resumen.snapshots].reverse().map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{formatDate(s.snapshot_date)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(s.exchange_rate, 2)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatBob(s.total_bob)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {formatUsd(s.total_usd)}
-                  </TableCell>
-                  <TableCell className="max-w-[180px] truncate text-xs text-muted-foreground">
-                    {s.note ?? ""}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DistribucionCuentasChart cuentas={distribucionCuentas} />
         </CardContent>
       </Card>
     </>
+  );
+}
+
+function Kpi({
+  label,
+  valor,
+  sub,
+  color,
+  icon: Icon,
+}: {
+  label: string;
+  valor: string;
+  sub: string;
+  color: "pos" | "neg" | "neutral";
+  icon: React.ComponentType<{ className?: string; weight?: "duotone" }>;
+}) {
+  const texto =
+    color === "pos" ? "text-primary" : color === "neg" ? "text-destructive" : "text-foreground";
+  const chip =
+    color === "pos"
+      ? "bg-primary/15 text-primary"
+      : color === "neg"
+        ? "bg-destructive/15 text-destructive"
+        : "bg-muted text-muted-foreground";
+  return (
+    <Card className="transition-shadow hover:shadow-md">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <CardDescription>{label}</CardDescription>
+          <span className={"flex size-8 items-center justify-center rounded-lg " + chip}>
+            <Icon weight="duotone" className="size-4" />
+          </span>
+        </div>
+        <CardTitle className={"text-2xl tabular-nums " + texto}>{valor}</CardTitle>
+      </CardHeader>
+      <CardContent className="text-sm text-muted-foreground">{sub}</CardContent>
+    </Card>
   );
 }

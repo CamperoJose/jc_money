@@ -24,3 +24,6 @@ venv/
 *.log
 .idea/
 .vscode/
+
+# TypeScript build info
+*.tsbuildinfo
