@@ -42,7 +42,7 @@ async function leerConfig(admin: SupabaseClient, userId: string) {
   const paramsRaw = map.get("tc_bcb_param_names");
   return {
     codIndicador: Number(map.get("tc_cod_indicador") ?? 1),
-    codMoneda: Number(map.get("tc_cod_moneda") ?? 35),
+    codMoneda: Number(map.get("tc_cod_moneda") ?? 12),
     namespace: map.get("tc_bcb_namespace") || undefined,
     soapAction: map.get("tc_bcb_soap_action") || undefined,
     paramNames: paramsRaw ? paramsRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined,

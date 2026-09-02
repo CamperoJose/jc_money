@@ -10,7 +10,7 @@ export default async function TipoCambioPage() {
   const supabase = await createClient();
 
   let rates: ExchangeRate[] = [];
-  let config: TcConfig = { cod_indicador: 1, cod_moneda: 35 };
+  let config: TcConfig = { cod_indicador: 1, cod_moneda: 12 };
   let errorMsg: string | null = null;
   try {
     config = await getTcConfig(supabase);

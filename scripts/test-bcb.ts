@@ -120,91 +120,60 @@ chk("pair ok: desIndicador", pPair.desIndicador === "Tipo de Cambio", pPair.desI
 const soapPairNoValor = `<return><codDato>CodError</codDato><dato>0</dato></return><return><codDato>TipoCambio</codDato><dato>6.96</dato></return>`;
 chk("pair fallback valor", parseRespuestaBCB(soapPairNoValor).valor === 6.96, parseRespuestaBCB(soapPairNoValor).valor);
 
-// 7) Orquestación con fetch simulado (descubre namespace + POST)
+// 7) Orquestación: NO lee el WSDL (namespace fijo), un solo POST con formato de pares.
 async function testOrquestacion() {
   const llamadas: string[] = [];
   const fakeFetch = async (url: string, init?: { method?: string; body?: string }) => {
     llamadas.push(`${init?.method ?? "GET"} ${url}`);
-    if (url.endsWith("?wsdl")) {
-      return { ok: true, status: 200, text: async () => wsdlFake };
-    }
-    // valida que el body tenga el envelope
     chk("orquestación: POST lleva envelope", (init?.body ?? "").includes("obtenerIndicador"));
-    return { ok: true, status: 200, text: async () => soapOk };
+    chk("orquestación: usa namespace ws.bcb.gob.bo", (init?.body ?? "").includes('xmlns:web="http://ws.bcb.gob.bo"'));
+    chk("orquestación: codMoneda 12", (init?.body ?? "").includes("<codMoneda>12</codMoneda>"));
+    return { ok: true, status: 200, text: async () => soapPairOk };
   };
-  const r = await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 35, fechaISO: "2026-09-02" });
+  const r = await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 12, fechaISO: "2026-09-02" });
   chk("orquestación: valor 6.96", r.valor === 6.96, r.valor);
-  chk("orquestación: hizo GET wsdl + POST", llamadas.length === 2, llamadas);
+  chk("orquestación: un solo POST, sin WSDL", llamadas.length === 1 && !llamadas[0].includes("?wsdl"), llamadas);
 }
 
-// 8) Orquestación con namespace provisto (no descubre WSDL)
-async function testNamespaceProvisto() {
+// 8) Nunca consulta el WSDL.
+async function testNoWsdl() {
   let getWsdl = false;
   const fakeFetch = async (url: string) => {
     if (url.endsWith("?wsdl")) getWsdl = true;
-    return { ok: true, status: 200, text: async () => soapOk };
+    return { ok: true, status: 200, text: async () => soapPairOk };
   };
-  await obtenerTipoCambioBCB(fakeFetch, {
-    codIndicador: 1,
-    codMoneda: 35,
-    fechaISO: "2026-09-02",
-    namespace: "http://webservices.bcb.gob.bo/",
-    paramNames: ["codIndicador", "codMoneda", "fecha"],
-  });
-  chk("con namespace+params provistos NO consulta el WSDL", getWsdl === false);
+  await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 12, fechaISO: "2026-09-02" });
+  chk("nunca consulta el WSDL", getWsdl === false);
 }
 
-// 9) Error del BCB lanza excepción
+// 9) codError != 0 lanza excepción con el código.
 async function testErrorLanza() {
-  const fakeFetch = async () => ({ ok: true, status: 200, text: async () => soapErr });
-  let lanzo = false;
-  try {
-    await obtenerTipoCambioBCB(fakeFetch, {
-      codIndicador: 1,
-      codMoneda: 35,
-      fechaISO: "2026-09-02",
-      namespace: "x",
-    });
-  } catch {
-    lanzo = true;
-  }
-  chk("codError 2001 lanza excepción", lanzo);
-}
-
-// 10) Reintento: si la convención codIndicador/… da 1003 (binding), reintenta
-//     con arg0/arg1/arg2 y tiene éxito.
-async function testRetryArgs() {
-  const fakeFetch = async (url: string, init?: { body?: string }) => {
-    if (url.endsWith("?wsdl")) return { ok: true, status: 200, text: async () => wsdlFake };
-    const body = init?.body ?? "";
-    return body.includes("<arg1>")
-      ? { ok: true, status: 200, text: async () => soapPairOk }
-      : { ok: true, status: 200, text: async () => soapReal1003 };
-  };
-  const r = await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 35, fechaISO: "2026-09-02" });
-  chk("retry a arg0/arg1/arg2 tras 1003", r.valor === 6.96, r.valor);
-}
-
-// 11) Si AMBAS convenciones dan 1003, lanza el codError 1003 (moneda inválida real).
-async function test1003Ambas() {
-  const fakeFetch = async (url: string) =>
-    url.endsWith("?wsdl")
-      ? { ok: true, status: 200, text: async () => wsdlFake }
-      : { ok: true, status: 200, text: async () => soapReal1003 };
+  const fakeFetch = async () => ({ ok: true, status: 200, text: async () => soapReal1003 });
   let msg = "";
   try {
-    await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 99, fechaISO: "2026-09-02" });
+    await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 35, fechaISO: "2026-09-02" });
   } catch (e) {
     msg = e instanceof Error ? e.message : String(e);
   }
-  chk("1003 en ambas convenciones lanza codError 1003", msg.includes("1003"), msg);
+  chk("codError 1003 lanza excepción con el código", msg.includes("1003"), msg);
+}
+
+// 10) HTTP 500 lanza excepción clara.
+async function testHttp500() {
+  const fakeFetch = async () => ({ ok: false, status: 500, text: async () => "error" });
+  let msg = "";
+  try {
+    await obtenerTipoCambioBCB(fakeFetch, { codIndicador: 1, codMoneda: 12, fechaISO: "2026-09-02" });
+  } catch (e) {
+    msg = e instanceof Error ? e.message : String(e);
+  }
+  chk("HTTP 500 lanza excepción", msg.includes("500"), msg);
 }
 
 await testOrquestacion();
-await testNamespaceProvisto();
+await testNoWsdl();
 await testErrorLanza();
-await testRetryArgs();
-await test1003Ambas();
+await testHttp500();
 
 if (fallos > 0) {
   console.error(`\n${fallos} test(s) fallaron.`);

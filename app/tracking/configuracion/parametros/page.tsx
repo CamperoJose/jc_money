@@ -11,7 +11,7 @@ export default async function ParametrosPage() {
   const supabase = await createClient();
 
   let categorias: Category[] = [];
-  let tcConfig: TcConfig = { cod_indicador: 1, cod_moneda: 35 };
+  let tcConfig: TcConfig = { cod_indicador: 1, cod_moneda: 12 };
   let errorMsg: string | null = null;
   try {
     [categorias, tcConfig] = await Promise.all([getCategorias(supabase), getTcConfig(supabase)]);

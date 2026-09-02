@@ -3,7 +3,8 @@ import type { ExchangeRate, TcConfig } from "@/lib/types";
 
 const CAMPOS = "id, rate_date, cod_indicador, cod_moneda, moneda_desc, valor, source, fetched_at";
 
-const DEFAULT_CONFIG: TcConfig = { cod_indicador: 1, cod_moneda: 35 };
+// Dólar (venta) del BCB = código 12 (34/35 del documento devuelven 1003).
+const DEFAULT_CONFIG: TcConfig = { cod_indicador: 1, cod_moneda: 12 };
 
 function aRate(r: Record<string, unknown>): ExchangeRate {
   return {

@@ -68,6 +68,6 @@ select u.id, s.key, s.value
 from (select id from auth.users order by created_at asc limit 1) u
 cross join (values
   ('tc_cod_indicador', '1'),
-  ('tc_cod_moneda',    '35')
+  ('tc_cod_moneda',    '12')   -- USD venta = 12 en el WS del BCB (34/35 dan 1003)
 ) as s(key, value)
 on conflict (user_id, key) do nothing;
