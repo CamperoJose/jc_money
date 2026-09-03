@@ -22,6 +22,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  TableRoot,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableFoot,
+} from "@/components/tremor/table";
 import { DpfForm } from "@/components/dpf/dpf-form";
 import { etiquetaLiberacion } from "@/components/dpf/dpf-dashboard";
 import { formatBob, formatPercent, formatDate } from "@/lib/format";
@@ -142,58 +152,105 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
             <span className="font-bold tabular-nums text-primary">{formatBob(capitalFiltrado)}</span>
           </div>
 
-          {/* Tabla (desktop) */}
+          {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <div className="relative w-full overflow-x-auto">
-              <table className="w-full caption-bottom text-sm">
-                <thead className="border-b bg-muted/40">
-                  <tr className="text-left text-muted-foreground">
-                    <th className="px-3 py-2.5 font-medium">Entidad</th>
-                    <th className="px-3 py-2.5 font-medium">Inicio</th>
-                    <th className="px-3 py-2.5 font-medium">Vence</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Capital</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Tasa</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Int. líquido</th>
-                    <th className="px-3 py-2.5 font-medium">Estado</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <TableRoot>
+              <Table>
+                <TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHeaderCell>Entidad</TableHeaderCell>
+                    <TableHeaderCell>Plazo</TableHeaderCell>
+                    <TableHeaderCell className="min-w-[190px]">Avance</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Capital</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Tasa</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Interés líquido</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Al vencimiento</TableHeaderCell>
+                    <TableHeaderCell>Estado</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                   {filtradas.map((d) => {
                     const et = etiquetaLiberacion(d);
+                    const pct = Math.round(Math.min(1, Math.max(0, d.progreso)) * 100);
+                    const vencido = d.liberacion === "vencido";
                     return (
-                      <tr key={d.id} className="border-b transition-colors hover:bg-muted/40">
-                        <td className="px-3 py-2.5">
-                          <div className="font-medium">{d.pizarra || "—"}</div>
-                          {d.id_dpf_externo && (
-                            <div className="text-xs text-muted-foreground">{d.id_dpf_externo}</div>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-                          {formatDate(d.start_date)}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5">
-                          <div>{formatDate(d.end_date)}</div>
-                          {d.status !== "pagado" && (
-                            <div className="text-xs text-muted-foreground">
-                              {d.diasRestantes < 0
+                      <TableRow key={d.id}>
+                        {/* Entidad + identificadores */}
+                        <TableCell className="max-w-[190px]">
+                          <div className="truncate font-medium text-foreground">{d.pizarra || "—"}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {[d.nro_dpf && `Nº ${d.nro_dpf}`, d.id_dpf_externo, d.edv && `EDV ${d.edv}`]
+                              .filter(Boolean)
+                              .join(" · ") || "sin identificador"}
+                          </div>
+                        </TableCell>
+
+                        {/* Inicio → fin + meses */}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="text-foreground">
+                            {formatDate(d.start_date)} → {formatDate(d.end_date)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {d.term_months} {d.term_months === 1 ? "mes" : "meses"} · {d.diasTotales} d
+                          </div>
+                        </TableCell>
+
+                        {/* Avance con barra */}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  d.status === "pagado"
+                                    ? "bg-muted-foreground"
+                                    : vencido
+                                      ? "bg-destructive"
+                                      : "bg-primary"
+                                }`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                              {pct}%
+                            </span>
+                          </div>
+                          <div className={`mt-1 text-xs ${vencido ? "text-destructive" : "text-muted-foreground"}`}>
+                            {d.status === "pagado"
+                              ? "cobrado"
+                              : d.diasRestantes < 0
                                 ? `venció hace ${Math.abs(d.diasRestantes)} d`
                                 : d.diasRestantes === 0
                                   ? "vence hoy"
                                   : `faltan ${d.diasRestantes} d`}
-                            </div>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums">
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
                           {formatBob(d.principal)}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                          {formatPercent(d.annual_rate, 2)}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-primary">
-                          {formatBob(d.interesLiquido)}
-                        </td>
-                        <td className="px-3 py-2.5">
+                        </TableCell>
+
+                        {/* Tasa + interés mensual */}
+                        <TableCell className="whitespace-nowrap text-right">
+                          <div className="tabular-nums text-foreground">{formatPercent(d.annual_rate, 2)}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">
+                            {formatBob(d.interesMensual)}/mes
+                          </div>
+                        </TableCell>
+
+                        {/* Interés líquido + RC-IVA */}
+                        <TableCell className="whitespace-nowrap text-right">
+                          <div className="font-medium tabular-nums text-primary">{formatBob(d.interesLiquido)}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">
+                            {d.cobra_iva ? `RC-IVA ${formatBob(d.rcIva)}` : "sin IVA"}
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
+                          {formatBob(d.montoAlVencimiento)}
+                        </TableCell>
+
+                        <TableCell>
                           <Badge variant={et.color}>{et.texto}</Badge>
                           {d.status === "pagado" && d.paidAccount && (
                             <div className="mt-1 text-xs text-muted-foreground">
@@ -201,11 +258,9 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
                               {d.paid_at ? ` · ${formatDate(d.paid_at)}` : ""}
                             </div>
                           )}
-                          {!d.cobra_iva && (
-                            <div className="text-[10px] text-muted-foreground">sin IVA</div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5">
+                        </TableCell>
+
+                        <TableCell>
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" className="size-8" onClick={() => editar(d)} aria-label="Editar">
                               <PencilSimple className="size-4" />
@@ -223,13 +278,31 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
                               <Trash className="size-4" />
                             </Button>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+                <TableFoot>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={3} className="font-semibold">
+                      {filtradas.length} {filtradas.length === 1 ? "DPF" : "DPFs"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {formatBob(filtradas.reduce((s, d) => s + d.principal, 0))}
+                    </TableCell>
+                    <TableCell />
+                    <TableCell className="text-right font-semibold tabular-nums text-primary">
+                      {formatBob(filtradas.reduce((s, d) => s + d.interesLiquido, 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {formatBob(filtradas.reduce((s, d) => s + d.montoAlVencimiento, 0))}
+                    </TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
+                </TableFoot>
+              </Table>
+            </TableRoot>
           </Card>
 
           {/* Tarjetas (móvil) */}

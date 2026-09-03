@@ -2,7 +2,39 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-03 (sesión 17 — fix fecha UTC de fotos + job respeta manual + diff por cuenta)
+## Última actualización: 2026-09-03 (sesión 18 — plantilla Tremor: primitivos y tablas enriquecidas)
+
+### Sesión 18 — lo hecho ✅
+- **Plantilla de referencia** en `referencia/template-overview` (Tremor "template-overview":
+  Next 15 + Recharts + TanStack Table + Tailwind v3). Es **solo consulta**: excluida de
+  TypeScript (`tsconfig.json` → `exclude`) y del escaneo de clases de Tailwind
+  (`@source not "../referencia"` en `globals.css`) para no ensuciar el bundle.
+  Ver `referencia/README.md` con la tabla de traducción de colores → tokens.
+- **`components/tremor/`** — primitivos portados de la plantilla pero con los **tokens del tema
+  tweakcn** (nunca colores hardcoded, según CLAUDE.md §3):
+  - `table.tsx`: TableRoot/Table/TableHead/TableHeaderCell/TableBody/TableRow/TableCell/TableFoot.
+  - `kpi-card.tsx`: `Kpi` (etiqueta + valor + detalle + barra) y `DeltaChip`.
+  - `progress-circle.tsx`: anillo de progreso con variantes semánticas.
+  - `category-bar.tsx`: barra segmentada con leyenda y marcador.
+  - `ui/badge.tsx` actualizado al look Tremor (ring interior tintado) + variantes
+    `warning`/`neutral`, manteniendo las existentes.
+- **Tablas con mucha más información** (misma lógica, cero cambios funcionales):
+  - **Deudas**: antigüedad, días a vencer, barra de avance de cobro con %, cuenta y fecha del
+    cobro, totales al pie.
+  - **Activos**: días de tenencia, cuenta destino y fecha de venta, resultado con barra
+    bidireccional (ganancia/pérdida), totales al pie.
+  - **Gastos/Movimientos**: día de la semana + antigüedad, tipo y moneda de la cuenta, badge de
+    **origen** (manual / 🎙️ voz / API), barra de peso relativo, totales (ingresos/gastos/neto).
+  - **DPF**: identificadores (Nº/EDV), plazo inicio→fin con meses y días, barra de avance con %,
+    interés mensual, RC-IVA, monto al vencimiento, totales al pie.
+  - **Presupuestos**: hero con `ProgressCircle` de avance global + KPIs Tremor.
+  - **Patrimonio**: distribución por moneda con `CategoryBar`.
+- **Pendiente de esta línea**: aplicar el estilo a Tendencias, Tipo de cambio, Simulador y
+  Asistente IA; y evaluar TanStack Table (orden/filtro/paginación) si se quiere más potencia.
+
+---
+
+## Update previo: 2026-09-03 (sesión 17 — fix fecha UTC de fotos + job respeta manual + diff por cuenta)
 
 ### Sesión 17 — lo hecho ✅
 - **BUG CRÍTICO corregido (fotos de patrimonio misdatadas):** el formulario usaba
