@@ -14,6 +14,13 @@ export function periodoActual(): string {
     .slice(0, 7);
 }
 
+/** Primer día del mes SIGUIENTE al periodo 'YYYY-MM' (para rangos exclusivos). */
+function primerDiaMesSiguiente(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  // m es 1-based; usarlo como índice 0-based de Date apunta al mes siguiente.
+  return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+}
+
 function montoBob(amount: number, currency: Currency, rate: number | null): number {
   if (currency === "BOB") return amount;
   const r = rate && rate > 0 ? rate : 1;
@@ -44,7 +51,7 @@ export async function getGastadoPorCategoria(
     .select("amount, currency, exchange_rate, category_id, txn_date, type")
     .eq("type", "gasto")
     .gte("txn_date", `${period}-01`)
-    .lte("txn_date", `${period}-31`);
+    .lt("txn_date", primerDiaMesSiguiente(period));
   if (error) throw error;
   const mapa = new Map<string, number>();
   for (const t of data ?? []) {
