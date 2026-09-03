@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isoAFechaBolivia } from "@/lib/datetime";
-import type { Currency, TxnType } from "@/lib/types";
+import type { Currency, TxnSource, TxnType } from "@/lib/types";
 
 export interface TransaccionInput {
   occurred_at: string; // ISO instantáneo (con zona)
@@ -11,6 +11,7 @@ export interface TransaccionInput {
   account_id?: string | null;
   category_id?: string | null;
   description?: string | null;
+  source?: TxnSource; // 'manual' (por defecto) | 'voz' | 'api'
 }
 
 /** Valida el payload. Devuelve mensaje de error o null si es válido. */
@@ -46,7 +47,7 @@ function filaDesde(input: TransaccionInput) {
     account_id: input.account_id || null,
     category_id: input.category_id || null,
     description: input.description?.trim() || null,
-    source: "manual" as const,
+    source: input.source ?? "manual",
   };
 }
 

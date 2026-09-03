@@ -27,3 +27,6 @@ venv/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Credencial de Vertex AI: se usa vía env var GCP_SA_JSON en prod (no versionar)
+credenciales/vertex-ai.json

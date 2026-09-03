@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/tracking/sidebar";
+import { VozFab } from "@/components/voz/voz-fab";
+import { getCuentas } from "@/lib/queries/patrimonio";
+import { getCategorias } from "@/lib/queries/gastos";
+import type { Account, Category } from "@/lib/types";
 
 export default async function TrackingLayout({
   children,
@@ -10,6 +14,18 @@ export default async function TrackingLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Catálogos para el registro por voz (gastos y deudas). Tolerante a fallos.
+  let cuentas: Account[] = [];
+  let categorias: Category[] = [];
+  try {
+    [cuentas, categorias] = await Promise.all([
+      getCuentas(supabase),
+      getCategorias(supabase, "gasto"),
+    ]);
+  } catch {
+    /* si falla, el botón de voz aún aparece con catálogos vacíos */
+  }
 
   return (
     // block en móvil (barra superior + contenido apilados), fila en desktop.
@@ -26,6 +42,7 @@ export default async function TrackingLayout({
           {children}
         </main>
       </div>
+      <VozFab cuentas={cuentas} categorias={categorias} />
     </div>
   );
 }
