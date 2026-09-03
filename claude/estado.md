@@ -2,7 +2,27 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-03 (sesión 16 — pulido UI/UX y voz por Shortcut afinada)
+## Última actualización: 2026-09-03 (sesión 17 — fix fecha UTC de fotos + job respeta manual + diff por cuenta)
+
+### Sesión 17 — lo hecho ✅
+- **BUG CRÍTICO corregido (fotos de patrimonio misdatadas):** el formulario usaba
+  `new Date().toISOString().slice(0,10)` (fecha **UTC**) como fecha por defecto. Después de las
+  20:00 de Bolivia (00:00 UTC) la fecha saltaba al día siguiente, y como `snapshotAtDesdeFecha`
+  usa **mediodía** para fechas que no son "hoy Bolivia", una foto hecha a las 22:00 quedaba como
+  "día siguiente 12:00". Eso desordenaba el historial y hacía que el job cerrara el día con la foto
+  equivocada. Fix: `hoyISO()` ahora usa `fechaBoliviaHoy()`.
+- **Job respeta el registro manual:** si el día objetivo ya tiene una foto **manual**, el job **no**
+  genera la automática (esa foto es la verdad del día). Sigue sin tocar/borrar otras fotos; solo
+  inserta su propia auto y usa como base la última foto (manual o auto) ≤ 23:59 del día.
+- **Botón "Cambios Δ" (diff por cuenta):** al expandir una foto, un toggle **Saldos / Cambios Δ**
+  muestra el cambio **cuenta por cuenta** respecto a la foto anterior (con "nueva"/"removida" y el
+  total). `DiffCuentas` en `registros-client.tsx`.
+- Nota al usuario: los datos ya creados con la fecha mala se corrigen editando la foto (cambiar la
+  fecha) o borrando la auto/errónea y re-registrando.
+
+---
+
+## Update previo: 2026-09-03 (sesión 16 — pulido UI/UX y voz por Shortcut afinada)
 
 ### Sesión 16 — lo hecho ✅
 - **Voz por Shortcut de iOS operativa.** Causa raíz de que “no registraba”: el **middleware**

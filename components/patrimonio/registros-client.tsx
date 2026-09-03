@@ -34,6 +34,7 @@ import type { SnapshotUI } from "@/lib/queries/patrimonio";
 
 interface FilaConDiff {
   s: SnapshotUI;
+  prev: SnapshotUI | null;
   diffBob: number | null;
   diffPct: number | null;
 }
@@ -60,7 +61,7 @@ export function RegistrosClient({
       const prev = i > 0 ? snapshots[i - 1] : null;
       const diffBob = prev ? Math.round((s.total_bob - prev.total_bob) * 100) / 100 : null;
       const diffPct = prev && prev.total_bob ? (s.total_bob - prev.total_bob) / prev.total_bob : null;
-      return { s, diffBob, diffPct };
+      return { s, prev, diffBob, diffPct };
     });
     return conDiff.reverse();
   }, [snapshots]);
@@ -142,10 +143,11 @@ export function RegistrosClient({
                 </tr>
               </thead>
               <tbody>
-                {filas.map(({ s, diffBob, diffPct }, idx) => (
+                {filas.map(({ s, prev, diffBob, diffPct }, idx) => (
                   <FilaSnapshot
                     key={s.id}
                     s={s}
+                    prev={prev}
                     diffBob={diffBob}
                     diffPct={diffPct}
                     zebra={idx % 2 === 1}
@@ -206,6 +208,7 @@ export function RegistrosClient({
 
 function FilaSnapshot({
   s,
+  prev,
   diffBob,
   diffPct,
   zebra,
@@ -216,6 +219,7 @@ function FilaSnapshot({
   onBorrar,
 }: {
   s: SnapshotUI;
+  prev: SnapshotUI | null;
   diffBob: number | null;
   diffPct: number | null;
   zebra: boolean;
@@ -225,6 +229,7 @@ function FilaSnapshot({
   onEditar: () => void;
   onBorrar: () => void;
 }) {
+  const [modoDiff, setModoDiff] = useState(false);
   const esAuto = s.kind === "auto";
   const balances = [...s.balances].sort((a, b) => {
     const va = a.account.currency === "BOB" ? a.amount : a.amount * s.exchange_rate;
@@ -318,39 +323,145 @@ function FilaSnapshot({
             {s.note && (
               <div className="mb-2 text-xs italic text-muted-foreground">{s.note}</div>
             )}
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Detalle por cuenta
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {modoDiff ? "Cambios cuenta por cuenta" : "Detalle por cuenta"}
+                {modoDiff && !prev && <span className="ml-1 normal-case">· sin foto anterior</span>}
+              </div>
+              <div className="inline-flex rounded-lg border p-0.5">
+                <button
+                  onClick={() => setModoDiff(false)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    !modoDiff ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Saldos
+                </button>
+                <button
+                  onClick={() => setModoDiff(true)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    modoDiff ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Cambios Δ
+                </button>
+              </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {balances.map((b) => {
-                const enBob = b.account.currency === "BOB" ? b.amount : b.amount * s.exchange_rate;
-                return (
-                  <div
-                    key={b.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 truncate text-sm font-medium">
-                        {b.account.name}
-                        <Badge variant={b.account.is_liability ? "destructive" : "secondary"}>
-                          {b.account.currency}
-                        </Badge>
+
+            {modoDiff ? (
+              <DiffCuentas s={s} prev={prev} totalDiff={diffBob} />
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {balances.map((b) => {
+                  const enBob = b.account.currency === "BOB" ? b.amount : b.amount * s.exchange_rate;
+                  return (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 truncate text-sm font-medium">
+                          {b.account.name}
+                          <Badge variant={b.account.is_liability ? "destructive" : "secondary"}>
+                            {b.account.currency}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground tabular-nums">
+                          {formatNumber(b.amount, 2)} {b.account.currency}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground tabular-nums">
-                        {formatNumber(b.amount, 2)} {b.account.currency}
+                      <div className="shrink-0 text-right text-sm font-semibold tabular-nums">
+                        {formatBob(b.account.is_liability ? -enBob : enBob)}
                       </div>
                     </div>
-                    <div className="shrink-0 text-right text-sm font-semibold tabular-nums">
-                      {formatBob(b.account.is_liability ? -enBob : enBob)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+/** Cambios cuenta por cuenta entre la foto anterior (`prev`) y la actual (`s`). */
+function DiffCuentas({
+  s,
+  prev,
+  totalDiff,
+}: {
+  s: SnapshotUI;
+  prev: SnapshotUI | null;
+  totalDiff: number | null;
+}) {
+  const contrib = (amount: number, currency: string, isLiab: boolean, rate: number) => {
+    const bob = currency === "BOB" ? amount : amount * rate;
+    return isLiab ? -bob : bob;
+  };
+  const ids = new Set<string>();
+  s.balances.forEach((b) => ids.add(b.account_id));
+  prev?.balances.forEach((b) => ids.add(b.account_id));
+
+  const rows = [...ids]
+    .map((id) => {
+      const cur = s.balances.find((b) => b.account_id === id) ?? null;
+      const pre = prev?.balances.find((b) => b.account_id === id) ?? null;
+      const acc = (cur?.account ?? pre?.account)!;
+      const curC = cur ? contrib(cur.amount, acc.currency, acc.is_liability, s.exchange_rate) : 0;
+      const preC = pre ? contrib(pre.amount, acc.currency, acc.is_liability, prev?.exchange_rate ?? s.exchange_rate) : 0;
+      return {
+        id,
+        acc,
+        curAmount: cur?.amount ?? null,
+        preAmount: pre?.amount ?? null,
+        delta: Math.round((curC - preC) * 100) / 100,
+      };
+    })
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  return (
+    <div className="space-y-1.5">
+      {rows.map((r) => {
+        const cambio = Math.abs(r.delta) >= 0.005;
+        const sube = r.delta > 0;
+        return (
+          <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-sm font-medium">{r.acc.name}</span>
+              <Badge variant={r.acc.is_liability ? "destructive" : "secondary"}>{r.acc.currency}</Badge>
+              {r.preAmount == null && <Badge variant="success">nueva</Badge>}
+              {r.curAmount == null && <Badge variant="outline">removida</Badge>}
+            </div>
+            <div className="shrink-0 text-right">
+              {cambio ? (
+                <span className={cn("text-sm font-semibold tabular-nums", sube ? "text-primary" : "text-destructive")}>
+                  {sube ? "+" : "−"}
+                  {formatBob(Math.abs(r.delta))}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">sin cambio</span>
+              )}
+              <div className="text-[11px] text-muted-foreground tabular-nums">
+                {r.preAmount != null ? formatNumber(r.preAmount, 2) : "—"} →{" "}
+                {r.curAmount != null ? formatNumber(r.curAmount, 2) : "—"} {r.acc.currency}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {totalDiff != null && (
+        <div className="mt-1 flex items-center justify-between border-t pt-2 text-sm font-semibold">
+          <span>Cambio total</span>
+          <span className={cn("tabular-nums", totalDiff >= 0 ? "text-primary" : "text-destructive")}>
+            {totalDiff >= 0 ? "+" : "−"}
+            {formatBob(Math.abs(totalDiff))}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 

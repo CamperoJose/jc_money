@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatBob, formatUsd } from "@/lib/format";
+import { fechaBoliviaHoy } from "@/lib/datetime";
 import type { Account } from "@/lib/types";
 import type { SnapshotUI } from "@/lib/queries/patrimonio";
 
@@ -30,7 +31,9 @@ function inicialMontos(
 }
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  // Fecha de HOY en zona Bolivia (no UTC). Con toISOString(), después de las
+  // 20:00 de Bolivia la fecha saltaba al día siguiente y desordenaba las fotos.
+  return fechaBoliviaHoy();
 }
 
 export function RegistroForm({

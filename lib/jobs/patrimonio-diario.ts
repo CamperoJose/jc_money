@@ -226,7 +226,9 @@ async function getMovimientosDelDia(
  * Total = total de la base + (ingresos − gastos) registrados ese mismo día.
  * Los saldos de la base se copian para conservar la composición por cuenta.
  *
- * Idempotente por día: si ya existe una foto AUTO para `targetDate`, no repite.
+ * NUNCA modifica ni borra fotos existentes; solo inserta su propia foto auto.
+ * Se omite si el día ya tiene una foto MANUAL (esa es la verdad del día) o si
+ * ya existe una AUTO (idempotencia).
  */
 export async function ejecutarPatrimonioDiario(
   admin: SupabaseClient,
@@ -238,16 +240,26 @@ export async function ejecutarPatrimonioDiario(
   const userId = await getUsuarioId(admin);
   if (!userId) return { ok: false, reason: "No hay usuarios en la app." };
 
-  // Idempotencia: ¿ya hay una foto auto para ese día?
-  const { data: yaExiste, error: eDup } = await admin
+  // ¿Qué fotos hay ya en ese día? (para no pisar ni duplicar)
+  const { data: delDia, error: eDup } = await admin
     .from("net_worth_snapshots")
-    .select("id")
+    .select("id, kind")
     .eq("user_id", userId)
-    .eq("kind", "auto")
-    .eq("snapshot_date", targetDate)
-    .limit(1);
+    .eq("snapshot_date", targetDate);
   if (eDup) throw eDup;
-  if (yaExiste && yaExiste.length > 0) {
+  const kinds = (delDia ?? []).map((r) => (r as { kind: string }).kind);
+  // Si el usuario ya cerró el día con una foto MANUAL, esa es la verdad del día:
+  // no se genera una automática que la desplace (respeta tu registro).
+  if (kinds.includes("manual")) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: `El ${targetDate} ya tiene una foto manual; no se genera automática.`,
+      target_date: targetDate,
+    };
+  }
+  // Idempotencia: si ya hay una auto para ese día, no repite.
+  if (kinds.includes("auto")) {
     return { ok: true, skipped: true, reason: `Ya existe una foto auto para ${targetDate}.`, target_date: targetDate };
   }
 
