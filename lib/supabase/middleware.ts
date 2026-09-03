@@ -7,7 +7,8 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 const NOVENTA_DIAS = 60 * 60 * 24 * 90;
 
 /** Rutas accesibles sin sesión. */
-const PUBLIC_PATHS = ["/login", "/auth"];
+// /api/voz/ingesta se autentica por su cuenta (token del Shortcut de iOS).
+const PUBLIC_PATHS = ["/login", "/auth", "/api/voz/ingesta"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
