@@ -222,8 +222,11 @@ async function getMovimientosDelDia(
  * Crea la foto de patrimonio AUTOCALCULADA que cierra el día `targetDate`
  * (por defecto, ayer en Bolivia), fechada a las 23:59 de ese día.
  *
- * Base = última foto (manual o auto) con snapshot_at <= 23:59 del targetDate.
- * Total = total de la base + (ingresos − gastos) registrados ese mismo día.
+ * Base = EL ÚLTIMO REGISTRO (manual o auto) previo al día que se procesa
+ * (no se asume "el día anterior": es la última foto que exista).
+ * Total = total de la base + (ingresos − gastos) del DÍA ENTERO procesado
+ * (todos los del targetDate, sin importar la hora) + ajustes de cuentas
+ * derivadas (DPF, Por Cobrar, Activos) y movimientos (ventas/cobros) del día.
  * Los saldos de la base se copian para conservar la composición por cuenta.
  *
  * NUNCA modifica ni borra fotos existentes; solo inserta su propia foto auto.
@@ -263,7 +266,10 @@ export async function ejecutarPatrimonioDiario(
     return { ok: true, skipped: true, reason: `Ya existe una foto auto para ${targetDate}.`, target_date: targetDate };
   }
 
-  // Base: última foto en o antes de las 23:59 del targetDate.
+  // Base = EL ÚLTIMO REGISTRO (manual o auto) en o antes de las 23:59 del
+  // targetDate. Como arriba se omite el día si ya tiene alguna foto, aquí la
+  // base es siempre la última foto ANTERIOR al día que se procesa — no se asume
+  // "el día anterior": puede ser de varios días atrás si hubo huecos.
   const { data: bases, error: eBase } = await admin
     .from("net_worth_snapshots")
     .select(
@@ -295,7 +301,11 @@ export async function ejecutarPatrimonioDiario(
       ? Number(base.total_bob)
       : calcularTotalBob(balancesBase, rate);
 
-  // Neto del día: ingresos suman, gastos restan (en BOB, con el T/C de cada txn).
+  // Neto del DÍA ENTERO que se procesa (targetDate): TODOS los gastos/ingresos
+  // de ese día, sin importar la hora (ni la del registro base). Ingresos suman,
+  // gastos restan (en BOB, con el T/C de cada txn). Como el día solo se cierra
+  // cuando aún no tiene ninguna foto, la base es siempre anterior a este día, así
+  // que sumar el día completo no duplica nada.
   const { data: txns, error: eTx } = await admin
     .from("transactions")
     .select("type, amount, currency, exchange_rate")
