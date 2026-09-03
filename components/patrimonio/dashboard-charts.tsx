@@ -170,43 +170,45 @@ export function DistribucionCuentasChart({ cuentas }: { cuentas: DistribucionCue
 
   return (
     <div className="flex flex-col items-center gap-6 sm:flex-row">
-      <ResponsiveContainer width="100%" height={240} className="max-w-[260px]">
-        <PieChart>
-          <Pie
-            data={activos}
-            dataKey="montoBob"
-            nameKey="nombre"
-            innerRadius={58}
-            outerRadius={100}
-            paddingAngle={2}
-            stroke="var(--color-card)"
-            strokeWidth={2}
-          >
-            {activos.map((_, i) => (
-              <Cell key={i} fill={PALETA[i % PALETA.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value: number, _n, p) => [
-              formatBob(value),
-              (p?.payload as DistribucionCuenta)?.nombre ?? "",
-            ]}
-            contentStyle={tooltipStyle}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <ul className="w-full flex-1 space-y-2.5">
+      <div className="mx-auto aspect-square w-full max-w-[220px] shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={activos}
+              dataKey="montoBob"
+              nameKey="nombre"
+              innerRadius="55%"
+              outerRadius="88%"
+              paddingAngle={2}
+              stroke="var(--color-card)"
+              strokeWidth={2}
+            >
+              {activos.map((_, i) => (
+                <Cell key={i} fill={PALETA[i % PALETA.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value: number, _n, p) => [
+                formatBob(value),
+                (p?.payload as DistribucionCuenta)?.nombre ?? "",
+              ]}
+              contentStyle={tooltipStyle}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <ul className="w-full min-w-0 flex-1 space-y-2.5">
         {activos.map((c, i) => {
           const color = PALETA[i % PALETA.length];
           return (
             <li key={c.account_id} className="space-y-1">
               <div className="flex items-center gap-2 text-sm">
                 <span className="size-3 shrink-0 rounded-sm" style={{ background: color }} />
-                <span className="truncate font-medium">{c.nombre}</span>
-                <span className="ml-auto tabular-nums text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate font-medium">{c.nombre}</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
                   {formatNumber(c.pct * 100, 1)}%
                 </span>
-                <span className="w-28 shrink-0 text-right tabular-nums font-semibold">
+                <span className="shrink-0 text-right tabular-nums font-semibold">
                   {formatBob(c.montoBob)}
                 </span>
               </div>

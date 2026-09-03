@@ -172,33 +172,35 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
               <Vacio />
             ) : (
               <div className="flex flex-col items-center gap-4 sm:flex-row">
-                <ResponsiveContainer width="100%" height={200} className="max-w-[220px]">
-                  <PieChart>
-                    <Pie
-                      data={porCategoria}
-                      dataKey="montoBob"
-                      nameKey="nombre"
-                      innerRadius={45}
-                      outerRadius={80}
-                      paddingAngle={2}
-                    >
-                      {porCategoria.map((_, i) => (
-                        <Cell key={i} fill={PALETA[i % PALETA.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => formatBob(v)} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="w-full flex-1 space-y-1.5">
+                <div className="mx-auto aspect-square w-full max-w-[200px] shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={porCategoria}
+                        dataKey="montoBob"
+                        nameKey="nombre"
+                        innerRadius="55%"
+                        outerRadius="88%"
+                        paddingAngle={2}
+                      >
+                        {porCategoria.map((_, i) => (
+                          <Cell key={i} fill={PALETA[i % PALETA.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => formatBob(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="w-full min-w-0 flex-1 space-y-1.5">
                   {porCategoria.slice(0, 6).map((c, i) => (
                     <div key={c.nombre} className="flex items-center gap-2 text-sm">
                       <span
                         className="size-2.5 shrink-0 rounded-full"
                         style={{ background: PALETA[i % PALETA.length] }}
                       />
-                      <span className="flex-1 truncate">{c.nombre}</span>
-                      <span className="tabular-nums text-muted-foreground">{formatPercent(c.pct)}</span>
-                      <span className="w-24 text-right font-medium tabular-nums">{formatBob(c.montoBob)}</span>
+                      <span className="min-w-0 flex-1 truncate">{c.nombre}</span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">{formatPercent(c.pct)}</span>
+                      <span className="shrink-0 text-right font-medium tabular-nums">{formatBob(c.montoBob)}</span>
                     </div>
                   ))}
                 </div>
