@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Microphone, Stop, X, Warning, CircleNotch, CheckCircle } from "@phosphor-icons/react";
 
 type Estado = "idle" | "grabando" | "enviando" | "ok" | "error";
@@ -23,6 +24,7 @@ function elegirMime(): string {
  * el usuario recibe el detalle por correo. Sin menú de revisión.
  */
 export function VozFab() {
+  const router = useRouter();
   const [estado, setEstado] = useState<Estado>("idle");
   const [segundos, setSegundos] = useState(0);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -139,13 +141,20 @@ export function VozFab() {
         body: JSON.stringify({ audioBase64, mimeType: mimeRef.current, origen: "app" }),
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+      if (!res.ok) throw new Error(j.error ?? j.message ?? `Error ${res.status}`);
+      // j.ok === false → se procesó pero no se registró (faltó un dato).
+      if (j.ok === false) {
+        setEstado("error");
+        setMensaje(j.message ?? "No se registró: faltó un dato.");
+        return;
+      }
       setEstado("ok");
-      setMensaje(j.message ?? "Registro recibido. Te enviaremos un correo con el detalle.");
+      setMensaje(j.message ?? "Registrado. Te enviamos un correo con el detalle.");
       okTimerRef.current = setTimeout(() => {
         setEstado("idle");
         setMensaje(null);
-      }, 5000);
+      }, 6000);
+      router.refresh();
     } catch (e) {
       setEstado("error");
       setMensaje(e instanceof Error ? e.message : "Error al enviar el audio.");

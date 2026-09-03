@@ -94,12 +94,15 @@ async function llamarVertex(prompt: string, audioBase64: string, mimeType: strin
   let ultimoError = "";
   for (let intento = 1; intento <= REINTENTOS; intento++) {
     let res: Response;
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 30_000); // no colgar indefinidamente
     try {
       const token = await obtenerAccessToken();
       res = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: ctrl.signal,
       });
     } catch (e) {
       ultimoError = e instanceof Error ? e.message : "error de red";
@@ -108,6 +111,8 @@ async function llamarVertex(prompt: string, audioBase64: string, mimeType: strin
         continue;
       }
       throw new Error(`No se pudo contactar a Vertex AI: ${ultimoError}`);
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (res.ok) {

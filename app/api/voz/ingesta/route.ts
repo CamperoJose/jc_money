@@ -1,10 +1,11 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { procesarSolicitudVoz } from "@/lib/voz/proceso";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // permite terminar el proceso (Gemini + correo)
 
 const MAX_BASE64 = 12_000_000; // ~9 MB de audio
 
@@ -74,29 +75,35 @@ export async function POST(request: Request) {
   }
   const requestId = reqRow.id as string;
 
-  // 3) Procesa en segundo plano y actualiza la fila.
-  const uid = userId;
-  after(async () => {
-    const r = await procesarSolicitudVoz(admin, { userId: uid, audioBase64, mimeType });
-    await admin
-      .from("ai_requests")
-      .update({
-        status: r.status,
-        processed_at: new Date().toISOString(),
-        transcripcion: r.transcripcion,
-        n_gastos: r.nGastos,
-        n_deudas: r.nDeudas,
-        resumen: r.resumen,
-        detalle: r.detalle,
-        error: r.error,
-        correo_ok: r.correoOk,
-      })
-      .eq("id", requestId);
-  });
+  // 3) Procesa (interpreta con Gemini, registra, envía correo) y actualiza la fila.
+  //    Se hace dentro de la misma petición para que el cliente (app/Shortcut)
+  //    reciba una respuesta real y confiable (en Vercel `after` no es fiable acá).
+  const r = await procesarSolicitudVoz(admin, { userId, audioBase64, mimeType });
+  await admin
+    .from("ai_requests")
+    .update({
+      status: r.status,
+      processed_at: new Date().toISOString(),
+      transcripcion: r.transcripcion,
+      n_gastos: r.nGastos,
+      n_deudas: r.nDeudas,
+      resumen: r.resumen,
+      detalle: r.detalle,
+      error: r.error,
+      correo_ok: r.correoOk,
+    })
+    .eq("id", requestId);
 
-  // 4) Respuesta inmediata.
+  // 4) Respuesta con el resultado.
+  const mensaje =
+    r.status === "completado" || r.status === "parcial"
+      ? `Registrado: ${r.resumen}.`
+      : r.status === "incompleto"
+        ? `No se registró: ${r.error ?? "faltó un dato (p. ej. el monto)."}`
+        : `Error: ${r.error ?? "no se pudo procesar."}`;
+
   return NextResponse.json(
-    { ok: true, requestId, message: "Registro recibido. Te enviaremos un correo con el detalle." },
-    { status: 202 }
+    { ok: r.status !== "error", requestId, status: r.status, resumen: r.resumen, message: mensaje },
+    { status: r.status === "error" ? 502 : 200 }
   );
 }
