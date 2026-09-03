@@ -24,9 +24,45 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  TableRoot,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableFoot,
+} from "@/components/tremor/table";
 import { GastoForm } from "@/components/gastos/gasto-form";
 import { formatBob, formatDateTime, formatNumber } from "@/lib/format";
-import type { Account, Category, TransactionUI } from "@/lib/types";
+import { fechaBoliviaHoy } from "@/lib/datetime";
+import type { Account, Category, TransactionUI, TxnSource } from "@/lib/types";
+
+/** Día de la semana de una fecha YYYY-MM-DD (es-BO). */
+function diaSemana(fecha: string): string {
+  const d = new Date(`${fecha}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-BO", { weekday: "long", timeZone: "UTC" }).format(d);
+}
+
+/** "hoy" / "ayer" / "hace N d" respecto a hoy en Bolivia. */
+function antiguedad(fecha: string): string {
+  const a = Date.parse(`${fecha}T00:00:00Z`);
+  const b = Date.parse(`${fechaBoliviaHoy()}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return "";
+  const d = Math.round((b - a) / 86_400_000);
+  if (d <= 0) return "hoy";
+  if (d === 1) return "ayer";
+  return `hace ${d} d`;
+}
+
+/** Cómo se registró el movimiento (manual, por voz o por API). */
+function OrigenBadge({ source }: { source: TxnSource }) {
+  if (source === "voz") return <Badge variant="default">🎙️ Voz</Badge>;
+  if (source === "api") return <Badge variant="neutral">API</Badge>;
+  return <Badge variant="neutral">Manual</Badge>;
+}
 
 export function GastosClient({
   transacciones,
@@ -69,6 +105,19 @@ export function GastosClient({
       filtradas.reduce((acc, t) => acc + (t.type === "gasto" ? -t.amount_bob : t.amount_bob), 0),
     [filtradas]
   );
+
+  // Totales y escala para el pie de tabla y las barras de peso relativo.
+  const { totalGastos, totalIngresos, neto, maxBob } = useMemo(() => {
+    let g = 0;
+    let i = 0;
+    let max = 0;
+    for (const t of filtradas) {
+      if (t.type === "gasto") g += t.amount_bob;
+      else i += t.amount_bob;
+      if (t.amount_bob > max) max = t.amount_bob;
+    }
+    return { totalGastos: g, totalIngresos: i, neto: i - g, maxBob: max };
+  }, [filtradas]);
 
   const categoriasUsadas = useMemo(() => {
     const ids = new Set(transacciones.map((t) => t.category_id).filter(Boolean));
@@ -175,69 +224,120 @@ export function GastosClient({
             </span>
           </div>
 
-          {/* Tabla (desktop) */}
+          {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <div className="relative w-full overflow-x-auto">
-              <table className="w-full caption-bottom text-sm">
-                <thead className="border-b bg-muted/40">
-                  <tr className="text-left text-muted-foreground">
-                    <th className="px-3 py-2.5 font-medium">Fecha y hora</th>
-                    <th className="px-3 py-2.5 font-medium">Detalle</th>
-                    <th className="px-3 py-2.5 font-medium">Categoría</th>
-                    <th className="px-3 py-2.5 font-medium">Cuenta</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Monto</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtradas.map((t) => (
-                    <tr key={t.id} className="border-b transition-colors hover:bg-muted/40">
-                      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-                        {formatDateTime(t.occurred_at)}
-                      </td>
-                      <td className="max-w-[220px] px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <TipoIcon tipo={t.type} />
-                          <span className="truncate" title={t.description ?? ""}>
-                            {t.description || <span className="text-muted-foreground">—</span>}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {t.category ? (
-                          <Badge variant="secondary">{t.category.name}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{t.account?.name ?? "—"}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                        <MontoCelda t={t} />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => editar(t)} aria-label="Editar">
-                            <PencilSimple className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              setErrorBorrar(null);
-                              setBorrar(t);
-                            }}
-                            aria-label="Borrar"
-                          >
-                            <Trash className="size-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TableRoot>
+              <Table>
+                <TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHeaderCell>Fecha y hora</TableHeaderCell>
+                    <TableHeaderCell>Detalle</TableHeaderCell>
+                    <TableHeaderCell>Categoría</TableHeaderCell>
+                    <TableHeaderCell>Cuenta</TableHeaderCell>
+                    <TableHeaderCell>Origen</TableHeaderCell>
+                    <TableHeaderCell className="min-w-[150px] text-right">Monto</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtradas.map((t) => {
+                    const peso = maxBob > 0 ? t.amount_bob / maxBob : 0;
+                    return (
+                      <TableRow key={t.id}>
+                        {/* Fecha + día de la semana + antigüedad */}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="text-foreground">{formatDateTime(t.occurred_at)}</div>
+                          <div className="text-xs capitalize text-muted-foreground">
+                            {diaSemana(t.txn_date)} · {antiguedad(t.txn_date)}
+                          </div>
+                        </TableCell>
+
+                        {/* Detalle */}
+                        <TableCell className="max-w-[240px]">
+                          <div className="flex items-center gap-2">
+                            <TipoIcon tipo={t.type} />
+                            <span className="truncate" title={t.description ?? ""}>
+                              {t.description || <span className="text-muted-foreground">Sin descripción</span>}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          {t.category ? (
+                            <Badge variant="secondary">{t.category.name}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
+                        {/* Cuenta + moneda */}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="text-foreground">{t.account?.name ?? "—"}</div>
+                          {t.account && (
+                            <div className="text-xs capitalize text-muted-foreground">
+                              {t.account.type.replace("_", " ")} · {t.account.currency}
+                            </div>
+                          )}
+                        </TableCell>
+
+                        {/* Origen del registro (manual / voz / api) */}
+                        <TableCell>
+                          <OrigenBadge source={t.source} />
+                        </TableCell>
+
+                        {/* Monto + barra de peso relativo */}
+                        <TableCell className="text-right">
+                          <MontoCelda t={t} />
+                          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={`h-full rounded-full ${t.type === "ingreso" ? "bg-emerald-500" : "bg-destructive/70"}`}
+                              style={{ width: `${Math.min(100, peso * 100)}%` }}
+                            />
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="size-8" onClick={() => editar(t)} aria-label="Editar">
+                              <PencilSimple className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                setErrorBorrar(null);
+                                setBorrar(t);
+                              }}
+                              aria-label="Borrar"
+                            >
+                              <Trash className="size-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <TableFoot>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={4} className="font-semibold">
+                      {filtradas.length} {filtradas.length === 1 ? "movimiento" : "movimientos"}
+                    </TableCell>
+                    <TableCell className="text-xs font-normal text-muted-foreground">
+                      Ingresos {formatBob(totalIngresos)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      <span className="text-destructive">−{formatBob(totalGastos)}</span>
+                      <div className={`text-xs font-normal ${neto >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                        neto {neto >= 0 ? "+" : "−"}{formatBob(Math.abs(neto))}
+                      </div>
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                </TableFoot>
+              </Table>
+            </TableRoot>
           </Card>
 
           {/* Tarjetas (móvil) */}

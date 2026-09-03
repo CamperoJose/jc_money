@@ -16,6 +16,7 @@ import { getResumen, type ResumenPatrimonio } from "@/lib/queries/patrimonio";
 import { getResumenDpf } from "@/lib/queries/dpf";
 import type { ResumenDpf } from "@/lib/dpf";
 import { DpfResumenCard } from "@/components/dpf/dpf-resumen-card";
+import { CategoryBar } from "@/components/tremor/category-bar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -294,29 +295,41 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
             <CardTitle>Distribución por moneda</CardTitle>
             <CardDescription>Valor en BOB de cada moneda (última foto).</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {distribucionMoneda &&
-              (["BOB", "USD", "USDT"] as const).map((m, i) => {
-                const val = distribucionMoneda[m];
-                const pct = totalMoneda ? val / totalMoneda : 0;
-                return (
-                  <div key={m}>
-                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                      <span className="font-medium">{m}</span>
-                      <span className="min-w-0 truncate tabular-nums">
-                        {formatBob(val)}{" "}
-                        <span className="text-muted-foreground">({formatNumber(pct * 100, 1)}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${Math.max(pct * 100, 0)}%`, background: `var(--color-chart-${i + 1})` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+          <CardContent className="space-y-5">
+            {distribucionMoneda && (
+              <>
+                <CategoryBar
+                  segmentos={(["BOB", "USD", "USDT"] as const).map((m, i) => ({
+                    etiqueta: m,
+                    valor: distribucionMoneda[m],
+                    color: `var(--color-chart-${i + 1})`,
+                  }))}
+                  formato={(n) => formatBob(n)}
+                />
+                {/* Detalle con participación de cada moneda */}
+                <div className="space-y-1.5 border-t pt-3">
+                  {(["BOB", "USD", "USDT"] as const).map((m, i) => {
+                    const val = distribucionMoneda[m];
+                    const pct = totalMoneda ? val / totalMoneda : 0;
+                    return (
+                      <div key={m} className="flex items-center gap-2 text-sm">
+                        <span
+                          className="size-2.5 shrink-0 rounded-sm"
+                          style={{ background: `var(--color-chart-${i + 1})` }}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-medium">{m}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {formatNumber(pct * 100, 1)}%
+                        </span>
+                        <span className="shrink-0 text-right font-semibold tabular-nums">
+                          {formatBob(val)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
