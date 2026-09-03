@@ -7,6 +7,19 @@ import { enviarCorreo } from "@/lib/mailer";
 import { htmlReciboVoz, htmlAlertaVoz, type GastoRecibo, type DeudaRecibo } from "@/lib/emails/plantillas";
 import { interpretarAudio } from "@/lib/voz/gemini";
 
+/** Envía un correo con límite de tiempo duro (para no colgar la petición). */
+async function enviarConLimite(opts: { subject: string; html: string; text?: string }): Promise<boolean> {
+  try {
+    await Promise.race([
+      enviarCorreo(opts),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout correo")), 12_000)),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Fecha y hora legible en zona Bolivia. */
 function ahoraBolivia(): string {
   return new Intl.DateTimeFormat("es-BO", {
@@ -158,29 +171,26 @@ export async function procesarSolicitudVoz(
     else if (totalReg > 0) status = "parcial";
     else status = "incompleto";
 
-    // Correo
+    // Correo (con límite de tiempo para no colgar la petición).
     let correoOk = false;
-    try {
-      if (totalReg > 0) {
-        const { subject, html, text } = htmlReciboVoz({
+    if (totalReg > 0) {
+      correoOk = await enviarConLimite(
+        htmlReciboVoz({
           fechaHora,
           transcripcion: parsed.transcripcion,
           gastos: registradosGasto,
           deudas: registradosDeuda,
           incompletos,
-        });
-        await enviarCorreo({ subject, html, text });
-      } else {
-        const { subject, html, text } = htmlAlertaVoz({
+        })
+      );
+    } else {
+      correoOk = await enviarConLimite(
+        htmlAlertaVoz({
           fechaHora,
           transcripcion: parsed.transcripcion,
           motivos: incompletos.length ? incompletos : ["No se detectó ningún gasto ni deuda en el audio."],
-        });
-        await enviarCorreo({ subject, html, text });
-      }
-      correoOk = true;
-    } catch {
-      correoOk = false;
+        })
+      );
     }
 
     const resumenPartes: string[] = [];
@@ -200,19 +210,14 @@ export async function procesarSolicitudVoz(
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al procesar el audio.";
-    // Intenta avisar por correo del fallo.
-    let correoOk = false;
-    try {
-      const { subject, html, text } = htmlAlertaVoz({
+    // Intenta avisar por correo del fallo (con límite de tiempo).
+    const correoOk = await enviarConLimite(
+      htmlAlertaVoz({
         fechaHora,
         transcripcion: null,
         motivos: [`Ocurrió un error al procesar el audio: ${msg}`],
-      });
-      await enviarCorreo({ subject, html, text });
-      correoOk = true;
-    } catch {
-      correoOk = false;
-    }
+      })
+    );
     return {
       status: "error",
       nGastos: 0,

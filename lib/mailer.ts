@@ -46,6 +46,10 @@ export async function enviarCorreo(opts: {
     port: cfg.port,
     secure: cfg.port === 465, // 465 = SSL; 587 = STARTTLS
     auth: { user: cfg.user, pass: cfg.pass },
+    // Timeouts para que un SMTP lento NO cuelgue la petición (registro por voz).
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
 
   await transporter.sendMail({
@@ -55,4 +59,5 @@ export async function enviarCorreo(opts: {
     text: opts.text,
     html: opts.html,
   });
+  transporter.close();
 }
