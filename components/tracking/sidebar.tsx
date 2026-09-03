@@ -265,7 +265,7 @@ export function Sidebar({ email }: { email?: string | null }) {
   return (
     <>
       {/* Barra superior móvil (ancho completo) */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card/85 px-4 py-3 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card/85 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur lg:hidden">
         <button
           type="button"
           onClick={() => setOpenMobile(true)}
@@ -283,7 +283,7 @@ export function Sidebar({ email }: { email?: string | null }) {
       {/* Sidebar desktop */}
       <aside
         className={cn(
-          "hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:block lg:h-screen",
+          "hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:block lg:h-dvh",
           collapsed ? "lg:w-[68px]" : "lg:w-64"
         )}
       >

@@ -2,7 +2,31 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-02 (sesión 13 — venta de activos y cobro de deudas hacia cuenta destino)
+## Última actualización: 2026-09-03 (sesión 14 — registro por voz (Gemini/Vertex) + pulido iOS/PWA)
+
+### Sesión 14 — lo hecho ✅
+- **Registro por voz de gastos y deudas** (botón flotante abajo-derecha en todo `/tracking`):
+  graba audio y lo envía **directo** a Gemini (Vertex AI `generateContent`). Acepta varios gastos
+  y/o deudas en un solo comando, sin orden fijo. Muestra una **revisión editable** (monto, moneda,
+  T/C, cuenta, categoría; quién/motivo en deudas) antes de registrar.
+  - `lib/gcp/` (credencial + token OAuth2 vía JWT RS256 con `node:crypto`), `lib/voz/gemini.ts`
+    (prompt con catálogo de cuentas/categorías → JSON `{gastos, deudas}`), API `/api/voz/parse` y
+    `/api/voz/registrar` (gastos `source='voz'`, deudas nuevas pendientes). `components/voz/voz-fab.tsx`.
+  - **Credencial:** GitHub Push Protection **bloquea** versionar la private key. Se usa por env var
+    **`GCP_SA_JSON`** (JSON crudo o base64) en Vercel; archivo local `credenciales/vertex-ai.json`
+    gitignored para dev. Ver `credenciales/README.md`.
+  - **IAM pendiente (usuario):** el service account necesita rol **Vertex AI User**
+    (`roles/aiplatform.user`); los roles "Service Agent" actuales NO permiten invocar el modelo.
+    Habilitar la **Vertex AI API** en el proyecto `accl-507423`.
+  - Env opcionales: `GEMINI_MODEL` (def. `gemini-2.5-flash`), `GCP_LOCATION` (def. `global`).
+- **Pulido iOS / sensación de app (PWA):** `app/manifest.ts` (standalone, iconos), metadatos
+  `appleWebApp` + `themeColor` + `viewport-fit=cover`, iconos PWA en `public/` (192/512 + maskable),
+  áreas seguras (notch/home indicator) en header móvil, main y botón de voz, `min-h-dvh`, sin
+  tap-highlight/callout/zoom-doble-tap, scroll sin rebote. "Agregar a inicio" abre en modo app.
+
+---
+
+## Update previo: 2026-09-02 (sesión 13 — venta de activos y cobro de deudas hacia cuenta destino)
 
 ### Sesión 13 — lo hecho ✅
 - **Registro de venta de activos con cuenta destino y plusvalía** y **registro de cobro de deudas con

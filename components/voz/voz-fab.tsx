@@ -244,7 +244,7 @@ export function VozFab({ cuentas, categorias }: { cuentas: Account[]; categorias
         aria-label={estado === "grabando" ? "Detener grabación" : "Registrar por voz"}
         title="Registrar gasto o deuda por voz"
         className={[
-          "fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full shadow-lg transition-all",
+          "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full shadow-lg transition-all active:scale-95",
           "h-14 px-4 text-primary-foreground",
           estado === "grabando"
             ? "bg-destructive hover:bg-destructive/90 animate-pulse"
@@ -266,13 +266,13 @@ export function VozFab({ cuentas, categorias }: { cuentas: Account[]; categorias
 
       {/* Aviso de grabación / error flotante */}
       {estado === "grabando" && (
-        <div className="fixed bottom-24 right-6 z-40 rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground shadow-md">
+        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground shadow-md">
           Grabando… toca para detener
           <button onClick={cancelar} className="ml-2 font-medium text-destructive">Cancelar</button>
         </div>
       )}
       {error && estado === "idle" && (
-        <div className="fixed bottom-24 right-6 z-40 flex max-w-xs items-start gap-1.5 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive shadow-md">
+        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 flex max-w-xs items-start gap-1.5 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive shadow-md">
           <Warning weight="fill" className="mt-0.5 size-3.5 shrink-0" />
           <span>{error}</span>
           <button onClick={() => setError(null)} aria-label="Cerrar"><X className="size-3.5" /></button>
