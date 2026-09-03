@@ -230,8 +230,8 @@ async function getMovimientosDelDia(
  * Los saldos de la base se copian para conservar la composición por cuenta.
  *
  * NUNCA modifica ni borra fotos existentes; solo inserta su propia foto auto.
- * Se omite si el día ya tiene una foto MANUAL (esa es la verdad del día) o si
- * ya existe una AUTO (idempotencia).
+ * Manuales y automática COEXISTEN en un mismo día; lo único que no puede haber
+ * es DOS automáticas (idempotencia: se omite si ya existe una auto ese día).
  */
 export async function ejecutarPatrimonioDiario(
   admin: SupabaseClient,
@@ -243,26 +243,17 @@ export async function ejecutarPatrimonioDiario(
   const userId = await getUsuarioId(admin);
   if (!userId) return { ok: false, reason: "No hay usuarios en la app." };
 
-  // ¿Qué fotos hay ya en ese día? (para no pisar ni duplicar)
-  const { data: delDia, error: eDup } = await admin
+  // Idempotencia: NUNCA dos automáticas el mismo día. Las fotos MANUALES sí
+  // pueden coexistir con la automática (puede haber manual(es) + una auto por día).
+  const { data: yaAuto, error: eDup } = await admin
     .from("net_worth_snapshots")
-    .select("id, kind")
+    .select("id")
     .eq("user_id", userId)
-    .eq("snapshot_date", targetDate);
+    .eq("kind", "auto")
+    .eq("snapshot_date", targetDate)
+    .limit(1);
   if (eDup) throw eDup;
-  const kinds = (delDia ?? []).map((r) => (r as { kind: string }).kind);
-  // Si el usuario ya cerró el día con una foto MANUAL, esa es la verdad del día:
-  // no se genera una automática que la desplace (respeta tu registro).
-  if (kinds.includes("manual")) {
-    return {
-      ok: true,
-      skipped: true,
-      reason: `El ${targetDate} ya tiene una foto manual; no se genera automática.`,
-      target_date: targetDate,
-    };
-  }
-  // Idempotencia: si ya hay una auto para ese día, no repite.
-  if (kinds.includes("auto")) {
+  if (yaAuto && yaAuto.length > 0) {
     return { ok: true, skipped: true, reason: `Ya existe una foto auto para ${targetDate}.`, target_date: targetDate };
   }
 
