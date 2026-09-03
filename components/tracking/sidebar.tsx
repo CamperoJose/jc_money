@@ -36,10 +36,18 @@ interface NavItem {
   label: string;
   icon: Icon;
 }
+/** Colores por sección (literales para que Tailwind los incluya). */
+interface Tint {
+  icon: string; // color del ícono
+  active: string; // fondo de la pestaña activa (texto blanco)
+  hover: string; // fondo tenue al pasar el mouse
+  dot: string; // indicador lateral
+}
 interface NavGroup {
   label: string;
   icon: Icon;
   ready: boolean;
+  tint: Tint;
   items?: NavItem[];
 }
 
@@ -48,6 +56,7 @@ const GROUPS: NavGroup[] = [
     label: "Patrimonio",
     icon: ChartLineUp,
     ready: true,
+    tint: { icon: "text-emerald-500", active: "bg-emerald-600", hover: "hover:bg-emerald-500/10", dot: "bg-emerald-500" },
     items: [
       { href: "/tracking/patrimonio", label: "Dashboard", icon: ChartPieSlice },
       { href: "/tracking/patrimonio/tendencias", label: "Tendencias", icon: ChartLineUp },
@@ -59,6 +68,7 @@ const GROUPS: NavGroup[] = [
     label: "Gastos",
     icon: Wallet,
     ready: true,
+    tint: { icon: "text-rose-500", active: "bg-rose-600", hover: "hover:bg-rose-500/10", dot: "bg-rose-500" },
     items: [
       { href: "/tracking/gastos", label: "Dashboard", icon: ChartPieSlice },
       { href: "/tracking/gastos/registros", label: "Movimientos", icon: Receipt },
@@ -69,6 +79,7 @@ const GROUPS: NavGroup[] = [
     label: "Inversiones",
     icon: Bank,
     ready: true,
+    tint: { icon: "text-violet-500", active: "bg-violet-600", hover: "hover:bg-violet-500/10", dot: "bg-violet-500" },
     items: [
       { href: "/tracking/inversiones/dpf", label: "DPF", icon: Vault },
       { href: "/tracking/inversiones/dpf/registros", label: "Registros", icon: ListBullets },
@@ -79,24 +90,28 @@ const GROUPS: NavGroup[] = [
     label: "Activos",
     icon: Package,
     ready: true,
+    tint: { icon: "text-amber-500", active: "bg-amber-600", hover: "hover:bg-amber-500/10", dot: "bg-amber-500" },
     items: [{ href: "/tracking/activos", label: "Bienes vendibles", icon: Package }],
   },
   {
     label: "Deudas",
     icon: HandCoins,
     ready: true,
+    tint: { icon: "text-sky-500", active: "bg-sky-600", hover: "hover:bg-sky-500/10", dot: "bg-sky-500" },
     items: [{ href: "/tracking/deudas", label: "Que me deben", icon: HandCoins }],
   },
   {
     label: "Asistente IA",
     icon: Sparkle,
     ready: true,
+    tint: { icon: "text-fuchsia-500", active: "bg-fuchsia-600", hover: "hover:bg-fuchsia-500/10", dot: "bg-fuchsia-500" },
     items: [{ href: "/tracking/asistente", label: "Solicitudes por voz", icon: Microphone }],
   },
   {
     label: "Configuración",
     icon: Gear,
     ready: true,
+    tint: { icon: "text-slate-400", active: "bg-slate-600", hover: "hover:bg-slate-500/10", dot: "bg-slate-400" },
     items: [{ href: "/tracking/configuracion/parametros", label: "Parámetros", icon: Faders }],
   },
 ];
@@ -141,10 +156,14 @@ export function Sidebar({ email }: { email?: string | null }) {
 
   const brand = (mini: boolean) => (
     <div className="flex items-center gap-2">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-700 text-white shadow-md shadow-emerald-600/20">
         <CurrencyCircleDollar weight="fill" className="size-5" />
       </span>
-      {!mini && <span className="text-lg font-bold tracking-tight text-sidebar-foreground">MyMoney</span>}
+      {!mini && (
+        <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-lg font-bold tracking-tight text-transparent dark:from-emerald-400 dark:to-teal-300">
+          MyMoney
+        </span>
+      )}
     </div>
   );
 
@@ -174,8 +193,8 @@ export function Sidebar({ email }: { email?: string | null }) {
             return (
               <div key={g.label} className="pb-1.5">
                 {!mini && (
-                  <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
-                    <g.icon weight="duotone" className="size-3.5" />
+                  <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                    <g.icon weight="fill" className={cn("size-3.5", g.tint.icon)} />
                     {g.label}
                   </div>
                 )}
@@ -192,11 +211,18 @@ export function Sidebar({ email }: { email?: string | null }) {
                         "group relative flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
                         mini ? "justify-center px-2 py-2.5" : "px-3 py-2",
                         active
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                          : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          ? cn(g.tint.active, "text-white shadow-sm")
+                          : cn("text-sidebar-foreground/75", g.tint.hover, "hover:text-sidebar-accent-foreground")
                       )}
                     >
-                      <item.icon weight={active ? "fill" : "duotone"} className="size-[18px] shrink-0" />
+                      {/* Barra indicadora lateral (solo activo, modo expandido) */}
+                      {active && !mini && (
+                        <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-white/80" />
+                      )}
+                      <item.icon
+                        weight={active ? "fill" : "duotone"}
+                        className={cn("size-[18px] shrink-0", !active && g.tint.icon)}
+                      />
                       {!mini && item.label}
                     </Link>
                   );
@@ -282,7 +308,7 @@ export function Sidebar({ email }: { email?: string | null }) {
         >
           <ListIcon weight="bold" className="size-5" />
         </button>
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <span className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-emerald-400 to-emerald-700 text-white shadow-sm">
           <CurrencyCircleDollar weight="fill" className="size-4" />
         </span>
         <span className="text-sm font-semibold text-foreground">{seccionActiva(pathname)}</span>
