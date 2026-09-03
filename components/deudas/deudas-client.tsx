@@ -11,10 +11,14 @@ import {
   Clock,
   CheckCircle,
   Users,
+  Coins,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogHeader,
@@ -24,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { DeudaForm } from "@/components/deudas/deuda-form";
 import { formatBob, formatDate, formatBobCompact } from "@/lib/format";
+import { fechaBoliviaHoy } from "@/lib/datetime";
 import type { ResumenDeudas } from "@/lib/deudas";
 import type { Account, DebtUI } from "@/lib/types";
 
@@ -31,6 +36,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<DebtUI | null>(null);
+  const [cobrar, setCobrar] = useState<DebtUI | null>(null);
   const [borrar, setBorrar] = useState<DebtUI | null>(null);
   const [borrando, setBorrando] = useState(false);
   const [errorBorrar, setErrorBorrar] = useState<string | null>(null);
@@ -148,6 +154,9 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                       <td className="px-3 py-2.5"><EstadoBadge d={d} /></td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1">
+                          {d.outstanding > 0 && (
+                            <Button variant="ghost" size="icon" className="size-8 text-primary hover:text-primary" onClick={() => setCobrar(d)} aria-label="Recibir cobro" title="Recibir cobro"><Coins weight="fill" className="size-4" /></Button>
+                          )}
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
                           <Button variant="ghost" size="icon" className="size-8 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
                         </div>
@@ -180,7 +189,10 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                       <span className="text-xs text-muted-foreground tabular-nums">de {formatBobCompact(d.amount)}</span>
                     </div>
                   </div>
-                  <div className="mt-2 flex justify-end gap-1">
+                  <div className="mt-2 flex items-center justify-end gap-1">
+                    {d.outstanding > 0 && (
+                      <Button variant="outline" size="sm" className="mr-auto h-7" onClick={() => setCobrar(d)}><Coins weight="fill" className="size-4" />Recibir cobro</Button>
+                    )}
                     <Button variant="ghost" size="icon" className="size-7" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
                     <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
                   </div>
@@ -193,6 +205,17 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
 
       {formOpen && (
         <DeudaForm key={editando?.id ?? "nuevo"} registro={editando} cuentas={cuentas} open={formOpen} onOpenChange={setFormOpen} />
+      )}
+
+      {cobrar && (
+        <CobroDialog
+          deuda={cobrar}
+          cuentas={cuentas}
+          onClose={(refrescar) => {
+            setCobrar(null);
+            if (refrescar) router.refresh();
+          }}
+        />
       )}
 
       <Dialog open={!!borrar} onOpenChange={(v) => !v && setBorrar(null)}>
@@ -214,6 +237,112 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
         </DialogFooter>
       </Dialog>
     </div>
+  );
+}
+
+/** Cuentas destino válidas para recibir un cobro (reales, no derivadas). */
+function cuentasDestino(cuentas: Account[]): Account[] {
+  return cuentas.filter((c) => c.active && !c.is_liability && c.type !== "dpf" && c.type !== "por_cobrar");
+}
+
+/** Diálogo "Recibir cobro": marca a qué cuenta llegó el dinero (hoy). El job lo
+ *  mueve de "Por cobrar" a esa cuenta; el patrimonio total no cambia. */
+function CobroDialog({
+  deuda,
+  cuentas,
+  onClose,
+}: {
+  deuda: DebtUI;
+  cuentas: Account[];
+  onClose: (refrescar: boolean) => void;
+}) {
+  const destinos = cuentasDestino(cuentas);
+  const [cuentaId, setCuentaId] = useState(deuda.paid_account_id ?? "");
+  const [monto, setMonto] = useState(String(deuda.outstanding));
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const montoN = parseFloat(monto) || 0;
+  const nuevoPagado = Math.min(deuda.amount, Math.round((deuda.paid_amount + montoN) * 100) / 100);
+  const cuentaSel = destinos.find((c) => c.id === cuentaId);
+
+  async function confirmar() {
+    setError(null);
+    if (!(montoN > 0)) return setError("Ingresa el monto recibido.");
+    if (montoN > deuda.outstanding + 0.001) return setError("El cobro no puede superar lo que falta por cobrar.");
+    if (!cuentaId) return setError("Elige la cuenta a la que llegó el dinero.");
+    setEnviando(true);
+    try {
+      const res = await fetch(`/api/deudas/${deuda.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          debt_date: deuda.debt_date,
+          amount: deuda.amount,
+          paid_amount: nuevoPagado,
+          reason: deuda.reason,
+          counterparty: deuda.counterparty,
+          due_date: deuda.due_date,
+          paid_account_id: cuentaId,
+          collected_date: fechaBoliviaHoy(),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+      onClose(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al registrar el cobro.");
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && !enviando && onClose(false)}>
+      <DialogHeader>
+        <DialogTitle>Recibir cobro</DialogTitle>
+        <DialogDescription>
+          Registra que {deuda.counterparty || "el deudor"} te pagó. Se asume que el dinero llegó ahora. Tu patrimonio
+          total no cambia: solo se mueve de “Por cobrar” a la cuenta que elijas (sube tu disponibilidad).
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">Por cobrar</span>
+          <span className="font-semibold text-primary tabular-nums">{formatBob(deuda.outstanding)}</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="montoCobro">Monto recibido (Bs)</Label>
+            <Input id="montoCobro" type="number" step="0.01" min="0" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="0.00" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cuentaCobro">¿A qué cuenta llegó?</Label>
+            <Select id="cuentaCobro" value={cuentaId} onChange={(e) => setCuentaId(e.target.value)}>
+              <option value="">— Elige cuenta —</option>
+              {destinos.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.currency})</option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Se registra con fecha de hoy. El job de medianoche mueve {cuentaSel ? `el dinero a ${cuentaSel.name}` : "el dinero a la cuenta elegida"}.
+          {nuevoPagado >= deuda.amount ? " La deuda quedará como cobrada." : " La deuda quedará parcialmente cobrada."}
+        </p>
+        {error && (
+          <p className="flex items-center gap-1.5 text-sm text-destructive"><Warning weight="fill" className="size-4" />{error}</p>
+        )}
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onClose(false)} disabled={enviando}>Cancelar</Button>
+        <Button onClick={confirmar} disabled={enviando}>
+          <Coins weight="fill" className="size-4" />
+          {enviando ? "Guardando…" : "Registrar cobro"}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 
