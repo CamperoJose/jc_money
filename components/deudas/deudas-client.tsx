@@ -26,6 +26,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  TableRoot,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableFoot,
+} from "@/components/tremor/table";
 import { DeudaForm } from "@/components/deudas/deuda-form";
 import { formatBob, formatDate, formatBobCompact } from "@/lib/format";
 import { fechaBoliviaHoy } from "@/lib/datetime";
@@ -119,53 +129,122 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
         </Card>
       ) : (
         <>
-          {/* Tabla (desktop) */}
+          {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <div className="relative w-full overflow-x-auto">
-              <table className="w-full caption-bottom text-sm">
-                <thead className="border-b bg-muted/40">
-                  <tr className="text-left text-muted-foreground">
-                    <th className="px-3 py-2.5 font-medium">Deudor</th>
-                    <th className="px-3 py-2.5 font-medium">Motivo</th>
-                    <th className="px-3 py-2.5 font-medium">Fecha</th>
-                    <th className="px-3 py-2.5 font-medium">Vence</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Monto</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Por cobrar</th>
-                    <th className="px-3 py-2.5 font-medium">Estado</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deudas.map((d) => (
-                    <tr key={d.id} className="border-b transition-colors hover:bg-muted/40">
-                      <td className="px-3 py-2.5 font-medium">{d.counterparty || "—"}</td>
-                      <td className="max-w-[200px] truncate px-3 py-2.5 text-muted-foreground" title={d.reason ?? ""}>{d.reason || "—"}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{formatDate(d.debt_date)}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5">
-                        {d.due_date ? (
-                          <span className={d.vencida ? "text-destructive" : "text-muted-foreground"}>
-                            {formatDate(d.due_date)}
-                            {d.vencida && d.diasVencida ? ` (+${d.diasVencida}d)` : ""}
-                          </span>
-                        ) : "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-muted-foreground">{formatBob(d.amount)}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-primary">{formatBob(d.outstanding)}</td>
-                      <td className="px-3 py-2.5"><EstadoBadge d={d} /></td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center justify-end gap-1">
-                          {d.outstanding > 0 && (
-                            <Button variant="ghost" size="icon" className="size-8 text-primary hover:text-primary" onClick={() => setCobrar(d)} aria-label="Recibir cobro" title="Recibir cobro"><Coins weight="fill" className="size-4" /></Button>
+            <TableRoot>
+              <Table>
+                <TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHeaderCell>Deudor / motivo</TableHeaderCell>
+                    <TableHeaderCell>Prestado</TableHeaderCell>
+                    <TableHeaderCell>Vencimiento</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Monto</TableHeaderCell>
+                    <TableHeaderCell className="min-w-[190px]">Avance de cobro</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Por cobrar</TableHeaderCell>
+                    <TableHeaderCell>Estado</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {deudas.map((d) => {
+                    const pct = d.amount > 0 ? d.paid_amount / d.amount : 0;
+                    const cuentaCobro = cuentas.find((c) => c.id === d.paid_account_id);
+                    return (
+                      <TableRow key={d.id}>
+                        {/* Deudor + motivo */}
+                        <TableCell className="max-w-[220px]">
+                          <div className="truncate font-medium text-foreground">{d.counterparty || "—"}</div>
+                          {d.reason && (
+                            <div className="truncate text-xs text-muted-foreground" title={d.reason}>{d.reason}</div>
                           )}
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </TableCell>
+
+                        {/* Fecha + antigüedad */}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="text-foreground">{formatDate(d.debt_date)}</div>
+                          <div className="text-xs text-muted-foreground">hace {diasDesde(d.debt_date)} d</div>
+                        </TableCell>
+
+                        {/* Vencimiento + días restantes */}
+                        <TableCell className="whitespace-nowrap">
+                          {d.due_date ? (
+                            <>
+                              <div className={d.vencida ? "font-medium text-destructive" : "text-foreground"}>
+                                {formatDate(d.due_date)}
+                              </div>
+                              <div className={`text-xs ${d.vencida ? "text-destructive" : "text-muted-foreground"}`}>
+                                {textoVencimiento(d)}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">Sin fecha</span>
+                          )}
+                        </TableCell>
+
+                        {/* Monto total */}
+                        <TableCell className="whitespace-nowrap text-right tabular-nums text-muted-foreground">
+                          {formatBob(d.amount)}
+                        </TableCell>
+
+                        {/* Avance de cobro: barra + cobrado + cuenta destino */}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={`h-full rounded-full transition-all ${d.status === "pagado" ? "bg-emerald-500" : "bg-primary"}`}
+                                style={{ width: `${Math.min(100, Math.max(0, pct * 100))}%` }}
+                              />
+                            </div>
+                            <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                              {Math.round(pct * 100)}%
+                            </span>
+                          </div>
+                          <div className="mt-1 truncate text-xs text-muted-foreground">
+                            Cobrado {formatBob(d.paid_amount)}
+                            {cuentaCobro ? ` · ${cuentaCobro.name}` : ""}
+                            {d.collected_date ? ` · ${formatDate(d.collected_date)}` : ""}
+                          </div>
+                        </TableCell>
+
+                        {/* Por cobrar */}
+                        <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums text-primary">
+                          {formatBob(d.outstanding)}
+                        </TableCell>
+
+                        <TableCell><EstadoBadge d={d} /></TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            {d.outstanding > 0 && (
+                              <Button variant="ghost" size="icon" className="size-8 text-primary hover:text-primary" onClick={() => setCobrar(d)} aria-label="Recibir cobro" title="Recibir cobro"><Coins weight="fill" className="size-4" /></Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="size-8" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
+                            <Button variant="ghost" size="icon" className="size-8 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <TableFoot>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={3} className="font-semibold">
+                      {deudas.length} {deudas.length === 1 ? "deuda" : "deudas"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {formatBob(deudas.reduce((s, d) => s + d.amount, 0))}
+                    </TableCell>
+                    <TableCell className="text-xs font-normal text-muted-foreground">
+                      Cobrado {formatBob(totalCobrado)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums text-primary">
+                      {formatBob(totalPorCobrar)}
+                    </TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
+                </TableFoot>
+              </Table>
+            </TableRoot>
           </Card>
 
           {/* Tarjetas (móvil) */}
@@ -238,6 +317,32 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
       </Dialog>
     </div>
   );
+}
+
+/** Días transcurridos desde una fecha YYYY-MM-DD (en zona Bolivia). */
+function diasDesde(fecha: string): number {
+  const a = Date.parse(`${fecha}T00:00:00Z`);
+  const b = Date.parse(`${fechaBoliviaHoy()}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.max(0, Math.round((b - a) / 86_400_000));
+}
+
+/** Texto de vencimiento: vencida hace N días, vence hoy o faltan N días. */
+function textoVencimiento(d: DebtUI): string {
+  if (d.status === "pagado") return "cobrada";
+  if (d.vencida) return `vencida hace ${d.diasVencida ?? 0} d`;
+  if (!d.due_date) return "";
+  const faltan = -diferenciaDias(fechaBoliviaHoy(), d.due_date);
+  if (faltan === 0) return "vence hoy";
+  return `faltan ${faltan} d`;
+}
+
+/** b − a en días (fechas YYYY-MM-DD). */
+function diferenciaDias(a: string, b: string): number {
+  const ma = Date.parse(`${a}T00:00:00Z`);
+  const mb = Date.parse(`${b}T00:00:00Z`);
+  if (Number.isNaN(ma) || Number.isNaN(mb)) return 0;
+  return Math.round((ma - mb) / 86_400_000);
 }
 
 /** Cuentas destino válidas para recibir un cobro (reales, no derivadas). */

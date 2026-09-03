@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Target, Warning, TrendUp, Wallet, Copy, Check } from "@phosphor-icons/react";
+import { Target, Warning, TrendUp, Wallet, Copy } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Kpi } from "@/components/tremor/kpi-card";
+import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { formatBob, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ResumenPresupuestos } from "@/lib/presupuestos";
@@ -93,12 +95,58 @@ export function PresupuestosClient({ resumen }: { resumen: ResumenPresupuestos }
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={<Target weight="duotone" className="size-5 text-primary" />} label="Planeado" valor={formatBob(totalPlaneado)} sub={`${conPresupuesto} categorías`} />
-        <Kpi icon={<TrendUp weight="duotone" className="size-5 text-destructive" />} label="Gastado" valor={formatBob(totalGastado)} sub={pctGlobal != null ? `${formatPercent(pctGlobal)} del plan` : undefined} tono={pctGlobal != null && pctGlobal > 1 ? "malo" : undefined} />
-        <Kpi icon={<Wallet weight="duotone" className="size-5 text-primary" />} label="Restante" valor={formatBob(totalRestante)} tono={totalRestante < 0 ? "malo" : "bueno"} />
-        <Kpi icon={<Check weight="duotone" className="size-5 text-muted-foreground" />} label="Avance global" valor={pctGlobal == null ? "—" : formatPercent(pctGlobal)} />
+      {/* Hero: avance global + KPIs */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Card className="lg:col-span-1">
+          <CardContent className="flex items-center gap-4 p-5">
+            <ProgressCircle
+              value={pctGlobal != null ? Math.min(100, pctGlobal * 100) : 0}
+              radius={44}
+              strokeWidth={8}
+              variant={
+                pctGlobal == null ? "neutral" : pctGlobal > 1 ? "error" : pctGlobal >= 0.85 ? "warning" : "success"
+              }
+            >
+              <span className="text-sm font-bold tabular-nums">
+                {pctGlobal == null ? "—" : `${Math.round(pctGlobal * 100)}%`}
+              </span>
+            </ProgressCircle>
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Avance global
+              </div>
+              <div className="mt-0.5 truncate text-xl font-semibold tabular-nums">
+                {formatBob(totalGastado)}
+              </div>
+              <div className="truncate text-xs text-muted-foreground">
+                de {formatBob(totalPlaneado)} planeado
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-3 sm:grid-cols-3 lg:col-span-2">
+          <Kpi
+            etiqueta="Planeado"
+            valor={formatBob(totalPlaneado)}
+            detalle={`${conPresupuesto} ${conPresupuesto === 1 ? "categoría" : "categorías"} con tope`}
+            icono={<Target weight="duotone" className="size-4" />}
+          />
+          <Kpi
+            etiqueta="Gastado"
+            valor={formatBob(totalGastado)}
+            detalle={pctGlobal != null ? `${formatPercent(pctGlobal)} del plan` : "Sin plan definido"}
+            icono={<TrendUp weight="duotone" className="size-4" />}
+            tono={pctGlobal != null && pctGlobal > 1 ? "neg" : "neutral"}
+          />
+          <Kpi
+            etiqueta="Restante"
+            valor={formatBob(totalRestante)}
+            detalle={totalRestante < 0 ? "Presupuesto excedido" : "Disponible este mes"}
+            icono={<Wallet weight="duotone" className="size-4" />}
+            tono={totalRestante < 0 ? "neg" : "pos"}
+          />
+        </div>
       </div>
 
       <Card>
@@ -165,17 +213,3 @@ function Fila({ f, onGuardar }: { f: BudgetUI; onGuardar: (id: string, v: string
   );
 }
 
-function Kpi({ icon, label, valor, sub, tono }: { icon: React.ReactNode; label: string; valor: string; sub?: string; tono?: "bueno" | "malo" }) {
-  return (
-    <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div className={`text-lg font-bold tabular-nums ${tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""}`}>{valor}</div>
-          {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

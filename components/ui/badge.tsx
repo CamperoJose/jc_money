@@ -1,14 +1,25 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type Variant = "default" | "secondary" | "outline" | "success" | "destructive";
+// Estilo Tremor (fondo tintado + ring interior), pero con los tokens del tema.
+type Variant =
+  | "default"
+  | "secondary"
+  | "outline"
+  | "success"
+  | "destructive"
+  | "warning"
+  | "neutral";
 
 const styles: Record<Variant, string> = {
-  default: "border-transparent bg-primary text-primary-foreground",
-  secondary: "border-transparent bg-secondary text-secondary-foreground",
-  outline: "text-foreground",
-  success: "border-transparent bg-primary/15 text-primary",
-  destructive: "border-transparent bg-destructive/15 text-destructive",
+  default: "bg-primary/10 text-primary ring-primary/30",
+  secondary: "bg-secondary text-secondary-foreground ring-border",
+  outline: "bg-transparent text-foreground ring-border",
+  success:
+    "bg-emerald-500/10 text-emerald-700 ring-emerald-500/30 dark:text-emerald-400",
+  destructive: "bg-destructive/10 text-destructive ring-destructive/30",
+  warning: "bg-amber-500/10 text-amber-700 ring-amber-500/30 dark:text-amber-400",
+  neutral: "bg-muted text-muted-foreground ring-border",
 };
 
 export function Badge({
@@ -19,7 +30,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-x-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
         styles[variant],
         className
       )}

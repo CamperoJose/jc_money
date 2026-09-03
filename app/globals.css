@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* La plantilla de referencia (Tremor) NO debe entrar al escaneo de clases de
+   Tailwind: es solo material de consulta y su CSS ensuciaría el bundle. */
+@source not "../referencia";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

@@ -22,6 +22,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  TableRoot,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableFoot,
+} from "@/components/tremor/table";
 import { ActivoForm } from "@/components/activos/activo-form";
 import { formatBob, formatDate, formatPercent } from "@/lib/format";
 import type { ResumenActivos } from "@/lib/activos";
@@ -96,54 +106,130 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
         </Card>
       ) : (
         <>
-          {/* Tabla (desktop) */}
+          {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <div className="relative w-full overflow-x-auto">
-              <table className="w-full caption-bottom text-sm">
-                <thead className="border-b bg-muted/40">
-                  <tr className="text-left text-muted-foreground">
-                    <th className="px-3 py-2.5 font-medium">Activo</th>
-                    <th className="px-3 py-2.5 font-medium">Adquirido</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Costo</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Valor / Venta</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Resultado</th>
-                    <th className="px-3 py-2.5 font-medium">Estado</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activos.map((a) => (
-                    <tr key={a.id} className="border-b transition-colors hover:bg-muted/40">
-                      <td className="px-3 py-2.5">
-                        <div className="font-medium">{a.name}</div>
-                        {a.category && <div className="text-xs text-muted-foreground">{a.category}</div>}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-                        {a.acquired_date ? formatDate(a.acquired_date) : "—"}
-                        {a.diasTenencia != null && <div className="text-xs">{a.diasTenencia} d</div>}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                        {formatBob(a.acquisition_cost)} {a.currency !== "BOB" && <span className="text-xs">{a.currency}</span>}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
-                        {a.realizado ? formatBob(a.sold_price ?? 0) : formatBob(a.valorActual)}
-                      </td>
-                      <td className={`whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums ${a.resultado >= 0 ? "text-primary" : "text-destructive"}`}>
-                        {a.resultado >= 0 ? "+" : ""}{formatBob(a.resultado)}
-                        {a.resultadoPct != null && <div className="text-xs font-normal">{formatPercent(a.resultadoPct, 1)}</div>}
-                      </td>
-                      <td className="px-3 py-2.5"><EstadoBadge a={a} /></td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => { setEditando(a); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(a); }} aria-label="Borrar"><Trash className="size-4" /></Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TableRoot>
+              <Table>
+                <TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHeaderCell>Activo</TableHeaderCell>
+                    <TableHeaderCell>Adquirido</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Costo</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Valor / Venta</TableHeaderCell>
+                    <TableHeaderCell className="min-w-[170px]">Resultado</TableHeaderCell>
+                    <TableHeaderCell>Estado</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {activos.map((a) => {
+                    const cuentaVenta = cuentas.find((c) => c.id === a.sold_account_id);
+                    // Magnitud relativa del resultado para la barra (cap a ±50%).
+                    const mag = a.resultadoPct != null ? Math.min(1, Math.abs(a.resultadoPct) / 0.5) : 0;
+                    const positivo = a.resultado >= 0;
+                    return (
+                      <TableRow key={a.id}>
+                        {/* Nombre + categoría + moneda */}
+                        <TableCell className="max-w-[220px]">
+                          <div className="truncate font-medium text-foreground">{a.name}</div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {a.category && <span className="truncate">{a.category}</span>}
+                            {a.currency !== "BOB" && <Badge variant="neutral">{a.currency}</Badge>}
+                            {!a.counts_in_patrimonio && <span>· no contable</span>}
+                          </div>
+                        </TableCell>
+
+                        {/* Adquisición + tenencia */}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="text-foreground">{a.acquired_date ? formatDate(a.acquired_date) : "—"}</div>
+                          {a.diasTenencia != null && (
+                            <div className="text-xs text-muted-foreground">
+                              {a.diasTenencia} d {a.realizado ? "hasta la venta" : "en cartera"}
+                            </div>
+                          )}
+                        </TableCell>
+
+                        {/* Costo */}
+                        <TableCell className="whitespace-nowrap text-right tabular-nums text-muted-foreground">
+                          {formatBob(a.acquisition_cost)}
+                        </TableCell>
+
+                        {/* Valor actual o precio de venta + cuenta destino */}
+                        <TableCell className="whitespace-nowrap text-right">
+                          <div className="font-medium tabular-nums text-foreground">
+                            {a.realizado ? formatBob(a.sold_price ?? 0) : formatBob(a.valorActual)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {a.realizado
+                              ? `vendido${a.sold_date ? ` ${formatDate(a.sold_date)}` : ""}${cuentaVenta ? ` → ${cuentaVenta.name}` : ""}`
+                              : "valor estimado"}
+                          </div>
+                        </TableCell>
+
+                        {/* Resultado con barra de magnitud */}
+                        <TableCell>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`font-semibold tabular-nums ${positivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                              {positivo ? "+" : ""}{formatBob(a.resultado)}
+                            </span>
+                            {a.resultadoPct != null && (
+                              <span className={`text-xs tabular-nums ${positivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                                {formatPercent(a.resultadoPct, 1)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                            <div className="flex w-1/2 justify-end">
+                              {!positivo && (
+                                <div className="h-full rounded-l-full bg-destructive transition-all" style={{ width: `${mag * 100}%` }} />
+                              )}
+                            </div>
+                            <div className="flex w-1/2 justify-start">
+                              {positivo && (
+                                <div className="h-full rounded-r-full bg-emerald-500 transition-all" style={{ width: `${mag * 100}%` }} />
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell><EstadoBadge a={a} /></TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="size-8" onClick={() => { setEditando(a); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
+                            <Button variant="ghost" size="icon" className="size-8 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(a); }} aria-label="Borrar"><Trash className="size-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <TableFoot>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={2} className="font-semibold">
+                      {activos.length} {activos.length === 1 ? "activo" : "activos"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {formatBob(activos.reduce((s, a) => s + a.acquisition_cost, 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {formatBob(activos.reduce((s, a) => s + (a.realizado ? (a.sold_price ?? 0) : a.valorActual), 0))}
+                    </TableCell>
+                    <TableCell className="font-semibold tabular-nums">
+                      {(() => {
+                        const t = activos.reduce((s, a) => s + a.resultado, 0);
+                        return (
+                          <span className={t >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>
+                            {t >= 0 ? "+" : ""}{formatBob(t)}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
+                </TableFoot>
+              </Table>
+            </TableRoot>
           </Card>
 
           {/* Tarjetas (móvil) */}
