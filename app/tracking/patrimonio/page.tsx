@@ -39,21 +39,23 @@ export const dynamic = "force-dynamic";
 export default async function PatrimonioDashboard() {
   const supabase = await createClient();
 
+  // Ambas consultas en paralelo (menor tiempo de carga del dashboard).
+  const [resPatrimonio, resDpf] = await Promise.allSettled([
+    getResumen(supabase),
+    getResumenDpf(supabase),
+  ]);
+
   let resumen: ResumenPatrimonio | null = null;
   let errorMsg: string | null = null;
-  try {
-    resumen = await getResumen(supabase);
-  } catch (e) {
-    errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
+  if (resPatrimonio.status === "fulfilled") {
+    resumen = resPatrimonio.value;
+  } else {
+    errorMsg =
+      resPatrimonio.reason instanceof Error ? resPatrimonio.reason.message : "Error al leer los datos.";
   }
 
   // DPF: tolerante a que la tabla/migración aún no exista (no rompe el dashboard).
-  let resumenDpf: ResumenDpf | null = null;
-  try {
-    resumenDpf = await getResumenDpf(supabase);
-  } catch {
-    resumenDpf = null;
-  }
+  const resumenDpf: ResumenDpf | null = resDpf.status === "fulfilled" ? resDpf.value : null;
 
   return (
     <div className="space-y-8">

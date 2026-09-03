@@ -8,7 +8,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-border/70 bg-card text-card-foreground shadow-[0_1px_2px_rgba(16,24,40,0.04),0_12px_28px_-16px_rgba(16,24,40,0.18)] transition-shadow duration-200 hover:shadow-[0_2px_4px_rgba(16,24,40,0.05),0_18px_40px_-18px_rgba(16,24,40,0.22)]",
+      // min-w-0 evita que el contenido (gráficos Recharts, tablas) fuerce
+      // desborde horizontal cuando la tarjeta es hija de un grid/flex.
+      "min-w-0 rounded-xl border border-border/70 bg-card text-card-foreground shadow-[0_1px_2px_rgba(16,24,40,0.04),0_12px_28px_-16px_rgba(16,24,40,0.18)] transition-shadow duration-200 hover:shadow-[0_2px_4px_rgba(16,24,40,0.05),0_18px_40px_-18px_rgba(16,24,40,0.22)]",
       className
     )}
     {...props}

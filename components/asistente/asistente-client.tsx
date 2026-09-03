@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkle,
@@ -44,6 +44,19 @@ export function AsistenteClient({
   const [ver, setVer] = useState(false);
   const [copiado, setCopiado] = useState<string | null>(null);
   const [regenerando, setRegenerando] = useState(false);
+
+  // Mientras haya una solicitud "procesando" (async), refresca cada 4s (máx 30s)
+  // para que pase a completado/incompleto sin recargar a mano.
+  const hayProcesando = solicitudes.some((s) => s.status === "procesando");
+  useEffect(() => {
+    if (!hayProcesando) return;
+    const intervalo = setInterval(() => router.refresh(), 4000);
+    const fin = setTimeout(() => clearInterval(intervalo), 30_000);
+    return () => {
+      clearInterval(intervalo);
+      clearTimeout(fin);
+    };
+  }, [hayProcesando, router]);
 
   async function copiar(texto: string, cual: string) {
     try {

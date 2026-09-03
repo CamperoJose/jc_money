@@ -2,7 +2,26 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-03 (sesión 15 — voz asíncrona + correo-recibo + auditoría + Shortcut iOS)
+## Última actualización: 2026-09-03 (sesión 16 — pulido UI/UX y voz por Shortcut afinada)
+
+### Sesión 16 — lo hecho ✅
+- **Voz por Shortcut de iOS operativa.** Causa raíz de que “no registraba”: el **middleware**
+  redirigía `/api/voz/ingesta` al login (el atajo no tiene sesión). Se **excluyó** del middleware
+  (matcher + PUBLIC_PATHS); el endpoint valida sesión **o** token por su cuenta. El token del atajo
+  puede ir como header `Authorization: Bearer`, `x-api-token` o **campo `token` del JSON** (lo más
+  fácil). Se limpian saltos de línea del base64. Timeouts en Vertex (25s) y SMTP; correo con tope de
+  12s. Flujo **asíncrono** con `after()` (responde 202 al instante, procesa en segundo plano).
+- **Pulido UI/UX:**
+  - `Card` ahora tiene `min-w-0` → arregla **desbordes horizontales** de gráficos Recharts dentro de
+    grids/flex (causa típica de scroll horizontal en móvil).
+  - **Skeletons de carga** en dashboards y listas (gastos, dpf, tendencias, activos, deudas, asistente,
+    gastos/registros) — `components/ui/loading-skeletons.tsx`.
+  - Dashboard de patrimonio: consultas en **paralelo** (`Promise.allSettled`) → carga más rápida.
+  - Asistente IA: **auto-refresh** mientras haya una solicitud en `procesando`.
+
+---
+
+## Update previo: 2026-09-03 (sesión 15 — voz asíncrona + correo-recibo + auditoría + Shortcut iOS)
 
 ### Sesión 15 — lo hecho ✅
 - **Flujo de voz asíncrono (sin menú de revisión):** el usuario graba y la app responde al instante
