@@ -17,8 +17,9 @@ export interface CategoriaCatalogo {
 const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
 const LOCATION = process.env.GCP_LOCATION?.trim() || "global";
 
-const REINTENTOS = 3;
-const ESPERAS_MS = [1000, 3000]; // entre intentos
+const REINTENTOS = 2;
+const ESPERAS_MS = [1500]; // entre intentos
+const TIMEOUT_MS = 25_000; // por intento (acota el tiempo total)
 
 /** Host de Vertex AI según la ubicación ("global" usa el host sin prefijo). */
 function hostVertex(location: string): string {
@@ -95,7 +96,7 @@ async function llamarVertex(prompt: string, audioBase64: string, mimeType: strin
   for (let intento = 1; intento <= REINTENTOS; intento++) {
     let res: Response;
     const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 30_000); // no colgar indefinidamente
+    const timeout = setTimeout(() => ctrl.abort(), TIMEOUT_MS); // no colgar indefinidamente
     try {
       const token = await obtenerAccessToken();
       res = await fetch(url, {
