@@ -222,12 +222,14 @@ async function getMovimientosDelDia(
  * Crea la foto de patrimonio AUTOCALCULADA que cierra el día `targetDate`
  * (por defecto, ayer en Bolivia), fechada a las 23:59 de ese día.
  *
- * Base = EL ÚLTIMO REGISTRO (manual o auto) previo al día que se procesa
- * (no se asume "el día anterior": es la última foto que exista).
- * Total = total de la base + (ingresos − gastos) del DÍA ENTERO procesado
- * (todos los del targetDate, sin importar la hora) + ajustes de cuentas
- * derivadas (DPF, Por Cobrar, Activos) y movimientos (ventas/cobros) del día.
- * Los saldos de la base se copian para conservar la composición por cuenta.
+ * Base = EL ÚLTIMO REGISTRO (manual o auto), la última foto que exista ≤ 23:59
+ * del targetDate (no se asume "el día anterior").
+ * Total = total de la base + (ingresos − gastos) ocurridos DESPUÉS de esa base
+ * y hasta las 23:59 del día + ajustes de cuentas derivadas (DPF, Por Cobrar,
+ * Activos) y movimientos (ventas/cobros). Contar "desde el último registro"
+ * evita duplicar lo que la base ya reflejaba: si la base es el cierre del día
+ * anterior equivale al día entero; si es un manual del mismo día, solo cuenta lo
+ * posterior. Los saldos de la base se copian para conservar la composición.
  *
  * NUNCA modifica ni borra fotos existentes; solo inserta su propia foto auto.
  * Manuales y automática COEXISTEN en un mismo día; lo único que no puede haber
@@ -258,13 +260,12 @@ export async function ejecutarPatrimonioDiario(
   }
 
   // Base = EL ÚLTIMO REGISTRO (manual o auto) en o antes de las 23:59 del
-  // targetDate. Como arriba se omite el día si ya tiene alguna foto, aquí la
-  // base es siempre la última foto ANTERIOR al día que se procesa — no se asume
-  // "el día anterior": puede ser de varios días atrás si hubo huecos.
+  // targetDate. Puede ser un manual del MISMO día (p. ej. un recálculo que hiciste
+  // por la tarde): en ese caso el neto solo cuenta lo ocurrido DESPUÉS de esa foto.
   const { data: bases, error: eBase } = await admin
     .from("net_worth_snapshots")
     .select(
-      "id, snapshot_date, exchange_rate, kind, total_bob, net_worth_balances(account_id, amount, accounts(currency, is_liability))"
+      "id, snapshot_date, snapshot_at, exchange_rate, kind, total_bob, net_worth_balances(account_id, amount, accounts(currency, is_liability))"
     )
     .eq("user_id", userId)
     .lte("snapshot_at", targetAtISO)
@@ -293,15 +294,19 @@ export async function ejecutarPatrimonioDiario(
       : calcularTotalBob(balancesBase, rate);
 
   // Neto del DÍA ENTERO que se procesa (targetDate): TODOS los gastos/ingresos
-  // de ese día, sin importar la hora (ni la del registro base). Ingresos suman,
-  // gastos restan (en BOB, con el T/C de cada txn). Como el día solo se cierra
-  // cuando aún no tiene ninguna foto, la base es siempre anterior a este día, así
-  // que sumar el día completo no duplica nada.
+  // Neto = lo ocurrido DESPUÉS del último registro (base) y hasta el cierre del
+  // targetDate (23:59). Así NO se duplica lo que la base ya reflejaba:
+  //  - si la base es el cierre del día anterior → cuenta el día entero;
+  //  - si la base es un manual del mismo día → cuenta solo lo posterior a él
+  //    (un gasto hecho ANTES del recálculo manual ya está dentro del manual y no
+  //    se vuelve a restar). Ingresos suman, gastos restan (BOB, con el T/C de cada txn).
+  const baseAtISO = base.snapshot_at as string;
   const { data: txns, error: eTx } = await admin
     .from("transactions")
     .select("type, amount, currency, exchange_rate")
     .eq("user_id", userId)
-    .eq("txn_date", targetDate);
+    .gt("occurred_at", baseAtISO)
+    .lte("occurred_at", targetAtISO);
   if (eTx) throw eTx;
 
   let netoDia = 0;
@@ -371,7 +376,7 @@ export async function ejecutarPatrimonioDiario(
       total_usd: totalUsd,
       note:
         `Autocalculado: base del ${base.snapshot_date} (${baseTotalBob}) ` +
-        `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto del día` +
+        `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto desde el último registro` +
         (derivadas.length ? ` ${ajusteDerivadas >= 0 ? "+" : "−"} ${Math.abs(ajusteDerivadas)} de ajuste derivadas (${detalleDerivadas})` : "") +
         (movimientos.length ? ` + ${ajusteMovimientos} de movimientos (${detalleMovimientos})` : "") +
         ".",
