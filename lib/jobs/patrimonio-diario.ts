@@ -224,12 +224,12 @@ async function getMovimientosDelDia(
  *
  * Base = EL ÚLTIMO REGISTRO (manual o auto), la última foto que exista ≤ 23:59
  * del targetDate (no se asume "el día anterior").
- * Total = total de la base + (ingresos − gastos) ocurridos DESPUÉS de esa base
- * y hasta las 23:59 del día + ajustes de cuentas derivadas (DPF, Por Cobrar,
- * Activos) y movimientos (ventas/cobros). Contar "desde el último registro"
- * evita duplicar lo que la base ya reflejaba: si la base es el cierre del día
- * anterior equivale al día entero; si es un manual del mismo día, solo cuenta lo
- * posterior. Los saldos de la base se copian para conservar la composición.
+ * Total = total de la base + (ingresos − gastos) del DÍA ENTERO procesado (todos
+ * los del targetDate, sin importar la hora) + ajustes de cuentas derivadas (DPF,
+ * Por Cobrar, Activos) y movimientos (ventas/cobros). Los gastos son
+ * independientes del patrimonio y solo lo impactan aquí: el manual son saldos en
+ * bruto y el job aplica encima los gastos del día. Los saldos de la base se
+ * copian para conservar la composición por cuenta.
  *
  * NUNCA modifica ni borra fotos existentes; solo inserta su propia foto auto.
  * Manuales y automática COEXISTEN en un mismo día; lo único que no puede haber
@@ -260,12 +260,12 @@ export async function ejecutarPatrimonioDiario(
   }
 
   // Base = EL ÚLTIMO REGISTRO (manual o auto) en o antes de las 23:59 del
-  // targetDate. Puede ser un manual del MISMO día (p. ej. un recálculo que hiciste
-  // por la tarde): en ese caso el neto solo cuenta lo ocurrido DESPUÉS de esa foto.
+  // targetDate (no se asume "el día anterior"). Sobre esa base se aplica el neto
+  // del día entero.
   const { data: bases, error: eBase } = await admin
     .from("net_worth_snapshots")
     .select(
-      "id, snapshot_date, snapshot_at, exchange_rate, kind, total_bob, net_worth_balances(account_id, amount, accounts(currency, is_liability))"
+      "id, snapshot_date, exchange_rate, kind, total_bob, net_worth_balances(account_id, amount, accounts(currency, is_liability))"
     )
     .eq("user_id", userId)
     .lte("snapshot_at", targetAtISO)
@@ -294,19 +294,16 @@ export async function ejecutarPatrimonioDiario(
       : calcularTotalBob(balancesBase, rate);
 
   // Neto del DÍA ENTERO que se procesa (targetDate): TODOS los gastos/ingresos
-  // Neto = lo ocurrido DESPUÉS del último registro (base) y hasta el cierre del
-  // targetDate (23:59). Así NO se duplica lo que la base ya reflejaba:
-  //  - si la base es el cierre del día anterior → cuenta el día entero;
-  //  - si la base es un manual del mismo día → cuenta solo lo posterior a él
-  //    (un gasto hecho ANTES del recálculo manual ya está dentro del manual y no
-  //    se vuelve a restar). Ingresos suman, gastos restan (BOB, con el T/C de cada txn).
-  const baseAtISO = base.snapshot_at as string;
+  // Neto = TODOS los gastos/ingresos del DÍA ENTERO procesado (targetDate), sin
+  // importar la hora ni la del registro base. En este modelo los gastos son
+  // independientes del patrimonio y solo lo impactan aquí (vía el job): el
+  // recálculo manual son saldos "en bruto" y el job aplica encima los gastos del
+  // día. Ingresos suman, gastos restan (en BOB, con el T/C de cada txn).
   const { data: txns, error: eTx } = await admin
     .from("transactions")
     .select("type, amount, currency, exchange_rate")
     .eq("user_id", userId)
-    .gt("occurred_at", baseAtISO)
-    .lte("occurred_at", targetAtISO);
+    .eq("txn_date", targetDate);
   if (eTx) throw eTx;
 
   let netoDia = 0;
@@ -376,7 +373,7 @@ export async function ejecutarPatrimonioDiario(
       total_usd: totalUsd,
       note:
         `Autocalculado: base del ${base.snapshot_date} (${baseTotalBob}) ` +
-        `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto desde el último registro` +
+        `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto del día` +
         (derivadas.length ? ` ${ajusteDerivadas >= 0 ? "+" : "−"} ${Math.abs(ajusteDerivadas)} de ajuste derivadas (${detalleDerivadas})` : "") +
         (movimientos.length ? ` + ${ajusteMovimientos} de movimientos (${detalleMovimientos})` : "") +
         ".",
