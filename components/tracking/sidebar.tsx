@@ -24,6 +24,8 @@ import {
   Flask,
   Package,
   Target,
+  Sparkle,
+  Microphone,
   type Icon,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -84,6 +86,12 @@ const GROUPS: NavGroup[] = [
     icon: HandCoins,
     ready: true,
     items: [{ href: "/tracking/deudas", label: "Que me deben", icon: HandCoins }],
+  },
+  {
+    label: "Asistente IA",
+    icon: Sparkle,
+    ready: true,
+    items: [{ href: "/tracking/asistente", label: "Solicitudes por voz", icon: Microphone }],
   },
   {
     label: "Configuración",

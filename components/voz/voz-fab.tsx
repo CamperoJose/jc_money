@@ -1,39 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Microphone,
-  Stop,
-  X,
-  FloppyDisk,
-  Warning,
-  Trash,
-  Receipt,
-  HandCoins,
-  CircleNotch,
-} from "@phosphor-icons/react";
-import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { fechaBoliviaHoy } from "@/lib/datetime";
-import type { Account, Category, Currency } from "@/lib/types";
-import type { DeudaVoz, GastoVoz } from "@/lib/voz/tipos";
+import { Microphone, Stop, X, Warning, CircleNotch, CheckCircle } from "@phosphor-icons/react";
 
-type Estado = "idle" | "grabando" | "procesando" | "revision";
-
-interface GastoEd extends GastoVoz {
-  _id: string;
-  exchange_rate: string;
-}
-interface DeudaEd extends DeudaVoz {
-  _id: string;
-}
-
-let contador = 0;
-const nid = () => `v${Date.now()}_${contador++}`;
+type Estado = "idle" | "grabando" | "enviando" | "ok" | "error";
 
 /** Elige un mimeType de grabación soportado por el navegador. */
 function elegirMime(): string {
@@ -47,52 +17,68 @@ function elegirMime(): string {
   return "";
 }
 
-export function VozFab({ cuentas, categorias }: { cuentas: Account[]; categorias: Category[] }) {
-  const router = useRouter();
+/**
+ * Botón flotante de registro por voz. Graba audio y lo envía a /api/voz/ingesta,
+ * que responde de inmediato ("registro recibido") y procesa en segundo plano;
+ * el usuario recibe el detalle por correo. Sin menú de revisión.
+ */
+export function VozFab() {
   const [estado, setEstado] = useState<Estado>("idle");
   const [segundos, setSegundos] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [gastos, setGastos] = useState<GastoEd[]>([]);
-  const [deudas, setDeudas] = useState<DeudaEd[]>([]);
-  const [guardando, setGuardando] = useState(false);
-  const [tcDefault, setTcDefault] = useState("");
+  const [mensaje, setMensaje] = useState<string | null>(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const mimeRef = useRef<string>("audio/webm");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const okTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const cuentasAct = cuentas.filter((c) => c.active);
-
-  const limpiarStream = useCallback(() => {
+  // Libera el micrófono por completo (apaga el indicador). Solo al desmontar o
+  // tras un rato de inactividad, no entre grabaciones (así no se re-pide permiso).
+  const soltarMic = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+  }, []);
+
+  const pararTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
   }, []);
 
-  useEffect(() => () => limpiarStream(), [limpiarStream]);
-
-  // T/C de referencia para prellenar montos en moneda extranjera.
-  useEffect(() => {
-    fetch(`/api/tipo-cambio/ultimo?date=${fechaBoliviaHoy()}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => j?.rate && setTcDefault(String(j.rate)))
-      .catch(() => {});
+  // Devuelve un stream de micrófono reutilizable: si ya se otorgó el permiso y
+  // el track sigue vivo, se reutiliza (iOS/Safari no vuelve a preguntar).
+  const obtenerStream = useCallback(async (): Promise<MediaStream> => {
+    const actual = streamRef.current;
+    if (actual && actual.getAudioTracks().some((t) => t.readyState === "live")) return actual;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
+    return stream;
   }, []);
 
+  useEffect(
+    () => () => {
+      pararTimer();
+      soltarMic();
+      if (okTimerRef.current) clearTimeout(okTimerRef.current);
+      if (idleRef.current) clearTimeout(idleRef.current);
+    },
+    [pararTimer, soltarMic]
+  );
+
   async function iniciar() {
-    setError(null);
+    setMensaje(null);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setError("Tu navegador no permite grabar audio.");
+      setEstado("error");
+      setMensaje("Tu navegador no permite grabar audio.");
       return;
     }
+    if (idleRef.current) clearTimeout(idleRef.current); // no sueltes el mic mientras se usa
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      const stream = await obtenerStream();
       const mime = elegirMime();
       mimeRef.current = (mime || "audio/webm").split(";")[0];
       const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
@@ -102,7 +88,10 @@ export function VozFab({ cuentas, categorias }: { cuentas: Account[]; categorias
       };
       rec.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeRef.current });
-        limpiarStream();
+        pararTimer();
+        // Conserva el permiso reutilizando el stream; suéltalo si queda inactivo.
+        if (idleRef.current) clearTimeout(idleRef.current);
+        idleRef.current = setTimeout(soltarMic, 120_000);
         void enviar(blob);
       };
       recorderRef.current = rec;
@@ -116,21 +105,17 @@ export function VozFab({ cuentas, categorias }: { cuentas: Account[]; categorias
         });
       }, 1000);
     } catch {
-      limpiarStream();
-      setError("No se pudo acceder al micrófono. Revisa los permisos.");
-      setEstado("idle");
+      pararTimer();
+      soltarMic();
+      setEstado("error");
+      setMensaje("No se pudo acceder al micrófono. Revisa los permisos.");
     }
   }
 
   function detener() {
-    if (recorderRef.current && recorderRef.current.state !== "inactive") {
-      recorderRef.current.stop();
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setEstado("procesando");
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
+    pararTimer();
+    setEstado("enviando");
   }
 
   function cancelar() {
@@ -138,123 +123,58 @@ export function VozFab({ cuentas, categorias }: { cuentas: Account[]; categorias
       recorderRef.current.onstop = null;
       recorderRef.current.stop();
     }
-    limpiarStream();
+    pararTimer();
+    // Mantén el permiso: suelta el mic solo tras inactividad.
+    if (idleRef.current) clearTimeout(idleRef.current);
+    idleRef.current = setTimeout(soltarMic, 120_000);
     setEstado("idle");
   }
 
   async function enviar(blob: Blob) {
     try {
       const audioBase64 = await blobABase64(blob);
-      const res = await fetch("/api/voz/parse", {
+      const res = await fetch("/api/voz/ingesta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audioBase64, mimeType: mimeRef.current }),
+        body: JSON.stringify({ audioBase64, mimeType: mimeRef.current, origen: "app" }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
-
-      const gs: GastoEd[] = (j.gastos ?? []).map((g: GastoVoz) => ({
-        ...g,
-        _id: nid(),
-        exchange_rate: g.moneda === "BOB" ? "" : tcDefault,
-      }));
-      const ds: DeudaEd[] = (j.deudas ?? []).map((d: DeudaVoz) => ({ ...d, _id: nid() }));
-
-      if (gs.length === 0 && ds.length === 0) {
-        setError("No se detectó ningún gasto ni deuda. Intenta de nuevo, más claro.");
+      setEstado("ok");
+      setMensaje(j.message ?? "Registro recibido. Te enviaremos un correo con el detalle.");
+      okTimerRef.current = setTimeout(() => {
         setEstado("idle");
-        return;
-      }
-      setGastos(gs);
-      setDeudas(ds);
-      setEstado("revision");
+        setMensaje(null);
+      }, 5000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al interpretar el audio.");
-      setEstado("idle");
+      setEstado("error");
+      setMensaje(e instanceof Error ? e.message : "Error al enviar el audio.");
     }
   }
 
-  function setGasto(id: string, campo: keyof GastoEd, valor: string) {
-    setGastos((xs) => xs.map((g) => (g._id === id ? { ...g, [campo]: valor } : g)));
-  }
-  function setDeuda(id: string, campo: keyof DeudaEd, valor: string) {
-    setDeudas((xs) => xs.map((d) => (d._id === id ? { ...d, [campo]: valor } : d)));
-  }
-
-  async function registrar() {
-    setError(null);
-    // Validación cliente.
-    for (const g of gastos) {
-      if (!(Number(g.monto) > 0)) return setError("Cada gasto necesita un monto mayor a 0.");
-      if (g.moneda !== "BOB" && !(parseFloat(g.exchange_rate) > 0)) {
-        return setError("Con moneda distinta a BOB, indica el tipo de cambio.");
-      }
-    }
-    for (const d of deudas) {
-      if (!(Number(d.monto) > 0)) return setError("Cada deuda necesita un monto mayor a 0.");
-    }
-
-    setGuardando(true);
-    try {
-      const res = await fetch("/api/voz/registrar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gastos: gastos.map((g) => ({
-            descripcion: g.descripcion,
-            monto: Number(g.monto),
-            moneda: g.moneda,
-            exchange_rate: g.moneda === "BOB" ? null : parseFloat(g.exchange_rate),
-            cuenta_id: g.cuenta_id,
-            categoria_id: g.categoria_id,
-          })),
-          deudas: deudas.map((d) => ({
-            quien: d.quien,
-            monto: Number(d.monto),
-            motivo: d.motivo,
-          })),
-        }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
-      cerrarRevision();
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar.");
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  function cerrarRevision() {
-    setGastos([]);
-    setDeudas([]);
-    setEstado("idle");
-  }
-
-  const procesando = estado === "procesando";
+  const enviando = estado === "enviando";
+  const grabando = estado === "grabando";
 
   return (
     <>
-      {/* Botón flotante */}
       <button
         type="button"
-        onClick={estado === "grabando" ? detener : estado === "idle" ? iniciar : undefined}
-        disabled={procesando}
-        aria-label={estado === "grabando" ? "Detener grabación" : "Registrar por voz"}
+        onClick={grabando ? detener : estado === "idle" || estado === "ok" || estado === "error" ? iniciar : undefined}
+        disabled={enviando}
+        aria-label={grabando ? "Detener grabación" : "Registrar por voz"}
         title="Registrar gasto o deuda por voz"
         className={[
-          "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full shadow-lg transition-all active:scale-95",
-          "h-14 px-4 text-primary-foreground",
-          estado === "grabando"
-            ? "bg-destructive hover:bg-destructive/90 animate-pulse"
-            : "bg-primary hover:bg-primary/90",
-          procesando ? "opacity-80" : "",
+          "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40",
+          "flex h-14 items-center gap-2 rounded-full px-4 text-primary-foreground shadow-lg transition-all active:scale-95",
+          grabando ? "animate-pulse bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90",
+          enviando ? "opacity-80" : "",
         ].join(" ")}
       >
-        {procesando ? (
+        {enviando ? (
           <CircleNotch weight="bold" className="size-6 animate-spin" />
-        ) : estado === "grabando" ? (
+        ) : estado === "ok" ? (
+          <CheckCircle weight="fill" className="size-6" />
+        ) : grabando ? (
           <>
             <Stop weight="fill" className="size-6" />
             <span className="font-semibold tabular-nums">{fmt(segundos)}</span>
@@ -264,137 +184,31 @@ export function VozFab({ cuentas, categorias }: { cuentas: Account[]; categorias
         )}
       </button>
 
-      {/* Aviso de grabación / error flotante */}
-      {estado === "grabando" && (
+      {grabando && (
         <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground shadow-md">
-          Grabando… toca para detener
+          Grabando… toca para enviar
           <button onClick={cancelar} className="ml-2 font-medium text-destructive">Cancelar</button>
         </div>
       )}
-      {error && estado === "idle" && (
-        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 flex max-w-xs items-start gap-1.5 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive shadow-md">
-          <Warning weight="fill" className="mt-0.5 size-3.5 shrink-0" />
-          <span>{error}</span>
-          <button onClick={() => setError(null)} aria-label="Cerrar"><X className="size-3.5" /></button>
+
+      {mensaje && (estado === "ok" || estado === "error") && (
+        <div
+          className={[
+            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 flex max-w-xs items-start gap-1.5 rounded-lg px-3 py-2 text-xs shadow-md",
+            estado === "ok" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive",
+          ].join(" ")}
+        >
+          {estado === "ok" ? (
+            <CheckCircle weight="fill" className="mt-0.5 size-3.5 shrink-0" />
+          ) : (
+            <Warning weight="fill" className="mt-0.5 size-3.5 shrink-0" />
+          )}
+          <span>{mensaje}</span>
+          <button onClick={() => { setEstado("idle"); setMensaje(null); }} aria-label="Cerrar">
+            <X className="size-3.5" />
+          </button>
         </div>
       )}
-
-      {/* Revisión */}
-      <Dialog open={estado === "revision"} onOpenChange={(v) => !v && !guardando && cerrarRevision()}>
-        <DialogHeader>
-          <DialogTitle>Revisar y confirmar</DialogTitle>
-          <DialogDescription>
-            Esto entendí de tu voz. Corrige lo que haga falta antes de registrar.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-          {gastos.length > 0 && (
-            <div className="space-y-2">
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <Receipt weight="duotone" className="size-4" /> Gastos ({gastos.length})
-              </p>
-              {gastos.map((g) => (
-                <div key={g._id} className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={g.descripcion}
-                      onChange={(e) => setGasto(g._id, "descripcion", e.target.value)}
-                      placeholder="Descripción"
-                      className="flex-1"
-                    />
-                    <Button variant="ghost" size="icon" className="size-8 shrink-0 text-destructive hover:text-destructive" onClick={() => setGastos((xs) => xs.filter((x) => x._id !== g._id))} aria-label="Quitar">
-                      <Trash className="size-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-[1fr_5rem] gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Monto</Label>
-                      <Input type="number" step="0.01" min="0" inputMode="decimal" value={g.monto ?? ""} onChange={(e) => setGasto(g._id, "monto", e.target.value)} placeholder="0.00" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Moneda</Label>
-                      <Select value={g.moneda} onChange={(e) => setGasto(g._id, "moneda", e.target.value as Currency)}>
-                        <option value="BOB">BOB</option>
-                        <option value="USD">USD</option>
-                        <option value="USDT">USDT</option>
-                      </Select>
-                    </div>
-                  </div>
-                  {g.moneda !== "BOB" && (
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Tipo de cambio (Bs por {g.moneda})</Label>
-                      <Input type="number" step="0.0001" min="0" inputMode="decimal" value={g.exchange_rate} onChange={(e) => setGasto(g._id, "exchange_rate", e.target.value)} placeholder="0.00" />
-                    </div>
-                  )}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Cuenta</Label>
-                      <Select value={g.cuenta_id ?? ""} onChange={(e) => setGasto(g._id, "cuenta_id", e.target.value)}>
-                        <option value="">— Sin cuenta —</option>
-                        {cuentasAct.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Categoría</Label>
-                      <Select value={g.categoria_id ?? ""} onChange={(e) => setGasto(g._id, "categoria_id", e.target.value)}>
-                        <option value="">— Sin categoría —</option>
-                        {categorias.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {deudas.length > 0 && (
-            <div className="space-y-2">
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <HandCoins weight="duotone" className="size-4" /> Deudas que me deben ({deudas.length})
-              </p>
-              {deudas.map((d) => (
-                <div key={d._id} className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                  <div className="flex items-center gap-2">
-                    <Input value={d.quien ?? ""} onChange={(e) => setDeuda(d._id, "quien", e.target.value)} placeholder="¿Quién te debe?" className="flex-1" />
-                    <Button variant="ghost" size="icon" className="size-8 shrink-0 text-destructive hover:text-destructive" onClick={() => setDeudas((xs) => xs.filter((x) => x._id !== d._id))} aria-label="Quitar">
-                      <Trash className="size-4" />
-                    </Button>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Monto (Bs)</Label>
-                      <Input type="number" step="0.01" min="0" inputMode="decimal" value={d.monto ?? ""} onChange={(e) => setDeuda(d._id, "monto", e.target.value)} placeholder="0.00" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Motivo</Label>
-                      <Input value={d.motivo ?? ""} onChange={(e) => setDeuda(d._id, "motivo", e.target.value)} placeholder="Opcional" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {error && estado === "revision" && (
-          <p className="mt-3 flex items-center gap-1.5 text-sm text-destructive">
-            <Warning weight="fill" className="size-4" />{error}
-          </p>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={cerrarRevision} disabled={guardando}>Cancelar</Button>
-          <Button onClick={registrar} disabled={guardando || (gastos.length === 0 && deudas.length === 0)}>
-            <FloppyDisk weight="bold" className="size-4" />
-            {guardando ? "Registrando…" : "Registrar todo"}
-          </Button>
-        </DialogFooter>
-      </Dialog>
     </>
   );
 }

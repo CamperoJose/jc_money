@@ -61,8 +61,14 @@ function filaDesde(input: DebtInput) {
   };
 }
 
-export async function crearDeuda(supabase: SupabaseClient, input: DebtInput): Promise<string> {
-  const { data, error } = await supabase.from("debts").insert(filaDesde(input)).select("id").single();
+export async function crearDeuda(
+  supabase: SupabaseClient,
+  input: DebtInput,
+  userId?: string
+): Promise<string> {
+  // Con service role (ingesta) el user_id debe ir explícito; con sesión, default.
+  const fila = userId ? { ...filaDesde(input), user_id: userId } : filaDesde(input);
+  const { data, error } = await supabase.from("debts").insert(fila).select("id").single();
   if (error) throw error;
   return data.id as string;
 }

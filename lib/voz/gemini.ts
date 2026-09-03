@@ -14,7 +14,7 @@ export interface CategoriaCatalogo {
   name: string;
 }
 
-const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
 const LOCATION = process.env.GCP_LOCATION?.trim() || "global";
 
 const REINTENTOS = 3;
@@ -64,8 +64,10 @@ ${listaCuentas || "(ninguna)"}
 CATEGORÍAS de gasto disponibles:
 ${listaCategorias || "(ninguna)"}
 
+Incluye también "transcripcion": lo que entendiste del audio, en texto natural.
+
 Responde ÚNICAMENTE con un JSON válido, sin texto adicional ni markdown, con esta forma exacta:
-{"gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
+{"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
 Si no hay gastos, "gastos" es []. Si no hay deudas, "deudas" es []. No inventes montos ni cuentas.`;
 }
 
@@ -148,7 +150,7 @@ function parsear(texto: string, cuentas: CuentaCatalogo[], categorias: Categoria
   } catch {
     throw new Error("No se pudo interpretar la respuesta del modelo.");
   }
-  const raw = obj as { gastos?: unknown; deudas?: unknown };
+  const raw = obj as { gastos?: unknown; deudas?: unknown; transcripcion?: unknown };
   const idsCuenta = new Set(cuentas.map((c) => c.id));
   const idsCat = new Set(categorias.map((c) => c.id));
 
@@ -159,7 +161,7 @@ function parsear(texto: string, cuentas: CuentaCatalogo[], categorias: Categoria
     ? raw.deudas.map(normalizarDeuda).filter((d): d is DeudaVoz => d !== null)
     : [];
 
-  return { gastos, deudas };
+  return { gastos, deudas, transcripcion: textoONull(raw.transcripcion) };
 }
 
 function moneda(v: unknown): Currency {

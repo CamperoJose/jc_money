@@ -299,3 +299,140 @@ export function htmlReporteMensual(d: MensualEmailData): { subject: string; html
   const text = `Reporte ${nombreMesPeriodo(d.period)}: gasto ${bob(d.gastoMes)}, ingreso ${bob(d.ingresoMes)}, balance ${bob(balance)}.`;
   return { subject: `MyMoney · 📈 Reporte de ${nombreMesPeriodo(d.period)}`, html: layout("Reporte mensual", contenido), text };
 }
+
+// ============================================================================
+// Registro por voz (asíncrono): recibo de confirmación y alerta
+// ============================================================================
+
+export interface GastoRecibo {
+  descripcion: string;
+  monto: number;
+  moneda: string;
+  cuenta: string | null;
+  categoria: string | null;
+}
+export interface DeudaRecibo {
+  quien: string | null;
+  monto: number;
+  motivo: string | null;
+}
+export interface ReciboVozData {
+  fechaHora: string; // legible, ej. "03/09/2026 14:20"
+  transcripcion: string | null;
+  gastos: GastoRecibo[];
+  deudas: DeudaRecibo[];
+  incompletos: string[]; // "lo que no se pudo registrar y por qué"
+}
+
+function monedaFmt(monto: number, moneda: string): string {
+  return moneda === "BOB" ? bob(monto) : `${monto.toFixed(2)} ${moneda}`;
+}
+
+function fila(etiqueta: string, valor: string, monto: string, color = VERDE): string {
+  return `<tr>
+    <td style="padding:10px 0;border-bottom:1px solid ${BORDE};">
+      <div style="font-weight:bold;color:${TEXTO};">${etiqueta}</div>
+      ${valor ? `<div style="font-size:12px;color:${GRIS};margin-top:2px;">${valor}</div>` : ""}
+    </td>
+    <td align="right" style="padding:10px 0;border-bottom:1px solid ${BORDE};font-weight:bold;color:${color};white-space:nowrap;">${monto}</td>
+  </tr>`;
+}
+
+function esc(s: string): string {
+  return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string);
+}
+
+/** Recibo cuando al menos un ítem se registró. */
+export function htmlReciboVoz(d: ReciboVozData): { subject: string; html: string; text: string } {
+  const partes: string[] = [];
+  if (d.gastos.length) partes.push(`${d.gastos.length} gasto${d.gastos.length > 1 ? "s" : ""}`);
+  if (d.deudas.length) partes.push(`${d.deudas.length} deuda${d.deudas.length > 1 ? "s" : ""}`);
+  const resumen = partes.join(" y ") || "registro";
+
+  const filasGasto = d.gastos
+    .map((g) =>
+      fila(
+        esc(g.descripcion || "Gasto"),
+        [g.cuenta && `Cuenta: ${esc(g.cuenta)}`, g.categoria && `Categoría: ${esc(g.categoria)}`]
+          .filter(Boolean)
+          .join(" · "),
+        `− ${monedaFmt(g.monto, g.moneda)}`,
+        "#dc2626"
+      )
+    )
+    .join("");
+  const filasDeuda = d.deudas
+    .map((x) =>
+      fila(
+        `Te debe: ${esc(x.quien || "—")}`,
+        x.motivo ? esc(x.motivo) : "",
+        `+ ${bob(x.monto)}`,
+        VERDE
+      )
+    )
+    .join("");
+
+  const alerta = d.incompletos.length
+    ? `<div style="margin-top:16px;padding:12px 14px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;color:#92400e;font-size:13px;">
+         <b>⚠️ No se registró todo:</b>
+         <ul style="margin:6px 0 0;padding-left:18px;">${d.incompletos.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
+       </div>`
+    : "";
+
+  const trans = d.transcripcion
+    ? `<div style="margin-top:14px;font-size:12px;color:${GRIS};font-style:italic;">🎙️ “${esc(d.transcripcion)}”</div>`
+    : "";
+
+  const contenido = `
+    <div style="text-align:center;padding:4px 0 10px;">
+      <div style="font-size:40px;">✅</div>
+      <div style="font-size:20px;font-weight:bold;color:${VERDE};margin-top:4px;">Registro recibido</div>
+      <div style="font-size:13px;color:${GRIS};margin-top:2px;">${resumen} · ${d.fechaHora}</div>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${filasGasto}${filasDeuda}</table>
+    ${alerta}
+    ${trans}`;
+
+  const textLineas = [
+    ...d.gastos.map((g) => `- Gasto: ${g.descripcion} ${monedaFmt(g.monto, g.moneda)}${g.cuenta ? ` (${g.cuenta})` : ""}`),
+    ...d.deudas.map((x) => `- Deuda: ${x.quien ?? "—"} +${bob(x.monto)}`),
+    ...(d.incompletos.length ? ["No registrado:", ...d.incompletos.map((i) => `  · ${i}`)] : []),
+  ].join("\n");
+
+  return {
+    subject: `MyMoney · ✅ Registrado por voz: ${resumen}`,
+    html: layout("Recibo de registro", contenido),
+    text: `Registro por voz recibido (${d.fechaHora}).\n${textLineas}`,
+  };
+}
+
+/** Alerta cuando NO se pudo registrar nada (faltó un dato crítico). */
+export function htmlAlertaVoz(d: {
+  fechaHora: string;
+  transcripcion: string | null;
+  motivos: string[];
+}): { subject: string; html: string; text: string } {
+  const lista = d.motivos.length
+    ? `<ul style="margin:8px 0 0;padding-left:18px;color:#92400e;">${d.motivos.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>`
+    : "";
+  const trans = d.transcripcion
+    ? `<div style="margin-top:14px;font-size:13px;color:${GRIS};font-style:italic;">🎙️ Entendí: “${esc(d.transcripcion)}”</div>`
+    : "";
+  const contenido = `
+    <div style="text-align:center;padding:4px 0 10px;">
+      <div style="font-size:40px;">⚠️</div>
+      <div style="font-size:20px;font-weight:bold;color:#b45309;margin-top:4px;">No se pudo registrar</div>
+      <div style="font-size:13px;color:${GRIS};margin-top:2px;">${d.fechaHora}</div>
+    </div>
+    <div style="padding:12px 14px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;font-size:13px;color:#92400e;">
+      Tu solicitud por voz no se guardó porque faltó información clave:
+      ${lista}
+      <div style="margin-top:8px;">Vuelve a intentarlo indicando el dato faltante (por ejemplo, el monto).</div>
+    </div>
+    ${trans}`;
+  return {
+    subject: "MyMoney · ⚠️ No se pudo registrar tu voz",
+    html: layout("Alerta de registro", contenido),
+    text: `No se pudo registrar tu solicitud por voz (${d.fechaHora}). Motivos: ${d.motivos.join("; ")}.`,
+  };
+}

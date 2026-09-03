@@ -195,6 +195,24 @@ export interface TcConfig {
   cod_moneda: number;
 }
 
+// --- Asistente IA (registro por voz) ----------------------------------------
+
+export type AiRequestStatus = "procesando" | "completado" | "parcial" | "incompleto" | "error";
+
+export interface AiRequest {
+  id: string;
+  created_at: string;
+  processed_at: string | null;
+  origen: string; // 'app' | 'shortcut'
+  status: AiRequestStatus;
+  transcripcion: string | null;
+  n_gastos: number;
+  n_deudas: number;
+  resumen: string | null;
+  error: string | null;
+  correo_ok: boolean;
+}
+
 export type SnapshotKind = "manual" | "auto";
 
 export interface NetWorthSnapshot {

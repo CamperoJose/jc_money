@@ -2,7 +2,31 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-03 (sesión 14 — registro por voz (Gemini/Vertex) + pulido iOS/PWA)
+## Última actualización: 2026-09-03 (sesión 15 — voz asíncrona + correo-recibo + auditoría + Shortcut iOS)
+
+### Sesión 15 — lo hecho ✅
+- **Flujo de voz asíncrono (sin menú de revisión):** el usuario graba y la app responde al instante
+  ("Registro recibido"); el proceso corre en segundo plano con `after()` de Next: interpreta con
+  Gemini, registra los gastos/deudas completos y **envía un correo** — **recibo** (HTML lindo, asunto
+  legible) si se registró algo, o **alerta** si faltó un dato crítico (p. ej. el monto). Plantillas
+  `htmlReciboVoz` / `htmlAlertaVoz` en `lib/emails/plantillas.ts`.
+- **Modelo más rápido/barato:** default `gemini-2.5-flash-lite` (antes `2.5-flash`).
+- **Tab "Asistente IA → Solicitudes por voz"** (`/tracking/asistente`): auditoría de cada solicitud
+  (estado completado/parcial/incompleto/error, fecha/hora, origen app/atajo, transcripción, nº de
+  gastos/deudas, correo enviado). Tabla `ai_requests` (migración `0014`).
+- **Shortcut / Botón de Acción de iOS:** endpoint único `/api/voz/ingesta` autentica por **sesión web
+  o `Authorization: Bearer <token>`**. Token de larga duración en `api_ingest_tokens` (regenerable
+  desde la UI, `/api/voz/token`). La página muestra token enmascarado (ver/copiar/regenerar), la URL
+  y las instrucciones del Atajo (Grabar audio → Base64 → POST JSON).
+- **Micrófono:** se reutiliza el `MediaStream` entre grabaciones (no se re-pide permiso cada vez); se
+  libera solo tras 2 min de inactividad o al desmontar.
+- Inserción con `user_id` explícito en `crearTransaccion`/`crearDeuda` (para la service role del job).
+- **Pendiente usuario:** aplicar migración `0014`. Env opcional `NEXT_PUBLIC_APP_URL` (para la URL del
+  atajo; si no, se deriva del host). `GEMINI_MODEL` sigue configurable.
+
+---
+
+## Update previo: 2026-09-03 (sesión 14 — registro por voz (Gemini/Vertex) + pulido iOS/PWA)
 
 ### Sesión 14 — lo hecho ✅
 - **Registro por voz de gastos y deudas** (botón flotante abajo-derecha en todo `/tracking`):

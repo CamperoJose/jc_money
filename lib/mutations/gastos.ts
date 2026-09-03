@@ -53,13 +53,13 @@ function filaDesde(input: TransaccionInput) {
 
 export async function crearTransaccion(
   supabase: SupabaseClient,
-  input: TransaccionInput
+  input: TransaccionInput,
+  userId?: string
 ): Promise<string> {
-  const { data, error } = await supabase
-    .from("transactions")
-    .insert(filaDesde(input))
-    .select("id")
-    .single();
+  // Con la service role (jobs/ingesta) auth.uid() es null, así que el user_id
+  // debe ir explícito; con sesión, se omite y aplica el default auth.uid().
+  const fila = userId ? { ...filaDesde(input), user_id: userId } : filaDesde(input);
+  const { data, error } = await supabase.from("transactions").insert(fila).select("id").single();
   if (error) throw error;
   return data.id as string;
 }

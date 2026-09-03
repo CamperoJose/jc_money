@@ -21,4 +21,6 @@ export interface DeudaVoz {
 export interface ResultadoVoz {
   gastos: GastoVoz[];
   deudas: DeudaVoz[];
+  /** Lo que el modelo entendió del audio (para auditoría). */
+  transcripcion: string | null;
 }
