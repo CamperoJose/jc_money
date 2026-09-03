@@ -16,14 +16,16 @@ const MAX_BASE64 = 12_000_000; // ~9 MB de audio
  *   - `Authorization: Bearer <token>` contra api_ingest_tokens (Shortcut iOS).
  */
 export async function POST(request: Request) {
-  let payload: { audioBase64?: string; mimeType?: string; origen?: string };
+  let payload: { audioBase64?: string; mimeType?: string; origen?: string; token?: string };
   try {
     payload = (await request.json()) as typeof payload;
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const audioBase64 = (payload.audioBase64 ?? "").replace(/^data:[^,]*,/, "");
+  // Limpia prefijo data: y cualquier salto de línea que agregue el codificador
+  // base64 (p. ej. el Atajo de iOS con "Line Breaks" activado).
+  const audioBase64 = (payload.audioBase64 ?? "").replace(/^data:[^,]*,/, "").replace(/\s+/g, "");
   const mimeType = payload.mimeType || "audio/webm";
   if (!audioBase64) return NextResponse.json({ error: "Falta el audio." }, { status: 400 });
   if (audioBase64.length > MAX_BASE64) {
@@ -43,8 +45,12 @@ export async function POST(request: Request) {
   if (user) {
     userId = user.id;
   } else {
+    // Token del Shortcut: acepta Authorization: Bearer <t>, header x-api-token,
+    // o el campo `token` del JSON (lo más fácil de configurar en Atajos).
     const auth = request.headers.get("authorization") ?? "";
-    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    let token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!token) token = request.headers.get("x-api-token")?.trim() || "";
+    if (!token) token = (payload.token ?? "").trim();
     if (token) {
       const { data } = await admin
         .from("api_ingest_tokens")

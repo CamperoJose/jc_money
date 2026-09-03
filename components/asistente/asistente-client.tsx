@@ -127,24 +127,37 @@ export function AsistenteClient({
             </div>
           </div>
 
-          <details className="rounded-lg border bg-muted/20 p-3 text-sm">
+          <details className="rounded-lg border bg-muted/20 p-3 text-sm" open>
             <summary className="cursor-pointer font-medium">
               <DeviceMobile weight="duotone" className="mr-1 inline size-4 text-primary" />
-              Cómo configurarlo en el Atajo
+              Cómo configurarlo en el Atajo (pasos exactos)
             </summary>
-            <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
-              <li>App <b>Atajos</b> → nuevo atajo → acción <b>“Grabar audio”</b> (Dictar/Grabar).</li>
-              <li>Acción <b>“Codificar en Base64”</b> el audio grabado.</li>
-              <li>Acción <b>“Obtener contenido de URL”</b>:
-                <ul className="mt-1 list-disc pl-5">
-                  <li>URL: la de arriba · Método: <b>POST</b></li>
-                  <li>Encabezado <code>Authorization</code>: <code>Bearer TU_TOKEN</code></li>
-                  <li>Encabezado <code>Content-Type</code>: <code>application/json</code></li>
-                  <li>Cuerpo JSON: <code>{`{"audioBase64":"<Base64>","mimeType":"audio/m4a","origen":"shortcut"}`}</code></li>
+            <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-muted-foreground">
+              <li>Acción <b>“Grabar audio”</b> (Record Audio). Ábrela y pon <b>Finalizar grabación: Al tocar</b>.</li>
+              <li>Acción <b>“Codificar” → Base64</b> con la <b>Audio grabada</b>. Toca la flechita y pon
+                <b> Line Breaks (Saltos de línea): None</b>.</li>
+              <li>Acción <b>“Obtener contenido de”</b> (Get contents of):
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  <li>En el <b>campo URL de la acción</b> (arriba, no como encabezado) pega la URL de arriba.</li>
+                  <li>Método: <b>POST</b>.</li>
+                  <li><b>Encabezados:</b> deja solo <code>Content-Type</code> = <code>application/json</code>.
+                    <b> Borra los encabezados “URL” y “Bearer”.</b></li>
+                  <li><b>Cuerpo de la solicitud: JSON</b>, con estos 4 campos (todos tipo Texto):
+                    <ul className="mt-0.5 list-disc pl-5">
+                      <li><code>audioBase64</code> = variable <b>Base64 Encoded</b></li>
+                      <li><code>mimeType</code> = <code>audio/m4a</code></li>
+                      <li><code>origen</code> = <code>shortcut</code></li>
+                      <li><code>token</code> = tu token (el de arriba)</li>
+                    </ul>
+                  </li>
                 </ul>
               </li>
               <li>Asigna el atajo al <b>Botón de Acción</b> (Ajustes → Botón de Acción → Atajo).</li>
             </ol>
+            <p className="mt-2 rounded-md bg-amber-500/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+              Error común: poner la URL o el token como <b>encabezados</b>. La URL va en el campo de la
+              acción y el token va como <b>campo del JSON</b> (o encabezado <code>Authorization: Bearer …</code>).
+            </p>
           </details>
         </CardContent>
       </Card>
