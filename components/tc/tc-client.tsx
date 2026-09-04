@@ -11,6 +11,16 @@ import {
 } from "recharts";
 import { CurrencyDollar, TrendUp, TrendDown, Bank, ArrowsClockwise } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Kpi } from "@/components/tremor/kpi-card";
+import {
+  TableRoot,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/tremor/table";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber, formatDate, formatPercent } from "@/lib/format";
 import { descripcionMoneda } from "@/lib/bcb";
@@ -70,31 +80,35 @@ export function TcClient({
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi
-              icon={<CurrencyDollar weight="duotone" className="size-5 text-primary" />}
-              label="Último T/C"
+              etiqueta="Último T/C"
               valor={`Bs ${formatNumber(ultimo!.valor, 2)}`}
-              sub={ultimo ? formatDate(ultimo.rate_date) : undefined}
+              detalle={ultimo ? `Registrado el ${formatDate(ultimo.rate_date)}` : undefined}
+              icono={<CurrencyDollar weight="duotone" className="size-4" />}
             />
             <Kpi
-              icon={
+              etiqueta="vs. registro anterior"
+              valor={variacion == null ? "—" : `${variacion >= 0 ? "+" : ""}${formatPercent(variacion, 2)}`}
+              detalle={variacion == null ? "Sin comparación" : variacion >= 0 ? "El dólar subió" : "El dólar bajó"}
+              icono={
                 (variacion ?? 0) >= 0 ? (
-                  <TrendUp weight="duotone" className="size-5 text-primary" />
+                  <TrendUp weight="duotone" className="size-4" />
                 ) : (
-                  <TrendDown weight="duotone" className="size-5 text-destructive" />
+                  <TrendDown weight="duotone" className="size-4" />
                 )
               }
-              label="vs. registro anterior"
-              valor={variacion == null ? "—" : `${variacion >= 0 ? "+" : ""}${formatPercent(variacion, 2)}`}
+              tono={variacion == null ? "neutral" : variacion >= 0 ? "pos" : "neg"}
             />
             <Kpi
-              icon={<ArrowsClockwise weight="duotone" className="size-5 text-muted-foreground" />}
-              label="Registros"
+              etiqueta="Registros"
               valor={String(rates.length)}
+              detalle="Histórico almacenado del BCB"
+              icono={<ArrowsClockwise weight="duotone" className="size-4" />}
             />
             <Kpi
-              icon={<Bank weight="duotone" className="size-5 text-muted-foreground" />}
-              label="Rango histórico"
+              etiqueta="Rango histórico"
               valor={`${formatNumber(min, 2)}–${formatNumber(max, 2)}`}
+              detalle={`Amplitud ${formatNumber(max - min, 4)} Bs`}
+              icono={<Bank weight="duotone" className="size-4" />}
             />
           </div>
 
@@ -132,34 +146,59 @@ export function TcClient({
             </CardHeader>
             <CardContent className="px-0">
               <div className="max-h-[420px] overflow-auto">
-                <table className="w-full caption-bottom text-sm">
-                  <thead className="sticky top-0 border-b bg-muted/80 backdrop-blur">
-                    <tr className="text-left text-muted-foreground">
-                      <th className="px-4 py-2 font-medium">Fecha</th>
-                      <th className="px-4 py-2 font-medium">Moneda</th>
-                      <th className="px-4 py-2 text-right font-medium">T/C (Bs)</th>
-                      <th className="px-4 py-2 font-medium">Origen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rates.map((r) => (
-                      <tr key={r.id} className="border-b transition-colors hover:bg-muted/40">
-                        <td className="px-4 py-2 tabular-nums">{formatDate(r.rate_date)}</td>
-                        <td className="px-4 py-2 text-muted-foreground">
-                          {r.moneda_desc ?? descripcionMoneda(r.cod_moneda)}
-                        </td>
-                        <td className="px-4 py-2 text-right font-medium tabular-nums">
-                          {formatNumber(r.valor, 5)}
-                        </td>
-                        <td className="px-4 py-2">
-                          <Badge variant={r.source === "bcb" ? "success" : "secondary"}>
-                            {r.source === "bcb" ? "BCB" : r.source}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <TableRoot>
+                  <Table>
+                    <TableHead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHeaderCell>Fecha</TableHeaderCell>
+                        <TableHeaderCell>Moneda</TableHeaderCell>
+                        <TableHeaderCell className="text-right">T/C (Bs)</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Variación</TableHeaderCell>
+                        <TableHeaderCell>Origen</TableHeaderCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rates.map((r, i) => {
+                        // rates viene del más reciente al más antiguo: el anterior es el siguiente.
+                        const previo = rates[i + 1];
+                        const delta = previo ? r.valor - previo.valor : null;
+                        const deltaPct = previo && previo.valor ? (r.valor - previo.valor) / previo.valor : null;
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell className="whitespace-nowrap tabular-nums">
+                              {formatDate(r.rate_date)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {r.moneda_desc ?? descripcionMoneda(r.cod_moneda)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium tabular-nums">
+                              {formatNumber(r.valor, 5)}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-right tabular-nums">
+                              {delta == null || Math.abs(delta) < 1e-9 ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <span className={delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>
+                                  {delta > 0 ? "▲" : "▼"} {formatNumber(Math.abs(delta), 4)}
+                                  {deltaPct != null && (
+                                    <span className="ml-1 text-xs opacity-80">
+                                      ({formatPercent(Math.abs(deltaPct), 2)})
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={r.source === "bcb" ? "success" : "neutral"}>
+                                {r.source === "bcb" ? "BCB" : r.source}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableRoot>
               </div>
             </CardContent>
           </Card>
@@ -169,17 +208,3 @@ export function TcClient({
   );
 }
 
-function Kpi({ icon, label, valor, sub }: { icon: React.ReactNode; label: string; valor: string; sub?: string }) {
-  return (
-    <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div className="text-lg font-bold tabular-nums">{valor}</div>
-          {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

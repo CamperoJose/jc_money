@@ -14,6 +14,17 @@ import {
 } from "recharts";
 import { Coins, TrendUp, Percent, Stack, Flask } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Kpi } from "@/components/tremor/kpi-card";
+import {
+  TableRoot,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableFoot,
+} from "@/components/tremor/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -133,10 +144,10 @@ export function SimuladorClient() {
         {/* Resultados */}
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi icon={<Coins weight="duotone" className="size-5 text-muted-foreground" />} label="Aportado (fresco)" valor={formatBob(r.aportadoTotal)} />
-            <Kpi icon={<TrendUp weight="duotone" className="size-5 text-primary" />} label="Interés líquido total" valor={formatBob(r.interesLiquidoTotal)} sub={`RC-IVA ${formatBob(r.rcIvaTotal)}`} />
-            <Kpi icon={<Stack weight="duotone" className="size-5 text-primary" />} label="Valor final" valor={formatBob(r.valorFinal)} sub={`Capital activo ${formatBobCompact(r.capitalFinalActivo)}`} />
-            <Kpi icon={<Percent weight="duotone" className="size-5 text-muted-foreground" />} label="Rendimiento s/ aportado" valor={r.tasaEfectiva == null ? "—" : formatPercent(r.tasaEfectiva, 2)} sub={`${r.duracionDias} días`} />
+            <Kpi etiqueta="Aportado (fresco)" valor={formatBob(r.aportadoTotal)} detalle="Dinero nuevo que pusiste" icono={<Coins weight="duotone" className="size-4" />} />
+            <Kpi etiqueta="Interés líquido total" valor={formatBob(r.interesLiquidoTotal)} detalle={`RC-IVA retenido ${formatBob(r.rcIvaTotal)}`} icono={<TrendUp weight="duotone" className="size-4" />} tono="pos" />
+            <Kpi etiqueta="Valor final" valor={formatBob(r.valorFinal)} detalle={`Capital activo ${formatBobCompact(r.capitalFinalActivo)}`} icono={<Stack weight="duotone" className="size-4" />} tono="pos" />
+            <Kpi etiqueta="Rendimiento s/ aportado" valor={r.tasaEfectiva == null ? "—" : formatPercent(r.tasaEfectiva, 2)} detalle={`Horizonte de ${r.duracionDias} días`} icono={<Percent weight="duotone" className="size-4" />} />
           </div>
 
           <Card>
@@ -173,32 +184,66 @@ export function SimuladorClient() {
             </CardHeader>
             <CardContent className="px-0">
               <div className="max-h-[360px] overflow-auto">
-                <table className="w-full caption-bottom text-sm">
-                  <thead className="sticky top-0 border-b bg-muted/80 backdrop-blur">
-                    <tr className="text-left text-muted-foreground">
-                      <th className="px-3 py-2 font-medium">#</th>
-                      <th className="px-3 py-2 font-medium">Apertura</th>
-                      <th className="px-3 py-2 text-right font-medium">Aporte</th>
-                      <th className="px-3 py-2 text-right font-medium">Liberado</th>
-                      <th className="px-3 py-2 text-right font-medium">Nuevo DPF</th>
-                      <th className="px-3 py-2 text-right font-medium">Int. líq.</th>
-                      <th className="px-3 py-2 text-right font-medium">Capital activo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {r.filas.map((f) => (
-                      <tr key={f.periodo} className="border-b tabular-nums transition-colors hover:bg-muted/40">
-                        <td className="px-3 py-1.5 text-muted-foreground">{f.periodo}</td>
-                        <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">{formatDate(f.fecha)}</td>
-                        <td className="px-3 py-1.5 text-right">{formatBob(f.aporteFresco)}</td>
-                        <td className="px-3 py-1.5 text-right text-muted-foreground">{formatBob(f.liberadoCapital)}</td>
-                        <td className="px-3 py-1.5 text-right font-medium">{formatBob(f.principal)}</td>
-                        <td className="px-3 py-1.5 text-right text-primary">{formatBob(f.interesLiquido)}</td>
-                        <td className="px-3 py-1.5 text-right font-medium">{formatBob(f.capitalActivo)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <TableRoot>
+                  <Table>
+                    <TableHead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHeaderCell>#</TableHeaderCell>
+                        <TableHeaderCell>Apertura</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Aporte</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Liberado</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Nuevo DPF</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Int. líquido</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Int. acumulado</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Capital activo</TableHeaderCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(() => {
+                        let acumulado = 0;
+                        return r.filas.map((f) => {
+                          acumulado += f.interesLiquido;
+                          return (
+                            <TableRow key={f.periodo} className="tabular-nums">
+                              <TableCell className="text-muted-foreground">{f.periodo}</TableCell>
+                              <TableCell className="whitespace-nowrap text-muted-foreground">
+                                {formatDate(f.fecha)}
+                              </TableCell>
+                              <TableCell className="text-right">{formatBob(f.aporteFresco)}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatBob(f.liberadoCapital)}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">{formatBob(f.principal)}</TableCell>
+                              <TableCell className="text-right text-primary">{formatBob(f.interesLiquido)}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatBob(acumulado)}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">{formatBob(f.capitalActivo)}</TableCell>
+                            </TableRow>
+                          );
+                        });
+                      })()}
+                    </TableBody>
+                    <TableFoot>
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={2} className="font-semibold">
+                          {r.filas.length} {r.filas.length === 1 ? "periodo" : "periodos"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {formatBob(r.aportadoTotal)}
+                        </TableCell>
+                        <TableCell colSpan={2} />
+                        <TableCell className="text-right font-semibold tabular-nums text-primary">
+                          {formatBob(r.interesLiquidoTotal)}
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {formatBob(r.valorFinal)}
+                        </TableCell>
+                      </TableRow>
+                    </TableFoot>
+                  </Table>
+                </TableRoot>
               </div>
             </CardContent>
           </Card>
@@ -223,17 +268,3 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Kpi({ icon, label, valor, sub }: { icon: React.ReactNode; label: string; valor: string; sub?: string }) {
-  return (
-    <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div className="text-lg font-bold tabular-nums">{valor}</div>
-          {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

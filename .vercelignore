@@ -1,0 +1,7 @@
+# Archivos que NO deben subirse al despliegue de Vercel.
+# Son material de consulta/documentación: no forman parte de la app y solo
+# ensucian el build (manifests anidados, tsconfig propios, escaneo de clases).
+referencia
+claude
+docs
+scripts

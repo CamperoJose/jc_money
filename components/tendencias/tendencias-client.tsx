@@ -14,6 +14,8 @@ import {
 } from "recharts";
 import { TrendUp, ChartLineUp, Target, Percent, Sparkle } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Kpi } from "@/components/tremor/kpi-card";
+import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { formatBob, formatBobCompact, formatPercent, formatDate } from "@/lib/format";
 import type { ResumenTendencias } from "@/lib/tendencias";
 
@@ -74,12 +76,54 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
         </CardContent>
       </Card>
 
-      {/* KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={<TrendUp weight="duotone" className="size-5 text-primary" />} label="Ritmo mensual" valor={`${(t.ritmoMensual ?? 0) >= 0 ? "+" : ""}${formatBobCompact(t.ritmoMensual)}`} sub="Pendiente de la recta" tono={(t.ritmoMensual ?? 0) >= 0 ? "bueno" : "malo"} />
-        <Kpi icon={<Percent weight="duotone" className="size-5 text-primary" />} label="Crecimiento mensual" valor={t.crecimientoMensualPct == null ? "—" : formatPercent(t.crecimientoMensualPct, 2)} sub="Compuesto" tono={(t.crecimientoMensualPct ?? 0) >= 0 ? "bueno" : "malo"} />
-        <Kpi icon={<ChartLineUp weight="duotone" className="size-5 text-muted-foreground" />} label="Confianza (R²)" valor={t.r2 != null ? formatPercent(t.r2, 0) : "—"} sub={t.r2 != null && t.r2 >= 0.8 ? "Tendencia clara" : "Tendencia irregular"} />
-        <Kpi icon={<Target weight="duotone" className="size-5 text-muted-foreground" />} label="Patrimonio actual" valor={formatBobCompact(t.valorActual)} sub={formatBob(t.valorActual)} />
+      {/* KPIs + confianza del ajuste */}
+      <div className="grid gap-3 lg:grid-cols-4">
+        <Kpi
+          etiqueta="Ritmo mensual"
+          valor={`${(t.ritmoMensual ?? 0) >= 0 ? "+" : ""}${formatBobCompact(t.ritmoMensual)}`}
+          detalle="Pendiente de la recta de tendencia"
+          icono={<TrendUp weight="duotone" className="size-4" />}
+          tono={(t.ritmoMensual ?? 0) >= 0 ? "pos" : "neg"}
+        />
+        <Kpi
+          etiqueta="Crecimiento mensual"
+          valor={t.crecimientoMensualPct == null ? "—" : formatPercent(t.crecimientoMensualPct, 2)}
+          detalle="Compuesto sobre el patrimonio"
+          icono={<Percent weight="duotone" className="size-4" />}
+          tono={(t.crecimientoMensualPct ?? 0) >= 0 ? "pos" : "neg"}
+        />
+        <Kpi
+          etiqueta="Patrimonio actual"
+          valor={formatBobCompact(t.valorActual)}
+          detalle={formatBob(t.valorActual)}
+          icono={<Target weight="duotone" className="size-4" />}
+        />
+        {/* Confianza del ajuste (R²) como anillo */}
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <ProgressCircle
+              value={t.r2 != null ? t.r2 * 100 : 0}
+              radius={30}
+              strokeWidth={6}
+              variant={t.r2 == null ? "neutral" : t.r2 >= 0.8 ? "success" : t.r2 >= 0.5 ? "warning" : "error"}
+            >
+              <span className="text-[11px] font-bold tabular-nums">
+                {t.r2 != null ? `${Math.round(t.r2 * 100)}%` : "—"}
+              </span>
+            </ProgressCircle>
+            <div className="min-w-0">
+              <div className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Confianza (R²)
+              </div>
+              <div className="mt-0.5 truncate text-sm font-semibold">
+                {t.r2 == null ? "Sin datos" : t.r2 >= 0.8 ? "Tendencia clara" : t.r2 >= 0.5 ? "Tendencia moderada" : "Tendencia irregular"}
+              </div>
+              <div className="truncate text-xs text-muted-foreground">
+                {t.r2 != null && t.r2 < 0.5 ? "Toma la proyección con cautela" : "Ajuste de la recta"}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Gráfico proyectado */}
@@ -173,17 +217,3 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
   );
 }
 
-function Kpi({ icon, label, valor, sub, tono }: { icon: React.ReactNode; label: string; valor: string; sub?: string; tono?: "bueno" | "malo" }) {
-  return (
-    <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div className={`text-lg font-bold tabular-nums ${tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""}`}>{valor}</div>
-          {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
