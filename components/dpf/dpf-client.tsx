@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -198,36 +199,38 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
 
                         {/* Avance con barra */}
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  d.status === "pagado"
-                                    ? "bg-muted-foreground"
-                                    : vencido
-                                      ? "bg-destructive"
-                                      : "bg-primary"
-                                }`}
-                                style={{ width: `${pct}%` }}
-                              />
+                          <div className="flex items-center gap-2.5">
+                            <ProgressCircle
+                              value={pct}
+                              radius={16}
+                              strokeWidth={3.5}
+                              variant={
+                                d.status === "pagado" ? "neutral" : vencido ? "error" : pct >= 80 ? "warning" : "default"
+                              }
+                            >
+                              <span className="text-[10px] font-semibold tabular-nums">{pct}</span>
+                            </ProgressCircle>
+                            <div className="min-w-0">
+                              <div className={vencido ? "text-destructive" : "text-foreground"}>
+                                {d.status === "pagado"
+                                  ? "Cobrado"
+                                  : d.diasRestantes < 0
+                                    ? `Venció hace ${Math.abs(d.diasRestantes)} d`
+                                    : d.diasRestantes === 0
+                                      ? "Vence hoy"
+                                      : `Faltan ${d.diasRestantes} d`}
+                              </div>
+                              <div className="truncate text-xs tabular-nums text-muted-foreground">
+                                {d.diasTotales} d de plazo
+                                {d.paidAccount ? ` · ${d.paidAccount.name}` : ""}
+                              </div>
                             </div>
-                            <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                              {pct}%
-                            </span>
-                          </div>
-                          <div className={`mt-1 text-xs ${vencido ? "text-destructive" : "text-muted-foreground"}`}>
-                            {d.status === "pagado"
-                              ? "cobrado"
-                              : d.diasRestantes < 0
-                                ? `venció hace ${Math.abs(d.diasRestantes)} d`
-                                : d.diasRestantes === 0
-                                  ? "vence hoy"
-                                  : `faltan ${d.diasRestantes} d`}
                           </div>
                         </TableCell>
 
-                        <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
-                          {formatBob(d.principal)}
+                        <TableCell className="whitespace-nowrap text-right">
+                          <div className="font-medium tabular-nums text-foreground">{formatBob(d.principal)}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">capital invertido</div>
                         </TableCell>
 
                         {/* Tasa + interés mensual */}

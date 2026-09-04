@@ -56,7 +56,7 @@ const GROUPS: NavGroup[] = [
     label: "Patrimonio",
     icon: ChartLineUp,
     ready: true,
-    tint: { icon: "text-emerald-500", active: "bg-emerald-600", hover: "hover:bg-emerald-500/10", dot: "bg-emerald-500" },
+    tint: { icon: "text-blue-500", active: "bg-blue-600", hover: "hover:bg-blue-500/10", dot: "bg-blue-500" },
     items: [
       { href: "/tracking/patrimonio", label: "Dashboard", icon: ChartPieSlice },
       { href: "/tracking/patrimonio/tendencias", label: "Tendencias", icon: ChartLineUp },
@@ -156,11 +156,11 @@ export function Sidebar({ email }: { email?: string | null }) {
 
   const brand = (mini: boolean) => (
     <div className="flex items-center gap-2">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-700 text-white shadow-md shadow-emerald-600/20">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
         <CurrencyCircleDollar weight="fill" className="size-5" />
       </span>
       {!mini && (
-        <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-lg font-bold tracking-tight text-transparent dark:from-emerald-400 dark:to-teal-300">
+        <span className="text-lg font-semibold tracking-tight text-foreground">
           MyMoney
         </span>
       )}
@@ -308,7 +308,7 @@ export function Sidebar({ email }: { email?: string | null }) {
         >
           <ListIcon weight="bold" className="size-5" />
         </button>
-        <span className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-emerald-400 to-emerald-700 text-white shadow-sm">
+        <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
           <CurrencyCircleDollar weight="fill" className="size-4" />
         </span>
         <span className="text-sm font-semibold text-foreground">{seccionActiva(pathname)}</span>

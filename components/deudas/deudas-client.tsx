@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -154,9 +155,9 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                         {/* Deudor + motivo */}
                         <TableCell className="max-w-[220px]">
                           <div className="truncate font-medium text-foreground">{d.counterparty || "—"}</div>
-                          {d.reason && (
-                            <div className="truncate text-xs text-muted-foreground" title={d.reason}>{d.reason}</div>
-                          )}
+                          <div className="truncate text-xs text-muted-foreground" title={d.reason ?? ""}>
+                            {d.reason || "sin motivo registrado"}
+                          </div>
                         </TableCell>
 
                         {/* Fecha + antigüedad */}
@@ -182,33 +183,46 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                         </TableCell>
 
                         {/* Monto total */}
-                        <TableCell className="whitespace-nowrap text-right tabular-nums text-muted-foreground">
-                          {formatBob(d.amount)}
+                        <TableCell className="whitespace-nowrap text-right">
+                          <div className="tabular-nums text-foreground">{formatBob(d.amount)}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">
+                            prestado original
+                          </div>
                         </TableCell>
 
                         {/* Avance de cobro: barra + cobrado + cuenta destino */}
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className={`h-full rounded-full transition-all ${d.status === "pagado" ? "bg-emerald-500" : "bg-primary"}`}
-                                style={{ width: `${Math.min(100, Math.max(0, pct * 100))}%` }}
-                              />
+                          <div className="flex items-center gap-2.5">
+                            <ProgressCircle
+                              value={pct * 100}
+                              radius={16}
+                              strokeWidth={3.5}
+                              variant={d.status === "pagado" ? "success" : d.vencida ? "error" : "default"}
+                            >
+                              <span className="text-[10px] font-semibold tabular-nums">
+                                {Math.round(pct * 100)}
+                              </span>
+                            </ProgressCircle>
+                            <div className="min-w-0">
+                              <div className="text-foreground">
+                                <span className="text-muted-foreground">Cobrado </span>
+                                <span className="font-medium tabular-nums">{formatBob(d.paid_amount)}</span>
+                              </div>
+                              <div className="truncate text-xs text-muted-foreground">
+                                {cuentaCobro
+                                  ? `${cuentaCobro.name}${d.collected_date ? ` · ${formatDate(d.collected_date)}` : ""}`
+                                  : "sin cuenta de cobro"}
+                              </div>
                             </div>
-                            <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                              {Math.round(pct * 100)}%
-                            </span>
-                          </div>
-                          <div className="mt-1 truncate text-xs text-muted-foreground">
-                            Cobrado {formatBob(d.paid_amount)}
-                            {cuentaCobro ? ` · ${cuentaCobro.name}` : ""}
-                            {d.collected_date ? ` · ${formatDate(d.collected_date)}` : ""}
                           </div>
                         </TableCell>
 
                         {/* Por cobrar */}
-                        <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums text-primary">
-                          {formatBob(d.outstanding)}
+                        <TableCell className="whitespace-nowrap text-right">
+                          <div className="font-semibold tabular-nums text-primary">{formatBob(d.outstanding)}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground">
+                            {Math.round((1 - pct) * 100)}% pendiente
+                          </div>
                         </TableCell>
 
                         <TableCell><EstadoBadge d={d} /></TableCell>

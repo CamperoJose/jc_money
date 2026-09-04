@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CategoryBar } from "@/components/tremor/category-bar";
+import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -118,6 +119,17 @@ export function GastosClient({
       if (t.amount_bob > max) max = t.amount_bob;
     }
     return { totalGastos: g, totalIngresos: i, neto: i - g, maxBob: max };
+  }, [filtradas]);
+
+  // Total por categoría dentro del filtro, para mostrar cuánto pesa cada
+  // categoría en la fila (idioma de la plantilla: dato + contexto debajo).
+  const totalPorCategoria = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of filtradas) {
+      if (!t.category_id) continue;
+      m.set(t.category_id, (m.get(t.category_id) ?? 0) + t.amount_bob);
+    }
+    return m;
   }, [filtradas]);
 
   const categoriasUsadas = useMemo(() => {
@@ -236,6 +248,7 @@ export function GastosClient({
                     <TableHeaderCell>Categoría</TableHeaderCell>
                     <TableHeaderCell>Cuenta</TableHeaderCell>
                     <TableHeaderCell>Origen</TableHeaderCell>
+                    <TableHeaderCell className="min-w-[150px]">Peso en el filtro</TableHeaderCell>
                     <TableHeaderCell className="min-w-[150px] text-right">Monto</TableHeaderCell>
                     <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
                   </TableRow>
@@ -253,25 +266,44 @@ export function GastosClient({
                           </div>
                         </TableCell>
 
-                        {/* Detalle */}
+                        {/* Detalle: descripción arriba, tipo y etiquetas debajo */}
                         <TableCell className="max-w-[240px]">
                           <div className="flex items-center gap-2">
                             <TipoIcon tipo={t.type} />
-                            <span className="truncate" title={t.description ?? ""}>
-                              {t.description || <span className="text-muted-foreground">Sin descripción</span>}
+                            <span
+                              className="truncate font-medium text-foreground"
+                              title={t.description ?? ""}
+                            >
+                              {t.description || <span className="font-normal text-muted-foreground">Sin descripción</span>}
                             </span>
+                          </div>
+                          <div className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
+                            {t.type === "ingreso" ? "Ingreso" : "Gasto"}
+                            {t.tags && t.tags.length > 0 ? ` · ${t.tags.join(", ")}` : ""}
                           </div>
                         </TableCell>
 
-                        <TableCell>
+                        {/* Categoría + cuánto pesa esa categoría en el filtro */}
+                        <TableCell className="whitespace-nowrap">
                           {t.category ? (
-                            <Badge variant="secondary">{t.category.name}</Badge>
+                            <>
+                              <Badge variant="neutral" className="gap-1.5 font-normal">
+                                <span
+                                  className={`size-2 shrink-0 rounded-sm ${t.type === "ingreso" ? "bg-emerald-500" : "bg-blue-500"}`}
+                                  aria-hidden
+                                />
+                                {t.category.name}
+                              </Badge>
+                              <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                                {formatBob(totalPorCategoria.get(t.category_id ?? "") ?? 0)} en el filtro
+                              </div>
+                            </>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
 
-                        {/* Cuenta + moneda */}
+                        {/* Cuenta + tipo y moneda */}
                         <TableCell className="whitespace-nowrap">
                           <div className="text-foreground">{t.account?.name ?? "—"}</div>
                           {t.account && (
@@ -284,17 +316,41 @@ export function GastosClient({
                         {/* Origen del registro (manual / voz / api) */}
                         <TableCell>
                           <OrigenBadge source={t.source} />
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            {t.source === "voz" ? "dictado" : t.source === "api" ? "atajo iOS" : "en la app"}
+                          </div>
                         </TableCell>
 
-                        {/* Monto + barra de peso relativo */}
+                        {/* Peso relativo: anillo con el % y el contexto debajo */}
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <ProgressCircle
+                              value={peso * 100}
+                              radius={16}
+                              strokeWidth={3.5}
+                              variant={t.type === "ingreso" ? "success" : peso >= 0.66 ? "error" : peso >= 0.33 ? "warning" : "default"}
+                            >
+                              <span className="text-[10px] font-semibold tabular-nums">
+                                {Math.round(peso * 100)}
+                              </span>
+                            </ProgressCircle>
+                            <div className="min-w-0">
+                              <div className="text-foreground">
+                                <span className="text-muted-foreground">del mayor </span>
+                                <span className="font-medium tabular-nums">{formatBob(maxBob)}</span>
+                              </div>
+                              <div className="truncate text-xs tabular-nums text-muted-foreground">
+                                {t.type === "ingreso"
+                                  ? `${totalIngresos > 0 ? Math.round((t.amount_bob / totalIngresos) * 100) : 0}% de los ingresos`
+                                  : `${totalGastos > 0 ? Math.round((t.amount_bob / totalGastos) * 100) : 0}% de los gastos`}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Monto en BOB + moneda original y T/C */}
                         <TableCell className="text-right">
                           <MontoCelda t={t} />
-                          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
-                            <div
-                              className={`h-full rounded-full ${t.type === "ingreso" ? "bg-emerald-500" : "bg-destructive/70"}`}
-                              style={{ width: `${Math.min(100, peso * 100)}%` }}
-                            />
-                          </div>
                         </TableCell>
 
                         <TableCell>
@@ -327,6 +383,9 @@ export function GastosClient({
                     </TableCell>
                     <TableCell className="text-xs font-normal text-muted-foreground">
                       Ingresos {formatBob(totalIngresos)}
+                    </TableCell>
+                    <TableCell className="text-xs font-normal text-muted-foreground">
+                      Mayor {formatBob(maxBob)}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">
                       <span className="text-destructive">−{formatBob(totalGastos)}</span>
@@ -490,11 +549,13 @@ function MontoCelda({ t }: { t: TransactionUI }) {
       >
         {signo} {formatBob(t.amount_bob)}
       </span>
-      {t.currency !== "BOB" && (
-        <span className="block text-xs text-muted-foreground tabular-nums">
-          {formatNumber(t.amount, 2)} {t.currency}
-        </span>
-      )}
+      <span className="block text-xs tabular-nums text-muted-foreground">
+        {t.currency !== "BOB"
+          ? `${formatNumber(t.amount, 2)} ${t.currency} · T/C ${formatNumber(t.exchange_rate ?? 0, 2)}`
+          : t.type === "gasto"
+            ? "salida"
+            : "entrada"}
+      </span>
     </span>
   );
 }
