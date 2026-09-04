@@ -201,7 +201,7 @@ function Fila({ f, onGuardar }: { f: BudgetUI; onGuardar: (id: string, v: string
         </div>
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+        <div className="h-2 flex-1 canal overflow-hidden rounded-full bg-muted">
           <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${barra}%` }} />
         </div>
         <span className="w-40 shrink-0 text-right text-xs tabular-nums text-muted-foreground">

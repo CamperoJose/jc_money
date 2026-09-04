@@ -13,7 +13,7 @@ const Card = React.forwardRef<
       // la lectura cuando hay muchas tarjetas en una grilla).
       // min-w-0 evita que el contenido (gráficos Recharts, tablas) fuerce
       // desborde horizontal cuando la tarjeta es hija de un grid/flex.
-      "relative min-w-0 rounded-lg border border-border bg-card text-left text-card-foreground shadow-sm",
+      "relative min-w-0 overflow-hidden rounded-lg border border-border bg-card text-left text-card-foreground superficie",
       className
     )}
     {...props}

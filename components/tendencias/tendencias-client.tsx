@@ -61,7 +61,7 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
       </div>
 
       {/* Narrativa destacada */}
-      <Card className="overflow-hidden">
+      <Card className="trama-rejilla resplandor">
         <CardContent className="flex items-start gap-3 p-5">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Sparkle weight="fill" className="size-5" />

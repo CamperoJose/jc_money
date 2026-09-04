@@ -386,9 +386,9 @@ function FilaLiberacion({ d }: { d: DpfDepositUI }) {
         </div>
       </div>
       <div className="mt-2.5 flex items-center gap-2">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <div className="h-1.5 flex-1 canal overflow-hidden rounded-full bg-muted">
           <div
-            className={`h-full rounded-full ${d.liberacion === "vencido" ? "bg-destructive" : "bg-primary"}`}
+            className={`relleno-brillo h-full rounded-full ${d.liberacion === "vencido" ? "bg-destructive" : "bg-primary"}`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -432,11 +432,11 @@ function KpiHero({
   sub?: string;
 }) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="trama-puntos resplandor">
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
           <span className="truncate text-sm font-medium text-foreground">{label}</span>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5 text-primary ring-1 ring-inset ring-primary/20">
             {icon}
           </span>
         </div>

@@ -16,7 +16,7 @@
   --card-foreground: oklch(0.2100 0.0340 264.6650);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2100 0.0340 264.6650);
-  --primary: oklch(0.6230 0.2140 259.8150);        /* blue-500 */
+  --primary: oklch(0.4240 0.1650 264.8000);        /* azul oscuro (~blue-800) */
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.9670 0.0030 264.5420);      /* gray-100 */
   --secondary-foreground: oklch(0.2100 0.0340 264.6650);
@@ -28,25 +28,35 @@
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.9280 0.0060 264.5310);         /* gray-200 */
   --input: oklch(0.8720 0.0100 258.3380);          /* gray-300 */
-  --ring: oklch(0.6230 0.2140 259.8150);
+  --ring: oklch(0.4240 0.1650 264.8000);
   /* Serie de gráficos de la plantilla: blue, emerald, violet, amber, cyan. */
-  --chart-1: oklch(0.6230 0.2140 259.8150);
+  --chart-1: oklch(0.4880 0.2100 264.3760);
   --chart-2: oklch(0.6960 0.1700 162.4800);
   --chart-3: oklch(0.6060 0.2500 292.7170);
   --chart-4: oklch(0.7690 0.1880 70.0800);
   --chart-5: oklch(0.7150 0.1430 215.2210);
   --sidebar: oklch(0.9850 0.0020 247.8390);
   --sidebar-foreground: oklch(0.2100 0.0340 264.6650);
-  --sidebar-primary: oklch(0.6230 0.2140 259.8150);
+  --sidebar-primary: oklch(0.4240 0.1650 264.8000);
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.9670 0.0030 264.5420);
   --sidebar-accent-foreground: oklch(0.2100 0.0340 264.6650);
   --sidebar-border: oklch(0.9280 0.0060 264.5310);
-  --sidebar-ring: oklch(0.6230 0.2140 259.8150);
+  --sidebar-ring: oklch(0.4240 0.1650 264.8000);
   --font-sans: Geist, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-serif: Geist, ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: 0.5rem;
+
+  /* --- Sistema de superficies: degradados y texturas internas --- */
+  /* Brillo superior de las tarjetas (gloss). */
+  --superficie: linear-gradient(180deg, oklch(1 0 0) 0%, oklch(0.9850 0.0020 247.8390) 100%);
+  /* Filo de luz de 1px en el borde superior. */
+  --filo-luz: inset 0 1px 0 oklch(1 0 0 / 0.9);
+  /* Color de las tramas (rejilla, puntos, diagonales). */
+  --trama: oklch(0.2100 0.0340 264.6650 / 0.055);
+  /* Resplandor de acento en la esquina de los widgets destacados. */
+  --resplandor: oklch(0.4880 0.2100 264.3760 / 0.14);
   --shadow-x: 0;
   --shadow-y: 1px;
   --shadow-blur: 3px;
@@ -66,56 +76,63 @@
 }
 
 .dark {
-  --background: oklch(0.1300 0.0280 261.6920);     /* gray-950 */
+  --background: oklch(0.1450 0.0250 264.0000);     /* casi negro con tinte azul */
   --foreground: oklch(0.9850 0.0020 247.8390);     /* gray-50 */
-  --card: oklch(0.1700 0.0210 264.4000);           /* #090E1A de la plantilla */
+  --card: oklch(0.2050 0.0250 264.5000);           /* superficie elevada */
   --card-foreground: oklch(0.9850 0.0020 247.8390);
-  --popover: oklch(0.1700 0.0210 264.4000);
+  --popover: oklch(0.2200 0.0250 264.5000);
   --popover-foreground: oklch(0.9850 0.0020 247.8390);
-  --primary: oklch(0.6230 0.2140 259.8150);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.2100 0.0340 264.6650);      /* gray-900 */
+  --primary: oklch(0.5100 0.1900 264.5000);        /* azul oscuro, legible sobre el fondo */
+  --primary-foreground: oklch(0.9850 0.0020 247.8390);
+  --secondary: oklch(0.2600 0.0270 264.5000);
   --secondary-foreground: oklch(0.9850 0.0020 247.8390);
-  --muted: oklch(0.2100 0.0340 264.6650);
-  --muted-foreground: oklch(0.7070 0.0220 261.3250); /* gray-400 */
-  --accent: oklch(0.2780 0.0330 256.8480);         /* gray-800 */
+  --muted: oklch(0.2450 0.0250 264.5000);
+  --muted-foreground: oklch(0.7250 0.0250 262.0000);
+  --accent: oklch(0.2900 0.0300 264.5000);
   --accent-foreground: oklch(0.9850 0.0020 247.8390);
-  --destructive: oklch(0.6370 0.2370 25.3310);
+  --destructive: oklch(0.6500 0.2200 25.3310);
   --destructive-foreground: oklch(0.9850 0.0020 247.8390);
-  --border: oklch(0.2780 0.0330 256.8480);         /* gray-800 */
-  --input: oklch(0.3730 0.0340 259.7330);          /* gray-700 */
-  --ring: oklch(0.6230 0.2140 259.8150);
-  --chart-1: oklch(0.7070 0.1650 254.6240);
+  --border: oklch(0.2850 0.0250 264.5000);
+  --input: oklch(0.3400 0.0280 264.5000);
+  --ring: oklch(0.6000 0.1900 264.0000);
+  --chart-1: oklch(0.5800 0.2000 264.0000);
   --chart-2: oklch(0.6960 0.1700 162.4800);
   --chart-3: oklch(0.6060 0.2500 292.7170);
   --chart-4: oklch(0.7690 0.1880 70.0800);
   --chart-5: oklch(0.7150 0.1430 215.2210);
-  --sidebar: oklch(0.1300 0.0280 261.6920);
+  --sidebar: oklch(0.1650 0.0250 264.5000);
   --sidebar-foreground: oklch(0.9850 0.0020 247.8390);
-  --sidebar-primary: oklch(0.6230 0.2140 259.8150);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.2780 0.0330 256.8480);
+  --sidebar-primary: oklch(0.5100 0.1900 264.5000);
+  --sidebar-primary-foreground: oklch(0.9850 0.0020 247.8390);
+  --sidebar-accent: oklch(0.2900 0.0300 264.5000);
   --sidebar-accent-foreground: oklch(0.9850 0.0020 247.8390);
-  --sidebar-border: oklch(0.2780 0.0330 256.8480);
-  --sidebar-ring: oklch(0.6230 0.2140 259.8150);
+  --sidebar-border: oklch(0.2850 0.0250 264.5000);
+  --sidebar-ring: oklch(0.6000 0.1900 264.0000);
   --font-sans: Geist, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-serif: Geist, ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: 0.5rem;
+
+  /* --- Sistema de superficies en oscuro --- */
+  --superficie: linear-gradient(180deg, oklch(0.2350 0.0270 264.5000) 0%, oklch(0.1950 0.0240 264.5000) 100%);
+  --filo-luz: inset 0 1px 0 oklch(1 0 0 / 0.07);
+  --trama: oklch(1 0 0 / 0.045);
+  --resplandor: oklch(0.6000 0.2100 264.0000 / 0.22);
+
   --shadow-x: 0;
   --shadow-y: 1px;
   --shadow-blur: 3px;
   --shadow-spread: 0px;
   --shadow-opacity: 0.1;
   --shadow-color: oklch(0 0 0);
-  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
-  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --shadow-2xs: 0 1px 2px 0px hsl(0 0% 0% / 0.30);
+  --shadow-xs: 0 1px 2px 0px hsl(0 0% 0% / 0.30);
+  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.40), 0 1px 2px -1px hsl(0 0% 0% / 0.40);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.40), 0 1px 2px -1px hsl(0 0% 0% / 0.40);
+  --shadow-md: 0 2px 6px 0px hsl(0 0% 0% / 0.45), 0 2px 4px -1px hsl(0 0% 0% / 0.40);
+  --shadow-lg: 0 4px 12px 0px hsl(0 0% 0% / 0.50), 0 4px 6px -1px hsl(0 0% 0% / 0.40);
+  --shadow-xl: 0 8px 24px 0px hsl(0 0% 0% / 0.55), 0 8px 10px -1px hsl(0 0% 0% / 0.40);
+  --shadow-2xl: 0 16px 40px 0px hsl(0 0% 0% / 0.65);
 }
 
 @theme inline {
@@ -216,6 +233,106 @@
 }
 
 @layer utilities {
+  /* ------------------------------------------------------------------
+     Sistema de superficies
+     Degradados y texturas internas para dar materia a los widgets. Todo
+     se apoya en las variables --superficie / --filo-luz / --trama /
+     --resplandor, que cambian solas entre claro y oscuro.
+     ------------------------------------------------------------------ */
+
+  /* Degradado sutil + filo de luz arriba. Es la base de tarjetas y widgets. */
+  .superficie {
+    background-image: var(--superficie);
+    box-shadow: var(--filo-luz), var(--shadow-sm);
+  }
+
+  /* Rejilla fina. Va sobre .superficie usando el pseudo-elemento, para no
+     pisar el fondo del contenedor. */
+  .trama-rejilla {
+    position: relative;
+    isolation: isolate;
+  }
+  .trama-rejilla::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--trama) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--trama) 1px, transparent 1px);
+    background-size: 22px 22px;
+    /* Se desvanece hacia abajo para que no compita con el contenido. */
+    mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+  }
+
+  /* Puntos. Textura más discreta, buena para tarjetas de cifra. */
+  .trama-puntos {
+    position: relative;
+    isolation: isolate;
+  }
+  .trama-puntos::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: radial-gradient(var(--trama) 1px, transparent 1px);
+    background-size: 14px 14px;
+    mask-image: linear-gradient(180deg, #000 0%, transparent 80%);
+  }
+
+  /* Diagonales. Reservada para estados neutros o zonas “inactivas”. */
+  .trama-diagonal {
+    position: relative;
+    isolation: isolate;
+  }
+  .trama-diagonal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--trama) 0 1px,
+      transparent 1px 9px
+    );
+    mask-image: linear-gradient(180deg, #000 0%, transparent 90%);
+  }
+
+  /* Resplandor de acento en la esquina superior derecha. */
+  .resplandor {
+    position: relative;
+    isolation: isolate;
+  }
+  .resplandor::after {
+    content: "";
+    position: absolute;
+    right: -20%;
+    top: -60%;
+    width: 70%;
+    aspect-ratio: 1;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: 9999px;
+    background: radial-gradient(circle, var(--resplandor) 0%, transparent 70%);
+  }
+
+  /* Canal hundido para barras de progreso (sombra interior). */
+  .canal {
+    box-shadow: inset 0 1px 2px oklch(0 0 0 / 0.12);
+  }
+
+  /* Relleno de barra con volumen: degradado + brillo superior. */
+  .relleno-brillo {
+    background-image: linear-gradient(
+      180deg,
+      oklch(1 0 0 / 0.25) 0%,
+      transparent 55%
+    );
+  }
+
   /* Áreas seguras (notch / home indicator) para iPhone en modo standalone. */
   .pt-safe {
     padding-top: env(safe-area-inset-top);

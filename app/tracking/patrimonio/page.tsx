@@ -139,13 +139,13 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
       {/* Hero + KPIs */}
       <section className="grid gap-4 lg:grid-cols-4">
         {/* Patrimonio neto (hero) */}
-        <Card className="overflow-hidden lg:col-span-2">
+        <Card className="trama-rejilla resplandor lg:col-span-2">
           <CardContent className="flex h-full flex-col justify-between gap-4 p-6">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-primary/80">
                 Patrimonio neto
               </span>
-              <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <span className="flex size-9 items-center justify-center rounded-lg bg-primary bg-gradient-to-br from-white/25 to-transparent text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
                 <Wallet weight="fill" className="size-5" />
               </span>
             </div>
@@ -185,10 +185,10 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
 
       {/* Disponibilidad rápida (dinero líquido) */}
       {disponibilidadRapida != null && (
-        <Card className="overflow-hidden">
+        <Card className="trama-diagonal">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <span className="flex size-10 items-center justify-center rounded-lg bg-primary bg-gradient-to-br from-white/25 to-transparent text-primary-foreground shadow-sm ring-1 ring-inset ring-white/15">
                 <Wallet weight="fill" className="size-5" />
               </span>
               <div>

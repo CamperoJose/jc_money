@@ -212,9 +212,9 @@ export function DistribucionCuentasChart({ cuentas }: { cuentas: DistribucionCue
                   {formatBob(c.montoBob)}
                 </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-1.5 w-full canal overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full"
+                  className="relleno-brillo h-full rounded-full"
                   style={{ width: `${Math.max(c.pct * 100, 1.5)}%`, background: color }}
                 />
               </div>

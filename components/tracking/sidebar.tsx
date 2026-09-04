@@ -211,8 +211,16 @@ export function Sidebar({ email }: { email?: string | null }) {
                         "group relative flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
                         mini ? "justify-center px-2 py-2.5" : "px-3 py-2",
                         active
-                          ? cn(g.tint.active, "text-white shadow-sm")
-                          : cn("text-sidebar-foreground/75", g.tint.hover, "hover:text-sidebar-accent-foreground")
+                          ? cn(
+                              g.tint.active,
+                              // Volumen: degradado vertical + filo de luz interior.
+                              "bg-gradient-to-b from-white/20 to-transparent text-white shadow-sm ring-1 ring-inset ring-white/15"
+                            )
+                          : cn(
+                              "text-sidebar-foreground/75",
+                              g.tint.hover,
+                              "hover:bg-gradient-to-r hover:to-transparent hover:text-sidebar-accent-foreground"
+                            )
                       )}
                     >
                       {/* Barra indicadora lateral (solo activo, modo expandido) */}
@@ -317,7 +325,7 @@ export function Sidebar({ email }: { email?: string | null }) {
       {/* Sidebar desktop */}
       <aside
         className={cn(
-          "hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:block lg:h-dvh",
+          "hidden shrink-0 border-r border-sidebar-border bg-sidebar bg-gradient-to-b from-foreground/[0.03] via-transparent to-primary/[0.06] transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:block lg:h-dvh",
           collapsed ? "lg:w-[68px]" : "lg:w-64"
         )}
       >
@@ -341,7 +349,7 @@ export function Sidebar({ email }: { email?: string | null }) {
         />
         <aside
           className={cn(
-            "absolute left-0 top-0 h-full w-[82%] max-w-xs border-r border-sidebar-border bg-sidebar shadow-2xl transition-transform duration-300 ease-in-out",
+            "absolute left-0 top-0 h-full w-[82%] max-w-xs border-r border-sidebar-border bg-sidebar bg-gradient-to-b from-foreground/[0.03] via-transparent to-primary/[0.06] shadow-2xl transition-transform duration-300 ease-in-out",
             openMobile ? "translate-x-0" : "-translate-x-full"
           )}
         >

@@ -18,7 +18,7 @@ export function DpfResumenCard({ resumen }: { resumen: ResumenDpf }) {
           : `en ${proximo.diasRestantes} días`;
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="trama-rejilla resplandor">
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -93,9 +93,9 @@ export function DpfResumenCard({ resumen }: { resumen: ResumenDpf }) {
                 </div>
               </div>
             </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="mt-2 h-1.5 canal overflow-hidden rounded-full bg-muted">
               <div
-                className={`h-full rounded-full ${proximo.diasRestantes < 0 ? "bg-destructive" : "bg-primary"}`}
+                className={`relleno-brillo h-full rounded-full ${proximo.diasRestantes < 0 ? "bg-destructive" : "bg-primary"}`}
                 style={{ width: `${Math.round(proximo.progreso * 100)}%` }}
               />
             </div>

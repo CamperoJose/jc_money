@@ -469,9 +469,9 @@ export function GastosClient({
                     </div>
 
                     {/* Peso del movimiento dentro del filtro actual. */}
-                    <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="mt-2 h-1 w-full canal overflow-hidden rounded-full bg-muted">
                       <div
-                        className={`h-full rounded-full ${t.type === "ingreso" ? "bg-emerald-500" : "bg-destructive/70"}`}
+                        className={`relleno-brillo h-full rounded-full ${t.type === "ingreso" ? "bg-emerald-500" : "bg-destructive/70"}`}
                         style={{ width: `${Math.min(100, peso * 100)}%` }}
                       />
                     </div>

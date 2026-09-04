@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils";
 
 type Tono = "neutral" | "pos" | "neg";
 
+const tonoBarra: Record<Tono, string> = {
+  neutral: "bg-gradient-to-r from-primary/70 via-primary/30 to-transparent",
+  pos: "bg-gradient-to-r from-emerald-500/80 via-emerald-500/30 to-transparent",
+  neg: "bg-gradient-to-r from-destructive/80 via-destructive/30 to-transparent",
+};
+
 const tonoTexto: Record<Tono, string> = {
   neutral: "text-foreground",
   pos: "text-emerald-600 dark:text-emerald-400",
@@ -38,8 +44,11 @@ export function Kpi({
 }: KpiProps) {
   return (
     // Proporciones de la plantilla: etiqueta `text-sm font-medium` y valor
-    // grande `text-3xl font-semibold`, dentro de una tarjeta con padding 6.
-    <Card className={cn("overflow-hidden", className)}>
+    // grande `text-3xl font-semibold`. La textura de puntos y el resplandor de
+    // esquina le dan materia a la tarjeta sin restarle legibilidad a la cifra.
+    <Card className={cn("trama-puntos resplandor", className)}>
+      {/* Filo de acento superior, teñido según el tono del KPI. */}
+      <div className={cn("h-0.5 w-full", tonoBarra[tono])} />
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
           <span className="truncate text-sm font-medium text-foreground">{etiqueta}</span>
@@ -52,12 +61,12 @@ export function Kpi({
           <div className="mt-1 truncate text-sm text-muted-foreground">{detalle}</div>
         )}
         {progreso != null && (
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="canal mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full transition-all duration-500"
+              className="relleno-brillo h-full rounded-full transition-all duration-500"
               style={{
                 width: `${Math.min(100, Math.max(0, progreso * 100))}%`,
-                background: colorProgreso ?? "var(--color-primary)",
+                backgroundColor: colorProgreso ?? "var(--color-primary)",
               }}
             />
           </div>

@@ -348,9 +348,9 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
 
                     {/* Avance del plazo, igual que en la tabla de escritorio. */}
                     <div className="mt-2.5 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div className="h-1.5 flex-1 canal overflow-hidden rounded-full bg-muted">
                         <div
-                          className={`h-full rounded-full transition-all ${
+                          className={`relleno-brillo h-full rounded-full transition-all ${
                             d.status === "pagado"
                               ? "bg-muted-foreground"
                               : d.liberacion === "vencido"

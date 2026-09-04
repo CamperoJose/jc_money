@@ -178,15 +178,15 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
                               </span>
                             )}
                           </div>
-                          <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div className="mt-1 flex h-1.5 w-full canal overflow-hidden rounded-full bg-muted">
                             <div className="flex w-1/2 justify-end">
                               {!positivo && (
-                                <div className="h-full rounded-l-full bg-destructive transition-all" style={{ width: `${mag * 100}%` }} />
+                                <div className="relleno-brillo h-full rounded-l-full bg-destructive transition-all" style={{ width: `${mag * 100}%` }} />
                               )}
                             </div>
                             <div className="flex w-1/2 justify-start">
                               {positivo && (
-                                <div className="h-full rounded-r-full bg-emerald-500 transition-all" style={{ width: `${mag * 100}%` }} />
+                                <div className="relleno-brillo h-full rounded-r-full bg-emerald-500 transition-all" style={{ width: `${mag * 100}%` }} />
                               )}
                             </div>
                           </div>
@@ -284,15 +284,15 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="mt-1 flex h-1.5 w-full canal overflow-hidden rounded-full bg-muted">
                       <div className="flex w-1/2 justify-end">
                         {!positivo && (
-                          <div className="h-full rounded-l-full bg-destructive transition-all" style={{ width: `${mag * 100}%` }} />
+                          <div className="relleno-brillo h-full rounded-l-full bg-destructive transition-all" style={{ width: `${mag * 100}%` }} />
                         )}
                       </div>
                       <div className="flex w-1/2 justify-start">
                         {positivo && (
-                          <div className="h-full rounded-r-full bg-emerald-500 transition-all" style={{ width: `${mag * 100}%` }} />
+                          <div className="relleno-brillo h-full rounded-r-full bg-emerald-500 transition-all" style={{ width: `${mag * 100}%` }} />
                         )}
                       </div>
                     </div>

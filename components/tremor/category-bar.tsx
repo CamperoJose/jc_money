@@ -53,16 +53,16 @@ export function CategoryBar({
 
   return (
     <div className={cn("w-full", className)} {...props}>
-      <div className="relative flex h-2.5 w-full items-center">
-        <div className="flex h-full flex-1 items-center gap-0.5 overflow-hidden rounded-full bg-muted">
+      <div className="relative flex h-3 w-full items-center">
+        <div className="canal flex h-full flex-1 items-center gap-0.5 overflow-hidden rounded-full bg-muted">
           {segmentos.map((s, i) => {
             const pct = total > 0 ? (Math.max(0, s.valor) / total) * 100 : 0;
             if (pct === 0) return null;
             return (
               <div
                 key={`${s.etiqueta}-${i}`}
-                className="h-full transition-all duration-500"
-                style={{ width: `${pct}%`, background: s.color }}
+                className="relleno-brillo h-full transition-all duration-500"
+                style={{ width: `${pct}%`, backgroundColor: s.color }}
                 title={`${s.etiqueta}: ${fmt(s.valor)}`}
               />
             );

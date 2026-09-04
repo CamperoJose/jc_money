@@ -315,9 +315,9 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
 
                     {/* Avance de cobro */}
                     <div className="mt-2.5 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div className="h-1.5 flex-1 canal overflow-hidden rounded-full bg-muted">
                         <div
-                          className={`h-full rounded-full transition-all ${d.status === "pagado" ? "bg-emerald-500" : "bg-primary"}`}
+                          className={`relleno-brillo h-full rounded-full transition-all ${d.status === "pagado" ? "bg-emerald-500" : "bg-primary"}`}
                           style={{ width: `${Math.min(100, Math.max(0, pct * 100))}%` }}
                         />
                       </div>

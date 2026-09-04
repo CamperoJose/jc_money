@@ -27,7 +27,17 @@ export function TableHead({
   className,
   ...props
 }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("bg-muted/40", className)} {...props} />;
+  return (
+    <thead
+      className={cn(
+        // Degradado en la cabecera: la separa del cuerpo sin necesitar un
+        // borde grueso.
+        "bg-gradient-to-b from-muted to-muted/30 dark:from-white/[0.06] dark:to-transparent",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 export function TableHeaderCell({
@@ -57,7 +67,13 @@ export function TableRow({
   ...props
 }: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
-    <tr className={cn("transition-colors hover:bg-muted/40", className)} {...props} />
+    <tr
+      className={cn(
+        "transition-colors hover:bg-gradient-to-r hover:from-primary/[0.05] hover:to-transparent",
+        className
+      )}
+      {...props}
+    />
   );
 }
 
