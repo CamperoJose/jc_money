@@ -174,8 +174,14 @@ export function VozFab() {
         title="Registrar gasto o deuda por voz"
         className={[
           "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40",
-          "flex h-14 items-center gap-2 rounded-full px-4 text-primary-foreground shadow-lg transition-all active:scale-95",
-          grabando ? "animate-pulse bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90",
+          // Botón flotante: sobre él pasa todo el contenido al desplazar, así
+          // que aquí el vidrio sí aporta. El degradado y el filo interior le dan
+          // relieve para que no se pierda sobre fondos claros.
+          "flex h-14 items-center gap-2 rounded-full px-4 text-primary-foreground shadow-lg ring-1 ring-inset ring-white/20 backdrop-blur-xl backdrop-saturate-150 transition-all active:scale-95",
+          "bg-gradient-to-b from-white/25 to-transparent",
+          grabando
+            ? "animate-pulse bg-destructive/85 hover:bg-destructive"
+            : "bg-primary/85 hover:bg-primary",
           enviando ? "opacity-80" : "",
         ].join(" ")}
       >
@@ -194,7 +200,7 @@ export function VozFab() {
       </button>
 
       {grabando && (
-        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 rounded-lg bg-card px-3 py-2 text-xs text-muted-foreground shadow-md">
+        <div className="vidrio fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground shadow-md">
           Grabando… toca para enviar
           <button onClick={cancelar} className="ml-2 font-medium text-destructive">Cancelar</button>
         </div>

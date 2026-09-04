@@ -30,8 +30,9 @@ export function TableHead({
   return (
     <thead
       className={cn(
-        // Degradado en la cabecera: la separa del cuerpo sin necesitar un
-        // borde grueso.
+        // Degradado en la cabecera: la separa del cuerpo sin necesitar un borde
+        // grueso. Sin vidrio: la tabla no desplaza nada por detrás, así que el
+        // desenfoque solo costaría rendimiento.
         "bg-gradient-to-b from-muted to-muted/30 dark:from-white/[0.06] dark:to-transparent",
         className
       )}

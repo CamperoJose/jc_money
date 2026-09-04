@@ -39,13 +39,13 @@ export function Dialog({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in"
+        className="vidrio-velo fixed inset-0 animate-in fade-in"
         onClick={() => onOpenChange(false)}
       />
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 my-8 w-full max-w-lg rounded-xl border bg-card p-6 shadow-lg animate-in fade-in zoom-in-95"
+        className="vidrio relative z-10 my-8 w-full max-w-lg rounded-xl border border-border p-6 shadow-xl animate-in fade-in zoom-in-95"
       >
         <button
           type="button"

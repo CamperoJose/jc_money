@@ -307,7 +307,7 @@ export function Sidebar({ email }: { email?: string | null }) {
   return (
     <>
       {/* Barra superior móvil (ancho completo) */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card/85 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur lg:hidden">
+      <header className="vidrio sticky top-0 z-30 flex items-center gap-3 border-b border-border px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] lg:hidden">
         <button
           type="button"
           onClick={() => setOpenMobile(true)}
@@ -325,7 +325,7 @@ export function Sidebar({ email }: { email?: string | null }) {
       {/* Sidebar desktop */}
       <aside
         className={cn(
-          "hidden shrink-0 border-r border-sidebar-border bg-sidebar bg-gradient-to-b from-foreground/[0.03] via-transparent to-primary/[0.06] transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:block lg:h-dvh",
+          "vidrio vidrio-lateral hidden shrink-0 border-r border-sidebar-border bg-gradient-to-b from-foreground/[0.03] via-transparent to-primary/[0.06] transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:block lg:h-dvh",
           collapsed ? "lg:w-[68px]" : "lg:w-64"
         )}
       >
@@ -342,14 +342,14 @@ export function Sidebar({ email }: { email?: string | null }) {
       >
         <div
           className={cn(
-            "absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300",
+            "vidrio-velo absolute inset-0 transition-opacity duration-300",
             openMobile ? "opacity-100" : "opacity-0"
           )}
           onClick={() => setOpenMobile(false)}
         />
         <aside
           className={cn(
-            "absolute left-0 top-0 h-full w-[82%] max-w-xs border-r border-sidebar-border bg-sidebar bg-gradient-to-b from-foreground/[0.03] via-transparent to-primary/[0.06] shadow-2xl transition-transform duration-300 ease-in-out",
+            "vidrio vidrio-lateral absolute left-0 top-0 h-full w-[82%] max-w-xs border-r border-sidebar-border bg-gradient-to-b from-foreground/[0.03] via-transparent to-primary/[0.06] shadow-2xl transition-transform duration-300 ease-in-out",
             openMobile ? "translate-x-0" : "-translate-x-full"
           )}
         >
