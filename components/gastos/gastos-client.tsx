@@ -155,9 +155,9 @@ export function GastosClient({
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold">Movimientos</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Movimientos</h1>
           <p className="text-sm text-muted-foreground">
             {transacciones.length} {transacciones.length === 1 ? "movimiento" : "movimientos"} registrados.
           </p>

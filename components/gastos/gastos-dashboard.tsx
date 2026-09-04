@@ -63,13 +63,13 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Gastos</h1>
+      <div className="border-b border-border pb-5">
+        <h1 className="text-2xl font-semibold text-foreground">Gastos</h1>
         <p className="text-sm capitalize text-muted-foreground">{mesActual}</p>
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
           icon={<TrendDown weight="duotone" className="size-5 text-destructive" />}
           label="Gasto del mes"
@@ -247,17 +247,17 @@ function Kpi({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div
-            className={`text-lg font-bold tabular-nums ${
-              tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""
-            }`}
-          >
-            {valor}
-          </div>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+          <span className="shrink-0">{icon}</span>
+        </div>
+        <div
+          className={`mt-1 truncate text-3xl font-semibold tabular-nums ${
+            tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""
+          }`}
+        >
+          {valor}
         </div>
       </CardContent>
     </Card>

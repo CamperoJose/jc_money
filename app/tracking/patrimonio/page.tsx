@@ -60,9 +60,9 @@ export default async function PatrimonioDashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Patrimonio</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Patrimonio</h1>
           <p className="text-sm text-muted-foreground">
             Tu patrimonio neto, su evolución y en qué está distribuido.
           </p>
@@ -139,7 +139,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
       {/* Hero + KPIs */}
       <section className="grid gap-4 lg:grid-cols-4">
         {/* Patrimonio neto (hero) */}
-        <Card className="overflow-hidden border-primary/30 bg-gradient-to-br from-primary/12 via-primary/5 to-transparent lg:col-span-2">
+        <Card className="overflow-hidden lg:col-span-2">
           <CardContent className="flex h-full flex-col justify-between gap-4 p-6">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-primary/80">
@@ -185,7 +185,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
 
       {/* Disponibilidad rápida (dinero líquido) */}
       {disponibilidadRapida != null && (
-        <Card className="overflow-hidden border-primary/25 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+        <Card className="overflow-hidden">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div className="flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
@@ -397,19 +397,19 @@ function Kpi({
         ? "bg-destructive/15 text-destructive"
         : "bg-muted text-muted-foreground";
   return (
-    <Card className="transition-shadow hover:shadow-md">
-      <CardHeader className="pb-2">
+    <Card>
+      <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
-          <CardDescription>{label}</CardDescription>
+          <span className="truncate text-sm font-medium text-foreground">{label}</span>
           <span className={"flex size-8 shrink-0 items-center justify-center rounded-lg " + chip}>
             <Icon weight="duotone" className="size-4" />
           </span>
         </div>
-        <CardTitle className={"truncate text-2xl tabular-nums " + texto} title={valorFull}>
+        <div className={"mt-1 truncate text-3xl font-semibold tabular-nums " + texto} title={valorFull}>
           {valor}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="truncate text-sm text-muted-foreground">{sub}</CardContent>
+        </div>
+        <div className="mt-1 truncate text-sm text-muted-foreground">{sub}</div>
+      </CardContent>
     </Card>
   );
 }
@@ -429,7 +429,7 @@ function Metric({
 }) {
   const texto = tone === "pos" ? "text-primary" : tone === "neg" ? "text-destructive" : "text-foreground";
   return (
-    <div className="rounded-xl border bg-card p-3 shadow-sm">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon weight="duotone" className="size-3.5 shrink-0" />
         <span className="truncate">{label}</span>

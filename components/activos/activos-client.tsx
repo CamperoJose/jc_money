@@ -77,9 +77,9 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold">Activos</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Activos</h1>
           <p className="text-sm text-muted-foreground">
             {cuentaActivos} {cuentaActivos === 1 ? "activo" : "activos"} · {cuentaVendidos} vendidos
           </p>
@@ -90,7 +90,7 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi icon={<Vault weight="duotone" className="size-5 text-primary" />} label="En patrimonio" valor={formatBob(valorEnPatrimonio)} sub={`Valor total ${formatBob(valorTotalActivos)}`} />
         <Kpi icon={<TrendUp weight="duotone" className="size-5 text-primary" />} label="Plusvalía no realizada" valor={formatBob(plusvaliaNoRealizada)} tono={plusvaliaNoRealizada >= 0 ? "bueno" : "malo"} />
         <Kpi icon={<Coins weight="duotone" className="size-5 text-primary" />} label="Ganancia realizada" valor={formatBob(gananciaRealizada)} sub={`${cuentaVendidos} vendidos`} tono={gananciaRealizada >= 0 ? "bueno" : "malo"} />
@@ -337,13 +337,13 @@ function EstadoBadge({ a }: { a: AssetUI }) {
 function Kpi({ icon, label, valor, sub, tono }: { icon: React.ReactNode; label: string; valor: string; sub?: string; tono?: "bueno" | "malo" }) {
   return (
     <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div className={`text-lg font-bold tabular-nums ${tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""}`}>{valor}</div>
-          {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+          <span className="shrink-0">{icon}</span>
         </div>
+        <div className={`mt-1 truncate text-3xl font-semibold tabular-nums ${tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""}`}>{valor}</div>
+        {sub && <div className="mt-1 truncate text-sm text-muted-foreground">{sub}</div>}
       </CardContent>
     </Card>
   );

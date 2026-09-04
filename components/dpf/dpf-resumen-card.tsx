@@ -18,7 +18,7 @@ export function DpfResumenCard({ resumen }: { resumen: ResumenDpf }) {
           : `en ${proximo.diasRestantes} días`;
 
   return (
-    <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/8 via-transparent to-transparent">
+    <Card className="overflow-hidden">
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">

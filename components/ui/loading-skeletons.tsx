@@ -17,7 +17,7 @@ function CabeceraSkeleton() {
 /** Fila de KPIs (n tarjetas). */
 function KpisSkeleton({ n = 4 }: { n?: number }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: n }).map((_, i) => (
         <Card key={i}>
           <CardContent className="space-y-2 p-4">

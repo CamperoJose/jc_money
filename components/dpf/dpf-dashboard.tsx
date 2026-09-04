@@ -101,9 +101,9 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold">Inversiones · DPF</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Inversiones · DPF</h1>
           <p className="text-sm text-muted-foreground">
             {dpfsActivos} {dpfsActivos === 1 ? "activo" : "activos"} · {dpfsCobrados} cobrados ·{" "}
             {totalHistorico} en total
@@ -130,7 +130,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
       )}
 
       {/* Hero KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <KpiHero
           icon={<Vault weight="fill" className="size-5" />}
           label="Capital en DPF"
@@ -432,16 +432,16 @@ function KpiHero({
   sub?: string;
 }) {
   return (
-    <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-primary/80">{label}</span>
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+    <Card className="overflow-hidden">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             {icon}
           </span>
         </div>
-        <div className="mt-2 truncate text-2xl font-bold text-primary tabular-nums">{valor}</div>
-        {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
+        <div className="mt-1 truncate text-3xl font-semibold tabular-nums text-primary">{valor}</div>
+        {sub && <div className="mt-1 truncate text-sm text-muted-foreground">{sub}</div>}
       </CardContent>
     </Card>
   );
@@ -462,7 +462,7 @@ function Metric({
 }) {
   const texto = tone === "pos" ? "text-primary" : tone === "neg" ? "text-destructive" : "text-foreground";
   return (
-    <div className="rounded-xl border bg-card p-3 shadow-sm">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon weight="duotone" className="size-3.5 shrink-0" />
         <span className="truncate">{label}</span>

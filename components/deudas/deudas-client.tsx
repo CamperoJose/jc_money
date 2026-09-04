@@ -74,9 +74,9 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold">Deudas · Que me deben</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Deudas · Que me deben</h1>
           <p className="text-sm text-muted-foreground">
             {cuentaPendientes} {cuentaPendientes === 1 ? "deuda pendiente" : "deudas pendientes"} · suma a tu patrimonio (Por Cobrar)
           </p>
@@ -97,7 +97,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi icon={<HandCoins weight="duotone" className="size-5 text-primary" />} label="Total por cobrar" valor={formatBob(totalPorCobrar)} />
         <Kpi icon={<CheckCircle weight="duotone" className="size-5 text-primary" />} label="Ya cobrado" valor={formatBob(totalCobrado)} />
         <Kpi icon={<Clock weight="duotone" className="size-5 text-muted-foreground" />} label="Pendientes" valor={String(cuentaPendientes)} sub={`${cuentaVencidas} vencidas`} tono={cuentaVencidas > 0 ? "malo" : undefined} />
@@ -511,13 +511,13 @@ function EstadoBadge({ d }: { d: DebtUI }) {
 function Kpi({ icon, label, valor, sub, tono }: { icon: React.ReactNode; label: string; valor: string; sub?: string; tono?: "malo" }) {
   return (
     <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="rounded-lg bg-muted/60 p-2">{icon}</div>
-        <div className="min-w-0">
-          <div className="truncate text-xs text-muted-foreground">{label}</div>
-          <div className={`text-lg font-bold tabular-nums ${tono === "malo" ? "text-destructive" : ""}`}>{valor}</div>
-          {sub && <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>}
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+          <span className="shrink-0">{icon}</span>
         </div>
+        <div className={`mt-1 truncate text-3xl font-semibold tabular-nums ${tono === "malo" ? "text-destructive" : ""}`}>{valor}</div>
+        {sub && <div className="mt-1 truncate text-sm text-muted-foreground">{sub}</div>}
       </CardContent>
     </Card>
   );

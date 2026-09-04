@@ -47,8 +47,8 @@ export function ParametrosClient({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Parámetros</h1>
+      <div className="border-b border-border pb-5">
+        <h1 className="text-2xl font-semibold text-foreground">Parámetros</h1>
         <p className="text-sm text-muted-foreground">
           Administra los catálogos de categorías que usan tus movimientos e inversiones.
         </p>

@@ -14,16 +14,12 @@ export default async function TrackingLayout({
 
   return (
     // block en móvil (barra superior + contenido apilados), fila en desktop.
+    // Fondo plano, como la plantilla: sin degradados ni blobs que ensucien
+    // el contraste de las tarjetas.
     <div className="relative min-h-dvh bg-background lg:flex">
-      {/* Difuminados de fondo (blobs) para dar profundidad, sin estorbar. */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-24 -top-24 size-[26rem] rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute right-[-6rem] top-1/3 size-[22rem] rounded-full bg-primary/[0.07] blur-3xl" />
-        <div className="absolute bottom-[-8rem] left-1/3 size-[24rem] rounded-full bg-emerald-500/[0.06] blur-3xl" />
-      </div>
       <Sidebar email={user?.email} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+        <main className="mx-auto w-full min-w-0 max-w-7xl flex-1 overflow-x-hidden px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:py-10">
           {children}
         </main>
       </div>

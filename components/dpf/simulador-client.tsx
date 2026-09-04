@@ -143,7 +143,7 @@ export function SimuladorClient() {
 
         {/* Resultados */}
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi etiqueta="Aportado (fresco)" valor={formatBob(r.aportadoTotal)} detalle="Dinero nuevo que pusiste" icono={<Coins weight="duotone" className="size-4" />} />
             <Kpi etiqueta="Interés líquido total" valor={formatBob(r.interesLiquidoTotal)} detalle={`RC-IVA retenido ${formatBob(r.rcIvaTotal)}`} icono={<TrendUp weight="duotone" className="size-4" />} tono="pos" />
             <Kpi etiqueta="Valor final" valor={formatBob(r.valorFinal)} detalle={`Capital activo ${formatBobCompact(r.capitalFinalActivo)}`} icono={<Stack weight="duotone" className="size-4" />} tono="pos" />

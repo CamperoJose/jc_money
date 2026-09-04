@@ -37,19 +37,19 @@ export function Kpi({
   className,
 }: KpiProps) {
   return (
+    // Proporciones de la plantilla: etiqueta `text-sm font-medium` y valor
+    // grande `text-3xl font-semibold`, dentro de una tarjeta con padding 6.
     <Card className={cn("overflow-hidden", className)}>
-      <CardContent className="p-4">
+      <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
-          <span className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {etiqueta}
-          </span>
+          <span className="truncate text-sm font-medium text-foreground">{etiqueta}</span>
           {icono && <span className="shrink-0 text-muted-foreground">{icono}</span>}
         </div>
-        <div className={cn("mt-1.5 truncate text-2xl font-semibold tabular-nums", tonoTexto[tono])}>
+        <div className={cn("mt-1 truncate text-3xl font-semibold tabular-nums", tonoTexto[tono])}>
           {valor}
         </div>
         {detalle && (
-          <div className="mt-1 truncate text-xs text-muted-foreground">{detalle}</div>
+          <div className="mt-1 truncate text-sm text-muted-foreground">{detalle}</div>
         )}
         {progreso != null && (
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">

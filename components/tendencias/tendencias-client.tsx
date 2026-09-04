@@ -36,7 +36,7 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
   if (!t.suficienteData) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Tendencias</h1>
+        <div className="border-b border-border pb-5"><h1 className="text-2xl font-semibold text-foreground">Tendencias</h1></div>
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-14 text-center text-sm text-muted-foreground">
             <ChartLineUp weight="duotone" className="size-8 opacity-60" />
@@ -53,15 +53,15 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tendencias</h1>
+      <div className="border-b border-border pb-5">
+        <h1 className="text-2xl font-semibold text-foreground">Tendencias</h1>
         <p className="text-sm text-muted-foreground">
           Proyección estadística de tu patrimonio (regresión lineal + crecimiento compuesto).
         </p>
       </div>
 
       {/* Narrativa destacada */}
-      <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/12 via-primary/5 to-transparent">
+      <Card className="overflow-hidden">
         <CardContent className="flex items-start gap-3 p-5">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Sparkle weight="fill" className="size-5" />

@@ -71,9 +71,9 @@ export function PresupuestosClient({ resumen }: { resumen: ResumenPresupuestos }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold">Presupuestos</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Presupuestos</h1>
           <p className="text-sm capitalize text-muted-foreground">{nombreMes(period)}</p>
         </div>
         <Button variant="outline" onClick={copiarMesAnterior} disabled={copiando}>

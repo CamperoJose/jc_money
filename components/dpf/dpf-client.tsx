@@ -97,9 +97,9 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-bold">DPF · Registros</h1>
+          <h1 className="text-2xl font-semibold text-foreground">DPF · Registros</h1>
           <p className="text-sm text-muted-foreground">
             {dpfs.length} {dpfs.length === 1 ? "depósito" : "depósitos"} registrados.
           </p>
