@@ -249,35 +249,85 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
 
           {/* Tarjetas (móvil) */}
           <div className="grid gap-2 lg:hidden">
-            {deudas.map((d) => (
-              <Card key={d.id}>
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold">{d.counterparty || "—"}</span>
-                        <EstadoBadge d={d} />
+            {/* Resumen equivalente al pie de la tabla de escritorio. */}
+            <Card className="overflow-hidden">
+              <CardContent className="flex items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {deudas.length} {deudas.length === 1 ? "deuda" : "deudas"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Cobrado {formatBob(totalCobrado)}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Por cobrar</div>
+                  <div className="text-xl font-semibold tabular-nums text-primary">
+                    {formatBob(totalPorCobrar)}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {deudas.map((d) => {
+              const pct = d.amount > 0 ? d.paid_amount / d.amount : 0;
+              const cuentaCobro = cuentas.find((c) => c.id === d.paid_account_id);
+              return (
+                <Card key={d.id} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-semibold">{d.counterparty || "—"}</span>
+                          <EstadoBadge d={d} />
+                        </div>
+                        {d.reason && <div className="truncate text-xs text-muted-foreground">{d.reason}</div>}
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {formatDate(d.debt_date)} · hace {diasDesde(d.debt_date)} d
+                        </div>
+                        {d.due_date && (
+                          <div className={`text-xs ${d.vencida ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                            Vence {formatDate(d.due_date)} · {textoVencimiento(d)}
+                          </div>
+                        )}
                       </div>
-                      {d.reason && <div className="truncate text-xs text-muted-foreground">{d.reason}</div>}
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {formatDate(d.debt_date)}{d.due_date ? ` → vence ${formatDate(d.due_date)}` : ""}
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="font-bold tabular-nums text-primary">{formatBob(d.outstanding)}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          de {formatBobCompact(d.amount)}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="font-bold tabular-nums text-primary">{formatBob(d.outstanding)}</span>
-                      <span className="text-xs text-muted-foreground tabular-nums">de {formatBobCompact(d.amount)}</span>
+
+                    {/* Avance de cobro */}
+                    <div className="mt-2.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all ${d.status === "pagado" ? "bg-emerald-500" : "bg-primary"}`}
+                          style={{ width: `${Math.min(100, Math.max(0, pct * 100))}%` }}
+                        />
+                      </div>
+                      <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {Math.round(pct * 100)}%
+                      </span>
                     </div>
-                  </div>
-                  <div className="mt-2 flex items-center justify-end gap-1">
-                    {d.outstanding > 0 && (
-                      <Button variant="outline" size="sm" className="mr-auto h-7" onClick={() => setCobrar(d)}><Coins weight="fill" className="size-4" />Recibir cobro</Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="size-7" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
-                    <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="mt-1 truncate text-xs text-muted-foreground">
+                      Cobrado {formatBob(d.paid_amount)}
+                      {cuentaCobro ? ` · ${cuentaCobro.name}` : ""}
+                      {d.collected_date ? ` · ${formatDate(d.collected_date)}` : ""}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-end gap-1">
+                      {d.outstanding > 0 && (
+                        <Button variant="outline" size="sm" className="mr-auto h-7" onClick={() => setCobrar(d)}><Coins weight="fill" className="size-4" />Recibir cobro</Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="size-7" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </>
       )}

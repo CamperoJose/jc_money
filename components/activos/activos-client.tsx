@@ -234,33 +234,77 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
 
           {/* Tarjetas (móvil) */}
           <div className="grid gap-2 lg:hidden">
-            {activos.map((a) => (
-              <Card key={a.id}>
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold">{a.name}</span>
-                        <EstadoBadge a={a} />
+            {activos.map((a) => {
+              const cuentaVenta = cuentas.find((c) => c.id === a.sold_account_id);
+              const mag = a.resultadoPct != null ? Math.min(1, Math.abs(a.resultadoPct) / 0.5) : 0;
+              const positivo = a.resultado >= 0;
+              return (
+                <Card key={a.id} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-semibold">{a.name}</span>
+                          <EstadoBadge a={a} />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          {a.category && <span className="truncate">{a.category}</span>}
+                          {a.currency !== "BOB" && <Badge variant="neutral">{a.currency}</Badge>}
+                          {!a.counts_in_patrimonio && <span>· no contable</span>}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {a.acquired_date ? formatDate(a.acquired_date) : "—"} · costo {formatBob(a.acquisition_cost)}
+                        </div>
+                        {a.diasTenencia != null && (
+                          <div className="text-xs text-muted-foreground">
+                            {a.diasTenencia} d {a.realizado ? "hasta la venta" : "en cartera"}
+                          </div>
+                        )}
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {a.acquired_date ? formatDate(a.acquired_date) : "—"} · costo {formatBob(a.acquisition_cost)}
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="font-bold tabular-nums">
+                          {a.realizado ? formatBob(a.sold_price ?? 0) : formatBob(a.valorActual)}
+                        </span>
+                        <span className="text-right text-xs text-muted-foreground">
+                          {a.realizado
+                            ? `vendido${a.sold_date ? ` ${formatDate(a.sold_date)}` : ""}${cuentaVenta ? ` → ${cuentaVenta.name}` : ""}`
+                            : "valor estimado"}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="font-bold tabular-nums">{a.realizado ? formatBob(a.sold_price ?? 0) : formatBob(a.valorActual)}</span>
-                      <span className={`text-xs font-medium tabular-nums ${a.resultado >= 0 ? "text-primary" : "text-destructive"}`}>
-                        {a.resultado >= 0 ? "+" : ""}{formatBob(a.resultado)}
+
+                    {/* Resultado con barra bidireccional (igual que en escritorio). */}
+                    <div className="mt-2.5 flex items-center justify-between gap-2">
+                      <span className={`font-semibold tabular-nums ${positivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                        {positivo ? "+" : ""}{formatBob(a.resultado)}
                       </span>
+                      {a.resultadoPct != null && (
+                        <span className={`text-xs tabular-nums ${positivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                          {formatPercent(a.resultadoPct, 1)}
+                        </span>
+                      )}
                     </div>
-                  </div>
-                  <div className="mt-2 flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="size-7" onClick={() => { setEditando(a); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
-                    <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(a); }} aria-label="Borrar"><Trash className="size-4" /></Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="flex w-1/2 justify-end">
+                        {!positivo && (
+                          <div className="h-full rounded-l-full bg-destructive transition-all" style={{ width: `${mag * 100}%` }} />
+                        )}
+                      </div>
+                      <div className="flex w-1/2 justify-start">
+                        {positivo && (
+                          <div className="h-full rounded-r-full bg-emerald-500 transition-all" style={{ width: `${mag * 100}%` }} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="size-7" onClick={() => { setEditando(a); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(a); }} aria-label="Borrar"><Trash className="size-4" /></Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </>
       )}

@@ -318,18 +318,56 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
                           <span className="truncate text-sm font-semibold">{d.pizarra || "DPF"}</span>
                           <Badge variant={et.color}>{et.texto}</Badge>
                         </div>
-                        {d.id_dpf_externo && (
-                          <div className="text-xs text-muted-foreground">{d.id_dpf_externo}</div>
-                        )}
+                        <div className="truncate text-xs text-muted-foreground">
+                          {[d.nro_dpf && `Nº ${d.nro_dpf}`, d.id_dpf_externo, d.edv && `EDV ${d.edv}`]
+                            .filter(Boolean)
+                            .join(" · ") || "sin identificador"}
+                        </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {formatDate(d.start_date)} → {formatDate(d.end_date)} · {formatPercent(d.annual_rate, 2)}
+                          {formatDate(d.start_date)} → {formatDate(d.end_date)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {d.term_months} {d.term_months === 1 ? "mes" : "meses"} · {d.diasTotales} d ·{" "}
+                          {formatPercent(d.annual_rate, 2)}
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
+                      <div className="flex flex-col items-end gap-0.5">
                         <span className="font-bold tabular-nums">{formatBob(d.principal)}</span>
                         <span className="text-xs tabular-nums text-primary">+{formatBob(d.interesLiquido)}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {d.cobra_iva ? `RC-IVA ${formatBob(d.rcIva)}` : "sin IVA"}
+                        </span>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {formatBob(d.interesMensual)}/mes
+                        </span>
                       </div>
                     </div>
+
+                    {/* Avance del plazo, igual que en la tabla de escritorio. */}
+                    <div className="mt-2.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            d.status === "pagado"
+                              ? "bg-muted-foreground"
+                              : d.liberacion === "vencido"
+                                ? "bg-destructive"
+                                : "bg-primary"
+                          }`}
+                          style={{ width: `${Math.round(Math.min(1, Math.max(0, d.progreso)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {Math.round(Math.min(1, Math.max(0, d.progreso)) * 100)}%
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between gap-2 border-t pt-2">
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Al vencimiento
+                      </span>
+                      <span className="font-semibold tabular-nums">{formatBob(d.montoAlVencimiento)}</span>
+                    </div>
+
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-xs text-muted-foreground tabular-nums">
                         {d.status === "pagado"

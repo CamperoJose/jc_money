@@ -14,6 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CategoryBar } from "@/components/tremor/category-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -340,47 +341,95 @@ export function GastosClient({
             </TableRoot>
           </Card>
 
-          {/* Tarjetas (móvil) */}
+          {/* Tarjetas (móvil): misma información que la tabla de escritorio. */}
           <div className="grid gap-2 lg:hidden">
-            {filtradas.map((t) => (
-              <Card key={t.id}>
-                <CardContent className="flex items-start justify-between gap-3 p-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <TipoIcon tipo={t.type} />
-                      <span className="truncate text-sm font-medium">
-                        {t.description || (t.category?.name ?? "Movimiento")}
-                      </span>
+            {/* Resumen del filtro, equivalente al pie de la tabla. */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-3">
+                <CategoryBar
+                  segmentos={[
+                    { etiqueta: "Ingresos", valor: totalIngresos, color: "var(--color-chart-1)" },
+                    { etiqueta: "Gastos", valor: totalGastos, color: "var(--color-destructive)" },
+                  ]}
+                  formato="bob"
+                />
+                <div className="mt-3 flex items-baseline justify-between border-t pt-2">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Neto · {filtradas.length} mov.
+                  </span>
+                  <span
+                    className={`text-base font-semibold tabular-nums ${neto >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                  >
+                    {neto >= 0 ? "+" : "−"}
+                    {formatBob(Math.abs(neto))}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {filtradas.map((t) => {
+              const peso = maxBob > 0 ? t.amount_bob / maxBob : 0;
+              return (
+                <Card key={t.id} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <TipoIcon tipo={t.type} />
+                          <span className="truncate text-sm font-medium">
+                            {t.description || (t.category?.name ?? "Movimiento")}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {formatDateTime(t.occurred_at)}
+                        </div>
+                        <div className="text-xs capitalize text-muted-foreground">
+                          {diaSemana(t.txn_date)} · {antiguedad(t.txn_date)}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <MontoCelda t={t} />
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="size-7" onClick={() => editar(t)} aria-label="Editar">
+                            <PencilSimple className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setErrorBorrar(null);
+                              setBorrar(t);
+                            }}
+                            aria-label="Borrar"
+                          >
+                            <Trash className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(t.occurred_at)}</div>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
+
+                    {/* Peso del movimiento dentro del filtro actual. */}
+                    <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full ${t.type === "ingreso" ? "bg-emerald-500" : "bg-destructive/70"}`}
+                        style={{ width: `${Math.min(100, peso * 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-1">
                       {t.category && <Badge variant="secondary">{t.category.name}</Badge>}
-                      {t.account && <Badge variant="outline">{t.account.name}</Badge>}
+                      {t.account && (
+                        <Badge variant="outline">
+                          {t.account.name} · {t.account.currency}
+                        </Badge>
+                      )}
+                      <OrigenBadge source={t.source} />
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <MontoCelda t={t} />
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="size-7" onClick={() => editar(t)} aria-label="Editar">
-                        <PencilSimple className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-destructive hover:text-destructive"
-                        onClick={() => {
-                          setErrorBorrar(null);
-                          setBorrar(t);
-                        }}
-                        aria-label="Borrar"
-                      >
-                        <Trash className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </>
       )}
