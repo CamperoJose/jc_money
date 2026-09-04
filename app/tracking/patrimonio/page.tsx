@@ -304,7 +304,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
                     valor: distribucionMoneda[m],
                     color: `var(--color-chart-${i + 1})`,
                   }))}
-                  formato={(n) => formatBob(n)}
+                  formato="bob"
                 />
                 {/* Detalle con participación de cada moneda */}
                 <div className="space-y-1.5 border-t pt-3">
