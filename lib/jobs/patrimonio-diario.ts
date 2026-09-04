@@ -11,6 +11,8 @@ export interface ResultadoJob {
   base_date?: string;
   base_total_bob?: number;
   neto_dia_bob?: number;
+  /** Parte del neto del día que no se pudo atribuir a ninguna cuenta. */
+  neto_sin_cuenta_bob?: number;
   ajuste_derivadas_bob?: number;
   derivadas?: Record<string, number>;
   ajuste_movimientos_bob?: number;
@@ -224,12 +226,16 @@ async function getMovimientosDelDia(
  *
  * Base = EL ÚLTIMO REGISTRO (manual o auto), la última foto que exista ≤ 23:59
  * del targetDate (no se asume "el día anterior").
- * Total = total de la base + (ingresos − gastos) del DÍA ENTERO procesado (todos
- * los del targetDate, sin importar la hora) + ajustes de cuentas derivadas (DPF,
- * Por Cobrar, Activos) y movimientos (ventas/cobros). Los gastos son
- * independientes del patrimonio y solo lo impactan aquí: el manual son saldos en
- * bruto y el job aplica encima los gastos del día. Los saldos de la base se
- * copian para conservar la composición por cuenta.
+ * Los saldos se arman cuenta por cuenta: se copian los de la base, se reemplazan
+ * los de las cuentas derivadas (DPF, Por Cobrar, Activos) por su valor
+ * autocalculado, se suman los movimientos del día (ventas de activos, cobros de
+ * deudas) y se aplica el neto del DÍA ENTERO procesado (todos los gastos e
+ * ingresos del targetDate, sin importar la hora) SOBRE LA CUENTA DE CADA
+ * MOVIMIENTO. Los gastos son independientes del patrimonio y solo lo impactan
+ * aquí: el manual son saldos en bruto y el job aplica encima los gastos del día.
+ * El total se calcula DESDE esos saldos, no sumando piezas por separado, para
+ * que siempre valga total = Σ(saldos) y el diff por cuenta explique el cambio
+ * completo.
  *
  * NUNCA modifica ni borra fotos existentes; solo inserta su propia foto auto.
  * Manuales y automática COEXISTEN en un mismo día; lo único que no puede haber
@@ -287,11 +293,11 @@ export async function ejecutarPatrimonioDiario(
     account: b.accounts as { currency: "BOB" | "USD" | "USDT"; is_liability: boolean },
   }));
 
-  // Total base: para auto se confía en el almacenado; para manual se recalcula.
-  const baseTotalBob =
-    base.kind === "auto" && base.total_bob != null
-      ? Number(base.total_bob)
-      : calcularTotalBob(balancesBase, rate);
+  // Total base: SIEMPRE recalculado desde los saldos de la base. La foto nueva se
+  // arma a partir de esos saldos, así que tomar el total almacenado (que en fotos
+  // auto antiguas podía no cuadrar con Σ saldos) haría que la nota contradijera
+  // al detalle. Recalcular también sana ese desfase hacia adelante.
+  const baseTotalBob = calcularTotalBob(balancesBase, rate);
 
   // Neto del DÍA ENTERO que se procesa (targetDate): TODOS los gastos/ingresos
   // Neto = TODOS los gastos/ingresos del DÍA ENTERO procesado (targetDate), sin
@@ -301,24 +307,15 @@ export async function ejecutarPatrimonioDiario(
   // día. Ingresos suman, gastos restan (en BOB, con el T/C de cada txn).
   const { data: txns, error: eTx } = await admin
     .from("transactions")
-    .select("type, amount, currency, exchange_rate")
+    .select("type, amount, currency, exchange_rate, account_id")
     .eq("user_id", userId)
     .eq("txn_date", targetDate);
   if (eTx) throw eTx;
-
-  let netoDia = 0;
-  for (const t of txns ?? []) {
-    const amount = Number(t.amount);
-    const enBob = t.currency === "BOB" ? amount : amount * (Number(t.exchange_rate) || 0);
-    netoDia += t.type === "ingreso" ? enBob : -enBob;
-  }
-  netoDia = redondear(netoDia);
 
   // Cuentas derivadas (DPF, Por Cobrar, Activos): su saldo se AUTOCALCULA (no se
   // copia de la base). El resto de cuentas se copian tal cual. El ajuste al total
   // = Σ (valor autocalculado − saldo que traía la base) por cada cuenta derivada.
   const derivadas = await getCuentasDerivadas(admin, userId, rate);
-  const overrides = new Map(derivadas.map((d) => [d.accountId, d.value]));
   let ajusteDerivadas = 0;
   for (const d of derivadas) {
     const enBase = balancesBase.find((b) => b.account_id === d.accountId)?.amount ?? 0;
@@ -330,13 +327,16 @@ export async function ejecutarPatrimonioDiario(
   // una cuenta destino el día del evento. Requieren la moneda de cada cuenta.
   const { data: cuentasData } = await admin
     .from("accounts")
-    .select("id, currency")
+    .select("id, currency, is_liability")
     .eq("user_id", userId);
+  const metaCuenta = new Map(
+    (cuentasData ?? []).map((c) => {
+      const r = c as { id: string; currency: "BOB" | "USD" | "USDT"; is_liability: boolean };
+      return [r.id, { currency: r.currency, is_liability: !!r.is_liability }];
+    })
+  );
   const monedaCuenta = new Map(
-    (cuentasData ?? []).map((c) => [
-      (c as { id: string }).id,
-      (c as { currency: "BOB" | "USD" | "USDT" }).currency,
-    ])
+    [...metaCuenta].map(([id, m]) => [id, m.currency] as const)
   );
   const movimientos = await getMovimientosDelDia(
     admin,
@@ -346,6 +346,47 @@ export async function ejecutarPatrimonioDiario(
     rate,
     monedaCuenta
   );
+
+  // Reparte el neto del día CUENTA POR CUENTA (en la moneda de cada cuenta).
+  // Antes el neto se restaba solo del total y los saldos se copiaban intactos:
+  // el total bajaba pero ninguna cuenta lo reflejaba, así que Σ(saldos) ≠ total
+  // y el diff por cuenta no mostraba los gastos. Un gasto baja el saldo de su
+  // cuenta (o lo sube si la cuenta es un pasivo, porque aumenta la deuda).
+  const deltaPorCuenta = new Map<string, number>();
+  let netoSinCuentaBob = 0; // gastos/ingresos sin cuenta asignada (no atribuibles)
+  let netoDia = 0;
+  for (const t of txns ?? []) {
+    const amount = Number(t.amount);
+    if (!Number.isFinite(amount)) continue;
+    const enBob = t.currency === "BOB" ? amount : amount * (Number(t.exchange_rate) || 0);
+    const signo = t.type === "ingreso" ? 1 : -1;
+    netoDia += signo * enBob;
+
+    const accId = (t as { account_id: string | null }).account_id;
+    const meta = accId ? metaCuenta.get(accId) : undefined;
+    if (!accId || !meta) {
+      netoSinCuentaBob += signo * enBob;
+      continue;
+    }
+    // Monto en la moneda de la cuenta: directo si coincide, si no vía BOB.
+    const enMonedaCuenta =
+      t.currency === meta.currency
+        ? amount
+        : meta.currency === "BOB"
+          ? enBob
+          : rate
+            ? enBob / rate
+            : 0;
+    // En un pasivo, un gasto AUMENTA el saldo (más deuda) y por eso resta al
+    // total, que ya descuenta los pasivos.
+    const signoCuenta = meta.is_liability ? -signo : signo;
+    deltaPorCuenta.set(
+      accId,
+      redondear((deltaPorCuenta.get(accId) ?? 0) + signoCuenta * enMonedaCuenta)
+    );
+  }
+  netoDia = redondear(netoDia);
+  netoSinCuentaBob = redondear(netoSinCuentaBob);
   const incrementos = new Map<string, number>();
   let ajusteMovimientos = 0;
   for (const m of movimientos) {
@@ -354,7 +395,32 @@ export async function ejecutarPatrimonioDiario(
   }
   ajusteMovimientos = redondear(ajusteMovimientos);
 
-  const totalBob = redondear(baseTotalBob + netoDia + ajusteDerivadas + ajusteMovimientos);
+  // Saldos resultantes = base + overrides de derivadas + movimientos + neto del
+  // día repartido por cuenta. El total se calcula DESDE estos saldos, de modo que
+  // siempre se cumpla la invariante total = Σ(saldos) y el diff por cuenta
+  // explique el cambio completo.
+  const saldos = new Map<string, number>();
+  for (const b of balancesBase) saldos.set(b.account_id, b.amount);
+  for (const d of derivadas) saldos.set(d.accountId, d.value);
+  for (const [accId, inc] of incrementos) {
+    saldos.set(accId, redondear((saldos.get(accId) ?? 0) + inc));
+  }
+  for (const [accId, delta] of deltaPorCuenta) {
+    saldos.set(accId, redondear((saldos.get(accId) ?? 0) + delta));
+  }
+
+  const balancesFinales = [...saldos].map(([account_id, amount]) => ({
+    account_id,
+    amount,
+    account: {
+      currency: metaCuenta.get(account_id)?.currency ?? "BOB",
+      is_liability: metaCuenta.get(account_id)?.is_liability ?? false,
+    },
+  }));
+
+  // netoSinCuentaBob: movimientos sin cuenta asignada. No se pueden reflejar en
+  // ningún saldo, así que se suman aparte y se declaran en la nota.
+  const totalBob = redondear(calcularTotalBob(balancesFinales, rate) + netoSinCuentaBob);
   const totalUsd = rate ? redondear(totalBob / rate) : null;
 
   const detalleDerivadas = derivadas.map((d) => `${d.label}=${d.value}`).join(", ");
@@ -376,6 +442,7 @@ export async function ejecutarPatrimonioDiario(
         `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto del día` +
         (derivadas.length ? ` ${ajusteDerivadas >= 0 ? "+" : "−"} ${Math.abs(ajusteDerivadas)} de ajuste derivadas (${detalleDerivadas})` : "") +
         (movimientos.length ? ` + ${ajusteMovimientos} de movimientos (${detalleMovimientos})` : "") +
+        (netoSinCuentaBob !== 0 ? ` (incluye ${netoSinCuentaBob} sin cuenta asignada)` : "") +
         ".",
     })
     .select("id")
@@ -383,29 +450,15 @@ export async function ejecutarPatrimonioDiario(
   if (eIns) throw eIns;
   const snapId = snap.id as string;
 
-  // Copia los saldos de la base, pero reemplaza los de las cuentas derivadas por
-  // su valor autocalculado. OJO: con la service role el default `auth.uid()` no
-  // aplica, así que el user_id debe ir explícito en cada fila (RLS not-null).
-  const filas = balancesBase.map((b) => {
-    let amount = overrides.has(b.account_id) ? overrides.get(b.account_id)! : b.amount;
-    if (incrementos.has(b.account_id)) amount = redondear(amount + incrementos.get(b.account_id)!);
-    return { user_id: userId, snapshot_id: snapId, account_id: b.account_id, amount };
-  });
-  // Agrega las cuentas derivadas que la base no tenía.
-  for (const d of derivadas) {
-    if (!balancesBase.some((b) => b.account_id === d.accountId)) {
-      filas.push({ user_id: userId, snapshot_id: snapId, account_id: d.accountId, amount: d.value });
-    }
-  }
-  // Agrega cuentas destino de movimientos que la base no tenía (ni son derivadas).
-  for (const [accId, inc] of incrementos) {
-    if (
-      !balancesBase.some((b) => b.account_id === accId) &&
-      !derivadas.some((d) => d.accountId === accId)
-    ) {
-      filas.push({ user_id: userId, snapshot_id: snapId, account_id: accId, amount: inc });
-    }
-  }
+  // Guarda los saldos ya calculados (base + derivadas + movimientos + neto del
+  // día por cuenta). OJO: con la service role el default `auth.uid()` no aplica,
+  // así que el user_id debe ir explícito en cada fila (RLS not-null).
+  const filas = balancesFinales.map((b) => ({
+    user_id: userId,
+    snapshot_id: snapId,
+    account_id: b.account_id,
+    amount: b.amount,
+  }));
   if (filas.length) {
     const { error: eBal } = await admin.from("net_worth_balances").insert(filas);
     if (eBal) {
@@ -423,6 +476,7 @@ export async function ejecutarPatrimonioDiario(
     base_date: base.snapshot_date as string,
     base_total_bob: baseTotalBob,
     neto_dia_bob: netoDia,
+    neto_sin_cuenta_bob: netoSinCuentaBob || undefined,
     ajuste_derivadas_bob: derivadas.length ? ajusteDerivadas : undefined,
     derivadas: derivadas.length ? Object.fromEntries(derivadas.map((d) => [d.label, d.value])) : undefined,
     ajuste_movimientos_bob: movimientos.length ? ajusteMovimientos : undefined,
