@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import {
   Plus,
   PencilSimple,
@@ -47,6 +48,7 @@ export function RegistrosClient({
   cuentas: Account[];
 }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<SnapshotUI | null>(null);
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export function RegistrosClient({
         throw new Error(j.error ?? `Error ${res.status}`);
       }
       setBorrar(null);
+      avisos.exito("Foto borrada");
       router.refresh();
     } catch (e) {
       setErrorBorrar(e instanceof Error ? e.message : "Error al borrar.");

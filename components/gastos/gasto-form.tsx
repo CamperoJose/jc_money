@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import { FloppyDisk, Warning, Clock, TrendDown, TrendUp } from "@phosphor-icons/react";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export function GastoForm({
   onOpenChange: (v: boolean) => void;
 }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const editando = !!registro;
 
   const [tipo, setTipo] = useState<TxnType>(registro?.type ?? "gasto");
@@ -105,6 +107,10 @@ export function GastoForm({
       clearTimeout(timeout);
       setEnviando(false);
       onOpenChange(false);
+      avisos.exito(
+        editando ? "Movimiento actualizado" : "Movimiento registrado",
+        `${tipo === "gasto" ? "Gasto" : "Ingreso"} de ${monto} ${moneda}.`
+      );
       router.refresh();
     } catch (e) {
       clearTimeout(timeout);

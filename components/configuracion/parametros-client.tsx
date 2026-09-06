@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import {
   Plus,
   PencilSimple,
@@ -113,6 +114,7 @@ export function ParametrosClient({
 
 function TipoCambioPanel({ config }: { config: TcConfig }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const [indicador, setIndicador] = useState(String(config.cod_indicador));
   const [moneda, setMoneda] = useState(String(config.cod_moneda));
   const [guardando, setGuardando] = useState(false);
@@ -134,6 +136,7 @@ function TipoCambioPanel({ config }: { config: TcConfig }) {
         throw new Error(j.error ?? `Error ${res.status}`);
       }
       setOk(true);
+      avisos.exito("Tipo de cambio guardado");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -223,6 +226,7 @@ function Catalogo({
   placeholder: string;
 }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const [nuevo, setNuevo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -247,6 +251,7 @@ function Catalogo({
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `Error ${res.status}`);
       }
+      avisos.exito("Categorías actualizadas");
       router.refresh();
       return true;
     } catch (e) {

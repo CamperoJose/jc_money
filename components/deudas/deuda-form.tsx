@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import { FloppyDisk, Warning } from "@phosphor-icons/react";
 import {
   Dialog,
@@ -44,6 +45,7 @@ export function DeudaForm({
   onOpenChange: (v: boolean) => void;
 }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const editando = !!registro;
   const destinos = useMemo(() => cuentasDestino(cuentas), [cuentas]);
 
@@ -100,6 +102,7 @@ export function DeudaForm({
       clearTimeout(timeout);
       setEnviando(false);
       onOpenChange(false);
+      avisos.exito(editando ? "Deuda actualizada" : "Deuda registrada");
       router.refresh();
     } catch (e) {
       clearTimeout(timeout);

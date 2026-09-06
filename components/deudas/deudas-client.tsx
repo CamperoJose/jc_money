@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import {
   Plus,
   PencilSimple,
@@ -45,6 +46,7 @@ import type { Account, DebtUI } from "@/lib/types";
 
 export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cuentas: Account[] }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<DebtUI | null>(null);
   const [cobrar, setCobrar] = useState<DebtUI | null>(null);
@@ -65,6 +67,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
         throw new Error(j.error ?? `Error ${res.status}`);
       }
       setBorrar(null);
+      avisos.exito("Deuda borrada");
       router.refresh();
     } catch (e) {
       setErrorBorrar(e instanceof Error ? e.message : "Error al borrar.");
@@ -356,7 +359,10 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
           cuentas={cuentas}
           onClose={(refrescar) => {
             setCobrar(null);
-            if (refrescar) router.refresh();
+            if (refrescar) {
+              avisos.exito("Cobro registrado", "El job lo moverá de Por Cobrar a la cuenta destino.");
+              router.refresh();
+            }
           }}
         />
       )}

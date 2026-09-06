@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import {
   Plus,
   PencilSimple,
@@ -76,6 +77,7 @@ export function GastosClient({
   categorias: Category[];
 }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<TransactionUI | null>(null);
   const [borrar, setBorrar] = useState<TransactionUI | null>(null);
@@ -157,6 +159,7 @@ export function GastosClient({
         throw new Error(j.error ?? `Error ${res.status}`);
       }
       setBorrar(null);
+      avisos.exito("Movimiento borrado");
       router.refresh();
     } catch (e) {
       setErrorBorrar(e instanceof Error ? e.message : "Error al borrar.");

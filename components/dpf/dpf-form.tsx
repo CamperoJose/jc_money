@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import { FloppyDisk, Warning } from "@phosphor-icons/react";
 import {
   Dialog,
@@ -41,6 +42,7 @@ export function DpfForm({
   onOpenChange: (v: boolean) => void;
 }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const editando = !!registro;
 
   const [pizarra, setPizarra] = useState(registro?.pizarra ?? "");
@@ -123,6 +125,7 @@ export function DpfForm({
       clearTimeout(timeout);
       setEnviando(false);
       onOpenChange(false);
+      avisos.exito(editando ? "DPF actualizado" : "DPF registrado");
       router.refresh();
     } catch (e) {
       clearTimeout(timeout);

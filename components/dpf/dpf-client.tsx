@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import {
   Plus,
   PencilSimple,
@@ -42,6 +43,7 @@ type FiltroEstado = "todos" | DpfLiberacion;
 
 export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Account[] }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<DpfDeposit | null>(null);
   const [borrar, setBorrar] = useState<DpfDepositUI | null>(null);
@@ -88,6 +90,7 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
         throw new Error(j.error ?? `Error ${res.status}`);
       }
       setBorrar(null);
+      avisos.exito("DPF borrado");
       router.refresh();
     } catch (e) {
       setErrorBorrar(e instanceof Error ? e.message : "Error al borrar.");

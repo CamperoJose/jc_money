@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import {
   Plus,
   PencilSimple,
@@ -39,6 +40,7 @@ import type { Account, AssetUI } from "@/lib/types";
 
 export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; cuentas: Account[] }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<AssetUI | null>(null);
   const [borrar, setBorrar] = useState<AssetUI | null>(null);
@@ -67,6 +69,7 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
         throw new Error(j.error ?? `Error ${res.status}`);
       }
       setBorrar(null);
+      avisos.exito("Activo borrado");
       router.refresh();
     } catch (e) {
       setErrorBorrar(e instanceof Error ? e.message : "Error al borrar.");

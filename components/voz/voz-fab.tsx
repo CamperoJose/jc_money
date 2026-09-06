@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import { Microphone, Stop, X, Warning, CircleNotch, CheckCircle } from "@phosphor-icons/react";
 
 type Estado = "idle" | "grabando" | "enviando" | "ok" | "error";
@@ -25,6 +26,7 @@ function elegirMime(): string {
  */
 export function VozFab() {
   const router = useRouter();
+  const avisos = useAvisos();
   const [estado, setEstado] = useState<Estado>("idle");
   const [segundos, setSegundos] = useState(0);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -154,6 +156,10 @@ export function VozFab() {
         setEstado("idle");
         setMensaje(null);
       }, 6000);
+      avisos.exito(
+        "Registro recibido",
+        "Se está procesando; te llega un correo con el detalle."
+      );
       router.refresh();
     } catch (e) {
       setEstado("error");

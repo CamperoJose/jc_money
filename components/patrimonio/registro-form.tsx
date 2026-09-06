@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import { FloppyDisk, Warning, ArrowsClockwise } from "@phosphor-icons/react";
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export function RegistroForm({
   onOpenChange: (v: boolean) => void;
 }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const editando = !!registro;
 
   const [fecha, setFecha] = useState(registro?.snapshot_date ?? hoyISO());
@@ -141,6 +143,7 @@ export function RegistroForm({
       clearTimeout(timeout);
       setEnviando(false);
       onOpenChange(false);
+      avisos.exito(editando ? "Foto actualizada" : "Foto de patrimonio registrada");
       router.refresh();
     } catch (e) {
       clearTimeout(timeout);

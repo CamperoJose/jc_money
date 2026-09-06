@@ -262,6 +262,12 @@
   }
 }
 
+/* Barra de tiempo restante de los avisos. */
+@keyframes encoger {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
 @layer utilities {
   /* ------------------------------------------------------------------
      Sistema de superficies

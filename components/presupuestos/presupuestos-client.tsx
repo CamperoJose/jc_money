@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAvisos } from "@/components/ui/toast";
 import { Target, Warning, TrendUp, Wallet, Copy } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ function mesAnterior(period: string): string {
 
 export function PresupuestosClient({ resumen }: { resumen: ResumenPresupuestos }) {
   const router = useRouter();
+  const avisos = useAvisos();
   const { period, filas, totalPlaneado, totalGastado, totalRestante, pctGlobal, categoriasExcedidas, categoriasEnAlerta, conPresupuesto } = resumen;
   const [error, setError] = useState<string | null>(null);
   const [copiando, setCopiando] = useState(false);
@@ -42,6 +44,7 @@ export function PresupuestosClient({ resumen }: { resumen: ResumenPresupuestos }
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `Error ${res.status}`);
       }
+      avisos.exito("Presupuesto guardado");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar.");
@@ -61,6 +64,7 @@ export function PresupuestosClient({ resumen }: { resumen: ResumenPresupuestos }
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `Error ${res.status}`);
       }
+      avisos.exito("Presupuestos copiados del mes anterior");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al copiar.");
