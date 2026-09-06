@@ -41,10 +41,9 @@ Módulos desplegados:
 crea el deployment pero no lo publica.
 
 Lo que **NO** existe y **no se hará** (decisiones del usuario, ver `claude/decisiones.md`):
-deudas propias / pasivos (E2) y respaldos a Google Drive (E3).
+deudas propias / pasivos (E2), respaldos a Google Drive (E3) y tests automatizados (E6).
 
-Pendiente real, por prioridad: **tests automatizados**, recordatorios por correo, `api/estado` y
-alertas de presupuesto.
+Pendiente real, por prioridad: recordatorios por correo, `api/estado` y alertas de presupuesto.
 
 ## 3. Stack (decidido, no reabrir sin pedido explícito del usuario)
 
@@ -97,6 +96,8 @@ luego Inversiones DPF, y al final Deudas. Ver `claude/roadmap.md`.
   `lib/charts.ts`, que necesita tonos distinguibles entre sí para series múltiples.
 - **`npm run lint` debe quedar limpio.** Hay ESLint configurado (`eslint.config.mjs`) y corre dentro
   de `npm run build`. `any` es error, no aviso.
+- **Este proyecto NO lleva tests automatizados** (decisión E6): no agregues Vitest/Jest/Playwright ni
+  los propongas. La red de seguridad es `lint` + `tsc --noEmit` + `build` verde + revisar el diff.
 - **Texturas y vidrio**: `app/globals.css` define un sistema de superficies (`.superficie`,
   `.trama-*`, `.resplandor`, `.canal`, `.relleno-brillo`, `.vidrio*`). Reúsalo en vez de inventar
   degradados sueltos. El vidrio solo va donde algo se desplaza por detrás.

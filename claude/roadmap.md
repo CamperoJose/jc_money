@@ -80,8 +80,8 @@ Detalle: `claude/todos/fase-2-automatizacion.md`.
 
 - [x] 🤖 Simulador de proyección de laddering (recalcula al vuelo).
 - [x] 🤖 Ruta de ingesta lista para el Atajo de iOS (token Bearer de larga duración).
-- [ ] 🤖 **Tests automatizados (Vitest)** — la prioridad actual. Ver `claude/estado.md`.
 - [ ] 🤖 Documentación de la API.
+- ~~Tests automatizados~~ — **descartado por el usuario** (decisión E6).
 
 Detalle: `claude/todos/fase-3-avanzado.md`.
 

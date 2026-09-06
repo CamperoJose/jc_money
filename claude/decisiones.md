@@ -117,3 +117,20 @@ No había configuración, así que `next build` no linteaba nada. Se agrega `esl
 `next/core-web-vitals` + `next/typescript`. `@typescript-eslint/no-explicit-any` es **error**, no
 aviso: en una app de dinero, perder el tipo de un monto o de una fila de Supabase es exactamente
 donde aparecen los bugs caros. Todo desarrollo futuro debe dejar `npm run lint` limpio.
+
+### E6. No se escriben tests automatizados
+
+Se propuso montar Vitest (tras varios bugs que un test habría atrapado) y el usuario lo descartó:
+**este proyecto no lleva tests**. No agregues Vitest, Jest, Playwright ni suites de pruebas, y no
+vuelvas a proponerlo salvo que el usuario lo pida.
+
+La red de seguridad que **sí** existe y hay que mantener limpia en cada cambio:
+- `npm run lint` (ESLint, ver E5) y `npx tsc --noEmit`.
+- `npm run build` verde.
+- Verificación manual de lo que se tocó. Para cambios visuales, sirve renderizar el CSS compilado con
+  el navegador del entorno (Playwright está disponible como herramienta de verificación puntual;
+  eso **no** es "escribir tests").
+
+Consecuencia asumida: las regresiones se detectan en producción. Por eso pesa más revisar el propio
+diff con cuidado antes de pushear, y por eso importan las invariantes del dominio escritas en el
+código (por ejemplo `total = Σ(saldos)` en el job) en vez de en una suite.

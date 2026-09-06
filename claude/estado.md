@@ -61,7 +61,8 @@
 - ✅ Consistencia de datos saneada (fotos auto históricas regeneradas).
 - ❌ **Deudas que yo debo: NO se hará** — el usuario no tiene pasivos (decisión E2).
 - ❌ **Respaldos a Google Drive: NO se harán** (decisión E3).
-- ⏳ Sigue pendiente: tests automatizados, recordatorios, `api/estado`, alertas de presupuesto.
+- ❌ **Tests automatizados: NO se harán** (decisión E6).
+- ⏳ Sigue pendiente: recordatorios, `api/estado`, alertas de presupuesto.
 
 ---
 
@@ -604,18 +605,16 @@ Inversiones DPF (panel + registros + simulador), Activos, Deudas por cobrar, Tip
 Tendencias y Asistente IA (voz + atajo de iOS). Migraciones `0001`–`0014` aplicadas.
 
 Lo que queda, por prioridad:
-1. **Tests automatizados (Vitest).** Es lo de mayor retorno: los tres últimos bugs eran detectables
-   automáticamente. Mínimo: `lib/patrimonio.ts`, `lib/jobs/patrimonio-diario.ts` (con Supabase
-   simulado) y `lib/tendencias.ts`, con la invariante `total = Σ(saldos)` como test permanente.
-2. **Recordatorios** (`api/recordatorios`, tabla `reminders`): vencimiento de DPF y deudas por
+1. **Recordatorios** (`api/recordatorios`, tabla `reminders`): vencimiento de DPF y deudas por
    cobrar. La ruta está reservada en el middleware pero nunca se escribió; el SMTP ya funciona.
-3. **`api/estado`**: endpoint de salud (job y DB responden) — también reservado y vacío.
-4. **Alertas de presupuesto** por correo al superar el umbral.
-5. **Registros de Patrimonio con primitivos Tremor** (única pantalla con tabla propia; es la matriz
+2. **`api/estado`**: endpoint de salud (job y DB responden) — también reservado y vacío.
+3. **Alertas de presupuesto** por correo al superar el umbral.
+4. **Registros de Patrimonio con primitivos Tremor** (única pantalla con tabla propia; es la matriz
    estilo Excel, hay que hacerla con cuidado).
-6. Revisión de accesibilidad (contraste y foco visible) tras el cambio de paleta.
+5. Revisión de accesibilidad (contraste y foco visible) tras el cambio de paleta.
 
-**Fuera de alcance por decisión del usuario:** deudas propias (E2) y respaldos a Drive (E3).
+**Fuera de alcance por decisión del usuario:** deudas propias (E2), respaldos a Drive (E3) y
+**tests automatizados (E6)**.
 
 ### Notas para el usuario (operación)
 - El job de patrimonio corre solo a las 00:30 (Bolivia). Para probar a mano: GitHub → Actions →
