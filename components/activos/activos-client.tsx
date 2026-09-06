@@ -15,6 +15,8 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useOrden, usePaginacion } from "@/lib/hooks/tabla";
+import { Paginacion } from "@/components/tremor/paginacion";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -32,6 +34,7 @@ import {
   TableRow,
   TableCell,
   TableFoot,
+  TableHeaderCellOrdenable,
 } from "@/components/tremor/table";
 import { ActivoForm } from "@/components/activos/activo-form";
 import { formatBob, formatDate, formatPercent } from "@/lib/format";
@@ -57,6 +60,18 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
     cuentaVendidos,
     rendimientoRealizado,
   } = resumen;
+
+  // Ordenamiento por columna y paginación. Los totales del pie se siguen
+  // calculando sobre la lista completa, no sobre la página visible.
+  const { ordenadas, orden, ordenarPor } = useOrden(activos, {
+    activo: (a) => a.name,
+    adquirido: (a) => a.acquired_date ?? null,
+    costo: (a) => a.acquisition_cost,
+    valor: (a) => (a.realizado ? (a.sold_price ?? 0) : a.valorActual),
+    resultado: (a) => a.resultado,
+    estado: (a) => (a.realizado ? "vendido" : "activo"),
+  });
+  const paginacion = usePaginacion(ordenadas, 50);
 
   async function confirmarBorrar() {
     if (!borrar) return;
@@ -111,21 +126,21 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
         <>
           {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <TableRoot>
+            <TableRoot altoMaximo="calc(100dvh - 24rem)" aria-label="Activos">
               <Table>
                 <TableHead>
                   <TableRow className="hover:bg-transparent">
-                    <TableHeaderCell>Activo</TableHeaderCell>
-                    <TableHeaderCell>Adquirido</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Costo</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Valor / Venta</TableHeaderCell>
-                    <TableHeaderCell className="min-w-[170px]">Resultado</TableHeaderCell>
-                    <TableHeaderCell>Estado</TableHeaderCell>
+                    <TableHeaderCellOrdenable campo="activo" orden={orden} onOrdenar={ordenarPor}>Activo</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="adquirido" orden={orden} onOrdenar={ordenarPor}>Adquirido</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="costo" orden={orden} onOrdenar={ordenarPor} className="text-right">Costo</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="valor" orden={orden} onOrdenar={ordenarPor} className="text-right">Valor / Venta</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="resultado" orden={orden} onOrdenar={ordenarPor} className="min-w-[170px]">Resultado</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="estado" orden={orden} onOrdenar={ordenarPor}>Estado</TableHeaderCellOrdenable>
                     <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {activos.map((a) => {
+                  {paginacion.pagina.map((a) => {
                     const cuentaVenta = cuentas.find((c) => c.id === a.sold_account_id);
                     // Magnitud relativa del resultado para la barra (cap a ±50%).
                     const mag = a.resultadoPct != null ? Math.min(1, Math.abs(a.resultadoPct) / 0.5) : 0;
@@ -233,11 +248,12 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
                 </TableFoot>
               </Table>
             </TableRoot>
+            <Paginacion {...paginacion} etiqueta="activos" />
           </Card>
 
           {/* Tarjetas (móvil) */}
           <div className="grid gap-2 lg:hidden">
-            {activos.map((a) => {
+            {paginacion.pagina.map((a) => {
               const cuentaVenta = cuentas.find((c) => c.id === a.sold_account_id);
               const mag = a.resultadoPct != null ? Math.min(1, Math.abs(a.resultadoPct) / 0.5) : 0;
               const positivo = a.resultado >= 0;
@@ -308,6 +324,7 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
                 </Card>
               );
             })}
+            <Paginacion {...paginacion} etiqueta="activos" />
           </div>
         </>
       )}

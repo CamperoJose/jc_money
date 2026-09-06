@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAvisos } from "@/components/ui/toast";
 import { useFiltrosUrl } from "@/lib/hooks/estado-url";
+import { useOrden, usePaginacion } from "@/lib/hooks/tabla";
+import { Paginacion } from "@/components/tremor/paginacion";
 import {
   Plus,
   PencilSimple,
@@ -38,6 +40,7 @@ import {
   TableRow,
   TableCell,
   TableFoot,
+  TableHeaderCellOrdenable,
 } from "@/components/tremor/table";
 import { GastoForm } from "@/components/gastos/gasto-form";
 import { formatBob, formatDateTime, formatNumber } from "@/lib/format";
@@ -130,6 +133,18 @@ export function GastosClient({
     }
     return { totalGastos: g, totalIngresos: i, neto: i - g, maxBob: max };
   }, [filtradas]);
+
+  // Ordenamiento por columna y paginación. El pie de tabla y los totales siguen
+  // calculándose sobre TODAS las filtradas, no solo sobre la página visible.
+  const { ordenadas, orden, ordenarPor } = useOrden(filtradas, {
+    fecha: (t) => t.occurred_at,
+    detalle: (t) => t.description ?? "",
+    categoria: (t) => t.category?.name ?? "",
+    cuenta: (t) => t.account?.name ?? "",
+    origen: (t) => t.source,
+    monto: (t) => (t.type === "gasto" ? -t.amount_bob : t.amount_bob),
+  });
+  const paginacion = usePaginacion(ordenadas, 50);
 
   // Total por categoría dentro del filtro, para mostrar cuánto pesa cada
   // categoría en la fila (idioma de la plantilla: dato + contexto debajo).
@@ -256,22 +271,22 @@ export function GastosClient({
 
           {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <TableRoot>
+            <TableRoot altoMaximo="calc(100dvh - 22rem)" aria-label="Movimientos">
               <Table>
                 <TableHead>
                   <TableRow className="hover:bg-transparent">
-                    <TableHeaderCell>Fecha y hora</TableHeaderCell>
-                    <TableHeaderCell>Detalle</TableHeaderCell>
-                    <TableHeaderCell>Categoría</TableHeaderCell>
-                    <TableHeaderCell>Cuenta</TableHeaderCell>
-                    <TableHeaderCell>Origen</TableHeaderCell>
+                    <TableHeaderCellOrdenable campo="fecha" orden={orden} onOrdenar={ordenarPor}>Fecha y hora</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="detalle" orden={orden} onOrdenar={ordenarPor}>Detalle</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="categoria" orden={orden} onOrdenar={ordenarPor}>Categoría</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="cuenta" orden={orden} onOrdenar={ordenarPor}>Cuenta</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="origen" orden={orden} onOrdenar={ordenarPor}>Origen</TableHeaderCellOrdenable>
                     <TableHeaderCell className="min-w-[150px]">Peso en el filtro</TableHeaderCell>
-                    <TableHeaderCell className="min-w-[150px] text-right">Monto</TableHeaderCell>
+                    <TableHeaderCellOrdenable campo="monto" orden={orden} onOrdenar={ordenarPor} className="min-w-[150px] text-right">Monto</TableHeaderCellOrdenable>
                     <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtradas.map((t) => {
+                  {paginacion.pagina.map((t) => {
                     const peso = maxBob > 0 ? t.amount_bob / maxBob : 0;
                     return (
                       <TableRow key={t.id}>
@@ -415,6 +430,7 @@ export function GastosClient({
                 </TableFoot>
               </Table>
             </TableRoot>
+            <Paginacion {...paginacion} etiqueta="movimientos" />
           </Card>
 
           {/* Tarjetas (móvil): misma información que la tabla de escritorio. */}
@@ -443,7 +459,7 @@ export function GastosClient({
               </CardContent>
             </Card>
 
-            {filtradas.map((t) => {
+            {paginacion.pagina.map((t) => {
               const peso = maxBob > 0 ? t.amount_bob / maxBob : 0;
               return (
                 <Card key={t.id} className="overflow-hidden">
@@ -506,6 +522,7 @@ export function GastosClient({
                 </Card>
               );
             })}
+            <Paginacion {...paginacion} etiqueta="movimientos" />
           </div>
         </>
       )}

@@ -17,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
+import { useOrden, usePaginacion } from "@/lib/hooks/tabla";
+import { Paginacion } from "@/components/tremor/paginacion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +39,7 @@ import {
   TableRow,
   TableCell,
   TableFoot,
+  TableHeaderCellOrdenable,
 } from "@/components/tremor/table";
 import { DeudaForm } from "@/components/deudas/deuda-form";
 import { formatBob, formatDate, formatBobCompact } from "@/lib/format";
@@ -55,6 +58,19 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
   const [errorBorrar, setErrorBorrar] = useState<string | null>(null);
 
   const { deudas, totalPorCobrar, totalCobrado, cuentaPendientes, cuentaVencidas, porCobrarVencido, porContraparte } = resumen;
+
+  // Ordenamiento por columna y paginación. Los totales del pie se siguen
+  // calculando sobre la lista completa, no sobre la página visible.
+  const { ordenadas, orden, ordenarPor } = useOrden(deudas, {
+    deudor: (d) => d.counterparty ?? "",
+    prestado: (d) => d.debt_date ?? "",
+    vencimiento: (d) => d.due_date ?? null,
+    monto: (d) => d.amount,
+    avance: (d) => (d.amount > 0 ? d.paid_amount / d.amount : 0),
+    porCobrar: (d) => d.outstanding,
+    estado: (d) => d.status,
+  });
+  const paginacion = usePaginacion(ordenadas, 50);
 
   async function confirmarBorrar() {
     if (!borrar) return;
@@ -135,22 +151,22 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
         <>
           {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <TableRoot>
+            <TableRoot altoMaximo="calc(100dvh - 24rem)" aria-label="Deudas por cobrar">
               <Table>
                 <TableHead>
                   <TableRow className="hover:bg-transparent">
-                    <TableHeaderCell>Deudor / motivo</TableHeaderCell>
-                    <TableHeaderCell>Prestado</TableHeaderCell>
-                    <TableHeaderCell>Vencimiento</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Monto</TableHeaderCell>
-                    <TableHeaderCell className="min-w-[190px]">Avance de cobro</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Por cobrar</TableHeaderCell>
-                    <TableHeaderCell>Estado</TableHeaderCell>
+                    <TableHeaderCellOrdenable campo="deudor" orden={orden} onOrdenar={ordenarPor}>Deudor / motivo</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="prestado" orden={orden} onOrdenar={ordenarPor}>Prestado</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="vencimiento" orden={orden} onOrdenar={ordenarPor}>Vencimiento</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="monto" orden={orden} onOrdenar={ordenarPor} className="text-right">Monto</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="avance" orden={orden} onOrdenar={ordenarPor} className="min-w-[190px]">Avance de cobro</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="porCobrar" orden={orden} onOrdenar={ordenarPor} className="text-right">Por cobrar</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="estado" orden={orden} onOrdenar={ordenarPor}>Estado</TableHeaderCellOrdenable>
                     <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {deudas.map((d) => {
+                  {paginacion.pagina.map((d) => {
                     const pct = d.amount > 0 ? d.paid_amount / d.amount : 0;
                     const cuentaCobro = cuentas.find((c) => c.id === d.paid_account_id);
                     return (
@@ -262,6 +278,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                 </TableFoot>
               </Table>
             </TableRoot>
+            <Paginacion {...paginacion} etiqueta="deudas" />
           </Card>
 
           {/* Tarjetas (móvil) */}
@@ -286,7 +303,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
               </CardContent>
             </Card>
 
-            {deudas.map((d) => {
+            {paginacion.pagina.map((d) => {
               const pct = d.amount > 0 ? d.paid_amount / d.amount : 0;
               const cuentaCobro = cuentas.find((c) => c.id === d.paid_account_id);
               return (
@@ -345,6 +362,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                 </Card>
               );
             })}
+            <Paginacion {...paginacion} etiqueta="deudas" />
           </div>
         </>
       )}

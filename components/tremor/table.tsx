@@ -3,12 +3,18 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/** Contenedor con scroll horizontal (evita desbordes en móvil). */
+/**
+ * Contenedor con scroll horizontal (evita desbordes en móvil).
+ * Con `altoMaximo` el scroll también es vertical, que es lo que permite que la
+ * cabecera quede fija: `sticky` se ancla al contenedor con scroll, no a la
+ * página, así que sin altura máxima no tendría efecto.
+ */
 export function TableRoot({
   className,
   children,
+  altoMaximo,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: React.HTMLAttributes<HTMLDivElement> & { altoMaximo?: string }) {
   // `role="region"` sin nombre accesible es ruido para un lector de pantalla:
   // solo se declara región si quien la usa le puso etiqueta.
   const tieneNombre = Boolean(props["aria-label"] || props["aria-labelledby"]);
@@ -17,7 +23,8 @@ export function TableRoot({
     // poder desplazarse con el teclado, si no el contenido cortado es
     // inalcanzable sin mouse.
     <div
-      className={cn("w-full overflow-x-auto", className)}
+      className={cn("w-full overflow-x-auto", altoMaximo && "overflow-y-auto", className)}
+      style={altoMaximo ? { maxHeight: altoMaximo } : undefined}
       tabIndex={0}
       role={tieneNombre ? "region" : undefined}
       {...props}
@@ -41,10 +48,10 @@ export function TableHead({
   return (
     <thead
       className={cn(
-        // Degradado en la cabecera: la separa del cuerpo sin necesitar un borde
-        // grueso. Sin vidrio: la tabla no desplaza nada por detrás, así que el
-        // desenfoque solo costaría rendimiento.
-        "bg-gradient-to-b from-muted to-muted/30 dark:from-white/[0.06] dark:to-transparent",
+        // Cabecera fija: al desplazar filas largas los títulos de columna
+        // siguen visibles. Fondo opaco (no degradado transparente) porque las
+        // filas pasan justo por detrás.
+        "sticky top-0 z-10 bg-muted dark:bg-[oklch(0.25_0.025_264.5)]",
         className
       )}
       {...props}
@@ -67,6 +74,53 @@ export function TableHeaderCell({
       )}
       {...props}
     />
+  );
+}
+
+/**
+ * Cabecera que ordena al hacer clic. Es un `<button>` dentro del `<th>` para que
+ * funcione con teclado, y declara `aria-sort` para que un lector de pantalla
+ * anuncie por qué columna y en qué sentido está ordenada la tabla.
+ */
+export function TableHeaderCellOrdenable({
+  campo,
+  orden,
+  onOrdenar,
+  className,
+  children,
+  ...props
+}: React.ThHTMLAttributes<HTMLTableCellElement> & {
+  campo: string;
+  orden: { campo: string; asc: boolean } | null;
+  onOrdenar: (campo: string) => void;
+}) {
+  const activo = orden?.campo === campo;
+  const alineadoDerecha = /text-right/.test(className ?? "");
+  return (
+    <th
+      scope="col"
+      aria-sort={activo ? (orden!.asc ? "ascending" : "descending") : "none"}
+      className={cn(
+        "whitespace-nowrap border-b border-border px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+        className
+      )}
+      {...props}
+    >
+      <button
+        type="button"
+        onClick={() => onOrdenar(campo)}
+        className={cn(
+          "inline-flex w-full items-center gap-1 rounded transition-colors hover:text-foreground",
+          activo && "text-foreground",
+          alineadoDerecha && "justify-end"
+        )}
+      >
+        {children}
+        <span aria-hidden className={cn("text-[10px]", !activo && "opacity-30")}>
+          {activo ? (orden!.asc ? "▲" : "▼") : "▼"}
+        </span>
+      </button>
+    </th>
   );
 }
 

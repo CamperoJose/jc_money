@@ -16,6 +16,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
+import { useOrden, usePaginacion } from "@/lib/hooks/tabla";
+import { Paginacion } from "@/components/tremor/paginacion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -35,6 +37,7 @@ import {
   TableRow,
   TableCell,
   TableFoot,
+  TableHeaderCellOrdenable,
 } from "@/components/tremor/table";
 import { DpfForm } from "@/components/dpf/dpf-form";
 import { etiquetaLiberacion } from "@/components/dpf/dpf-dashboard";
@@ -84,6 +87,20 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
     setEditando(d);
     setFormOpen(true);
   }
+
+  // Ordenamiento por columna y paginación. Los totales del pie se siguen
+  // calculando sobre la lista completa, no sobre la página visible.
+  const { ordenadas, orden, ordenarPor } = useOrden(filtradas, {
+    entidad: (d) => d.pizarra ?? "",
+    plazo: (d) => d.start_date,
+    avance: (d) => d.progreso,
+    capital: (d) => d.principal,
+    tasa: (d) => d.annual_rate,
+    interes: (d) => d.interesLiquido,
+    vencimiento: (d) => d.montoAlVencimiento,
+    estado: (d) => d.liberacion,
+  });
+  const paginacion = usePaginacion(ordenadas, 50);
 
   async function confirmarBorrar() {
     if (!borrar) return;
@@ -170,23 +187,23 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
 
           {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
           <Card className="hidden overflow-hidden lg:block">
-            <TableRoot>
+            <TableRoot altoMaximo="calc(100dvh - 24rem)" aria-label="Registros de DPF">
               <Table>
                 <TableHead>
                   <TableRow className="hover:bg-transparent">
-                    <TableHeaderCell>Entidad</TableHeaderCell>
-                    <TableHeaderCell>Plazo</TableHeaderCell>
-                    <TableHeaderCell className="min-w-[190px]">Avance</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Capital</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Tasa</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Interés líquido</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Al vencimiento</TableHeaderCell>
-                    <TableHeaderCell>Estado</TableHeaderCell>
+                    <TableHeaderCellOrdenable campo="entidad" orden={orden} onOrdenar={ordenarPor}>Entidad</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="plazo" orden={orden} onOrdenar={ordenarPor}>Plazo</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="avance" orden={orden} onOrdenar={ordenarPor} className="min-w-[190px]">Avance</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="capital" orden={orden} onOrdenar={ordenarPor} className="text-right">Capital</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="tasa" orden={orden} onOrdenar={ordenarPor} className="text-right">Tasa</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="interes" orden={orden} onOrdenar={ordenarPor} className="text-right">Interés líquido</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="vencimiento" orden={orden} onOrdenar={ordenarPor} className="text-right">Al vencimiento</TableHeaderCellOrdenable>
+                    <TableHeaderCellOrdenable campo="estado" orden={orden} onOrdenar={ordenarPor}>Estado</TableHeaderCellOrdenable>
                     <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtradas.map((d) => {
+                  {paginacion.pagina.map((d) => {
                     const et = etiquetaLiberacion(d);
                     const pct = Math.round(Math.min(1, Math.max(0, d.progreso)) * 100);
                     const vencido = d.liberacion === "vencido";
@@ -321,11 +338,12 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
                 </TableFoot>
               </Table>
             </TableRoot>
+            <Paginacion {...paginacion} etiqueta="DPF" />
           </Card>
 
           {/* Tarjetas (móvil) */}
           <div className="grid gap-2 lg:hidden">
-            {filtradas.map((d) => {
+            {paginacion.pagina.map((d) => {
               const et = etiquetaLiberacion(d);
               return (
                 <Card key={d.id}>
@@ -418,6 +436,7 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
                 </Card>
               );
             })}
+            <Paginacion {...paginacion} etiqueta="DPF" />
           </div>
         </>
       )}
