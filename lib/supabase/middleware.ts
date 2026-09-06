@@ -8,7 +8,7 @@ const NOVENTA_DIAS = 60 * 60 * 24 * 90;
 
 /** Rutas accesibles sin sesión. */
 // /api/voz/ingesta se autentica por su cuenta (token del Shortcut de iOS).
-const PUBLIC_PATHS = ["/login", "/auth", "/api/voz/ingesta"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api/voz/ingesta", "/sin-conexion"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));

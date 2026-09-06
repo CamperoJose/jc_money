@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { RegistrarServiceWorker } from "@/components/pwa/registrar-sw";
 
 // Fuentes autoalojadas por Next: sin petición a fonts.googleapis.com, sin salto
 // de maquetación al cargar y sin depender de un tercero para que la app se vea
@@ -46,7 +47,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-dvh bg-background antialiased">{children}</body>
+      <body className="min-h-dvh bg-background antialiased">
+        {children}
+        <RegistrarServiceWorker />
+      </body>
     </html>
   );
 }
