@@ -50,8 +50,10 @@ export function Dialog({
       }
       if (e.key === "Enter" && onEnviar) {
         const el = document.activeElement as HTMLElement | null;
-        const etiqueta = el?.tagName;
-        const esCampo = etiqueta === "INPUT" || etiqueta === "SELECT";
+        // Solo desde un <input>. En un <select> Enter confirma la opción
+        // elegida, y en un <textarea> es un salto de línea; en un <button>, la
+        // pulsación es del propio botón.
+        const esCampo = el?.tagName === "INPUT";
         if (esCampo && panel.current?.contains(el)) {
           e.preventDefault();
           onEnviar();

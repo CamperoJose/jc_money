@@ -45,7 +45,18 @@ self.addEventListener("fetch", (evento) => {
   // Navegaciones: red primero, y si no hay conexión, página de aviso.
   if (req.mode === "navigate") {
     evento.respondWith(
-      fetch(req).catch(() => caches.match(PAGINA_SIN_CONEXION))
+      fetch(req).catch(async () => {
+        const guardada = await caches.match(PAGINA_SIN_CONEXION);
+        // `respondWith` no admite undefined: si la página de aviso no llegó a
+        // cachearse, se responde igualmente algo legible.
+        return (
+          guardada ??
+          new Response(
+            "<!doctype html><meta charset=utf-8><title>Sin conexión</title><p style=\"font-family:system-ui;padding:2rem\">Sin conexión. Vuelve a intentarlo cuando recuperes la señal.",
+            { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
+          )
+        );
+      })
     );
     return;
   }

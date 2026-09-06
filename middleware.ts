@@ -10,7 +10,10 @@ export const config = {
     /*
      * Todas las rutas excepto assets estáticos y la API con token Bearer
      * (esa se protege por su cuenta).
+     * `sw.js` y `manifest.webmanifest` DEBEN quedar fuera: si el middleware los
+     * redirige a /login, el navegador recibe HTML donde espera un script o un
+     * JSON y el service worker no llega a registrarse.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/voz/ingesta|api/ingesta|api/respaldo|api/recordatorios|api/estado|api/jobs).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/voz/ingesta|api/ingesta|api/respaldo|api/recordatorios|api/estado|api/jobs).*)",
   ],
 };

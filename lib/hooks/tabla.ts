@@ -4,7 +4,7 @@
 //
 // Ninguna tabla se podía ordenar y todas pintaban el 100% de las filas. Con 17
 // fotos y 7 movimientos no molestaba, pero Movimientos crece todos los días.
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export interface Orden {
   campo: string;
@@ -65,6 +65,16 @@ export function usePaginacion<T>(
 } {
   const [indice, setIndice] = useState(0);
   const total = filas.length;
+
+  // Al cambiar el filtro cambia la lista: quedarse en la página 3 de un
+  // resultado nuevo desorienta. Se vuelve a la primera.
+  const totalPrevio = useRef(total);
+  useEffect(() => {
+    if (totalPrevio.current !== total) {
+      totalPrevio.current = total;
+      setIndice(0);
+    }
+  }, [total]);
   const paginas = Math.max(1, Math.ceil(total / porPagina));
   // Si al filtrar quedan menos páginas que la actual, no dejar la vista vacía.
   const actual = Math.min(indice, paginas - 1);

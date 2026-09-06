@@ -299,12 +299,11 @@ export async function ejecutarPatrimonioDiario(
   // al detalle. Recalcular también sana ese desfase hacia adelante.
   const baseTotalBob = calcularTotalBob(balancesBase, rate);
 
-  // Neto del DÍA ENTERO que se procesa (targetDate): TODOS los gastos/ingresos
-  // Neto = TODOS los gastos/ingresos del DÍA ENTERO procesado (targetDate), sin
-  // importar la hora ni la del registro base. En este modelo los gastos son
+  // Neto = TODOS los gastos e ingresos del DÍA ENTERO procesado (targetDate),
+  // sin importar la hora ni la del registro base. En este modelo los gastos son
   // independientes del patrimonio y solo lo impactan aquí (vía el job): el
   // recálculo manual son saldos "en bruto" y el job aplica encima los gastos del
-  // día. Ingresos suman, gastos restan (en BOB, con el T/C de cada txn).
+  // día. Ingresos suman, gastos restan.
   const { data: txns, error: eTx } = await admin
     .from("transactions")
     .select("type, amount, currency, exchange_rate, account_id")

@@ -24,7 +24,8 @@ export function TableRoot({
     // inalcanzable sin mouse.
     <div
       className={cn("w-full overflow-x-auto", altoMaximo && "overflow-y-auto", className)}
-      style={altoMaximo ? { maxHeight: altoMaximo } : undefined}
+      // `max(...)` garantiza un alto usable aunque la ventana sea baja.
+      style={altoMaximo ? { maxHeight: `max(18rem, ${altoMaximo})` } : undefined}
       tabIndex={0}
       role={tieneNombre ? "region" : undefined}
       {...props}

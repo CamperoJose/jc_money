@@ -490,7 +490,7 @@ function CobroDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(v) => !v && !enviando && onClose(false)}>
+    <Dialog open onOpenChange={(v) => !v && !enviando && onClose(false)} onEnviar={enviando ? undefined : confirmar}>
       <DialogHeader>
         <DialogTitle>Recibir cobro</DialogTitle>
         <DialogDescription>
