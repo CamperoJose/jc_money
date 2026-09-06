@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+
+// Fuentes autoalojadas por Next: sin petición a fonts.googleapis.com, sin salto
+// de maquetación al cargar y sin depender de un tercero para que la app se vea
+// bien. Exponen variables CSS que globals.css usa en --font-sans / --font-mono.
+const geistSans = Geist({ subsets: ["latin"], variable: "--fuente-sans", display: "swap" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--fuente-mono", display: "swap" });
 
 export const metadata: Metadata = {
   title: "MyMoney",
@@ -30,18 +37,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
         {/* Aplica el tema ANTES de pintar para evitar el flash (FOUC). */}
         <script
           dangerouslySetInnerHTML={{

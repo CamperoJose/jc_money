@@ -91,8 +91,6 @@ export async function getResumenGastos(
   })
     .format(new Date())
     .slice(0, 7);
-
-  const mesPeriodos = [...new Set(gastos.map(periodoDe))].sort();
   const idxMesAnterior = (() => {
     const [y, m] = hoyPeriodo.split("-").map(Number);
     const d = new Date(Date.UTC(y, m - 2, 1));

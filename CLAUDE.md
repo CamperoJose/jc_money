@@ -20,31 +20,31 @@ salvo que aquí se anote explícitamente una corrección validada (ver `claude/d
 
 ## 2. Estado actual del proyecto
 
-**Fase actual: 2 (Tracking) — Patrimonio y Gastos en producción.** Ver siempre
-[`claude/estado.md`](./claude/estado.md) para el estado vivo y el punto exacto donde retomar.
+**Todo el Tracking está en producción** (`jc-money.vercel.app`, rama por defecto y única: `main`).
+Ver siempre [`claude/estado.md`](./claude/estado.md) para la bitácora y el punto exacto de retome.
 
-Lo que YA existe y está **desplegado en producción** (`jc-money.vercel.app`, rama por defecto
-`main`):
+Módulos desplegados:
 
-- App Next.js 15 (App Router) + Tailwind v4 + tema tweakcn, shadcn/ui, Phosphor.
-- **Auth** Supabase con Google (sin lista blanca por correo; aislamiento por RLS). Sesiones ~90 días.
-- **Patrimonio**: dashboard + matriz estilo Excel (fotos manual/auto, Δ vs. anterior). Datos de
-  CONTEOS migrados (`0003`).
-- **Gastos**: registro (fecha/hora Bolivia GMT-4, cuenta, categoría, monto/moneda), dashboard y
-  lista con filtros. Independiente de cuentas salvo por el job (ver abajo).
-- **Configuración → Parámetros**: ABM de categorías (gasto/ingreso/inversión).
-- **Job diario de patrimonio** (`/api/jobs/patrimonio-diario` + GitHub Actions 00:30 Bolivia):
-  autocalcula la foto de cierre del día = última foto + neto de gastos/ingresos del día.
-- Migraciones `0001`–`0005` aplicadas en Supabase.
+- **Patrimonio**: dashboard, matriz estilo Excel, ABM de fotos, **diff por cuenta** entre fotos,
+  tendencias con proyección y tipo de cambio (BCB).
+- **Gastos**: registro (fecha/hora Bolivia GMT-4, cuenta, categoría, monto/moneda), dashboard,
+  movimientos con filtros y **Presupuestos** con avance mensual.
+- **Inversiones DPF**: panel de monitoreo, registros con ABM y simulador de laddering.
+- **Activos** (bienes vendibles) y **Deudas por cobrar**, ambos con cuenta destino al vender/cobrar.
+- **Asistente IA**: registro por **voz** (Vertex AI, audio directo), asíncrono, con correo-recibo y
+  pestaña de auditoría; e ingesta por token para el **Atajo / botón de acción de iOS**.
+- **Configuración → Parámetros**: ABM de categorías.
+- **Job diario de patrimonio** (`/api/jobs/patrimonio-diario` + GitHub Actions 00:30 Bolivia).
+- Migraciones `0001`–`0014` aplicadas en Supabase.
 
-- **Inversiones DPF**: panel de monitoreo (capital, ganancia líquida, liberaciones próximas,
-  vencidos), registros con ABM y **simulador de laddering**. Independiente de patrimonio/gastos.
-  Migración `0006_datos_dpf.sql` con los DPF reales del Excel (pendiente de aplicar por el usuario).
+⚠️ El despliegue a producción en Vercel es **manual** ("Promote to Production"): un push a `main`
+crea el deployment pero no lo publica.
 
-Lo que **todavía NO** existe (por orden de fases):
+Lo que **NO** existe y **no se hará** (decisiones del usuario, ver `claude/decisiones.md`):
+deudas propias / pasivos (E2) y respaldos a Google Drive (E3).
 
-- Módulo **Deudas**.
-- Fase 2 restante: voz (Gemini), recordatorios/correos, respaldos a Drive.
+Pendiente real, por prioridad: **tests automatizados**, recordatorios por correo, `api/estado` y
+alertas de presupuesto.
 
 ## 3. Stack (decidido, no reabrir sin pedido explícito del usuario)
 
@@ -55,7 +55,7 @@ Lo que **todavía NO** existe (por orden de fases):
 | Base de datos | Supabase (Postgres) + Auth + Storage |
 | Auth | Supabase Auth con Google, restringido al correo del usuario |
 | Diseño | shadcn/ui sobre Tailwind CSS |
-| Tema | **tweakcn** — el usuario exporta el tema; **NO inventar paleta** |
+| Tema | Paleta y tipografía de la plantilla Tremor de `referencia/` (azul oscuro + Geist). **Se cambia editando los tokens de `app/globals.css`, nunca colores en los componentes.** Ver decisión E1. |
 | Iconos | Phosphor Icons (pesos Fill y Duotone) |
 | Grid Excel (PC) | AG Grid Community (MIT) |
 | Dashboards | Tremor o Recharts |
@@ -91,7 +91,17 @@ luego Inversiones DPF, y al final Deudas. Ver `claude/roadmap.md`.
 - **Antes de codear una fase**, lee su archivo de TODOs en `claude/todos/`.
 - **Al terminar un bloque de trabajo**, actualiza `claude/estado.md` y marca los TODOs cerrados.
 - **Commits** en español, claros y descriptivos.
-- **No estilices ninguna pantalla** hasta tener el tema de tweakcn del usuario (spec 17.3.1).
+- **Nunca hardcodees colores** en un componente: usa los tokens del tema (`bg-card`, `text-muted-foreground`,
+  `var(--color-chart-1)`…). Para cambiar el aspecto se editan los tokens en `app/globals.css`, y así
+  el cambio alcanza a toda la app sin tocar clases. La única excepción es `PALETA_CATEGORICA` en
+  `lib/charts.ts`, que necesita tonos distinguibles entre sí para series múltiples.
+- **`npm run lint` debe quedar limpio.** Hay ESLint configurado (`eslint.config.mjs`) y corre dentro
+  de `npm run build`. `any` es error, no aviso.
+- **Texturas y vidrio**: `app/globals.css` define un sistema de superficies (`.superficie`,
+  `.trama-*`, `.resplandor`, `.canal`, `.relleno-brillo`, `.vidrio*`). Reúsalo en vez de inventar
+  degradados sueltos. El vidrio solo va donde algo se desplaza por detrás.
+- **Toda pantalla nueva necesita su versión móvil.** Las tablas viven detrás de `hidden lg:block`;
+  si solo tocas la tabla, desde el celular no se ve nada (pasó en la sesión 19).
 - **Datos sensibles / cuentas externas**: nunca los pongas en el repo. Van en `.env.local` (no versionado)
   y el usuario los gestiona según `cosas_manuales.md`.
 

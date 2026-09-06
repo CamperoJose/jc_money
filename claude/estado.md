@@ -2,7 +2,70 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-03 (sesión 18 — plantilla Tremor: primitivos y tablas enriquecidas)
+## Última actualización: 2026-09-04 (sesión 19 — paleta/tipografía de la plantilla, ejes de tiempo, ESLint)
+
+### Sesión 19 — lo hecho ✅
+
+**Bugs corregidos (los tres eran reales y estaban en producción):**
+- **500 en `/tracking/patrimonio`.** El dashboard es un *server component* y le pasaba
+  `formato={(n) => formatBob(n)}` a `CategoryBar`, que es `"use client"`. React no serializa
+  funciones a través del límite servidor→cliente. `next build` y `tsc` pasaban porque la ruta es
+  dinámica y solo revienta al recibir una petición. `formato` pasó a ser un identificador
+  serializable (`"numero" | "bob" | "usd" | "porcentaje"`).
+- **El job no aplicaba el neto del día a ninguna cuenta.** Restaba `netoDia` solo de `total_bob` y
+  copiaba los saldos de la base intactos: el total bajaba, ninguna cuenta lo reflejaba y
+  `Σ(saldos) ≠ total`. Por eso el diff por cuenta no mostraba los gastos. Ahora cada gasto/ingreso
+  se aplica al saldo de **su** cuenta (en la moneda de esa cuenta; en un pasivo un gasto **sube** el
+  saldo) y **el total se calcula DESDE los saldos**, de modo que la invariante `total = Σ(saldos)`
+  se cumpla por construcción.
+- **Ejes de tiempo categóricos.** Los gráficos usaban `dataKey="fecha"` con texto, que en Recharts
+  reparte todas las muestras a la misma distancia sin importar cuántos días pasaron. Con fotos
+  irregulares la curva era engañosa. Nuevo `lib/charts.ts` con eje numérico `scale="time"`.
+
+**Rediseño visual (plantilla Tremor aplicada de verdad):**
+- **Paleta y tipografía nuevas** — ver decisión E1 en `claude/decisiones.md`. Se abandona el tema
+  verde/crema de tweakcn: ahora escala `gray` de Tailwind sobre blanco, **azul oscuro (~blue-800)**
+  como primario, y modo oscuro con fondo casi negro azulado y tarjetas claramente elevadas.
+  Tipografía **Geist / Geist Mono**, autoalojadas con `next/font/google`.
+- **Sistema de superficies** en `globals.css`: `.superficie` (degradado + filo de luz),
+  `.trama-rejilla` / `.trama-puntos` / `.trama-diagonal` (texturas internas con máscara),
+  `.resplandor`, `.canal` y `.relleno-brillo` (barras con volumen). Se apoyan en variables que
+  cambian solas entre claro y oscuro.
+- **Glassmorphism** (`.vidrio`, `.vidrio-lateral`, `.vidrio-velo`) **solo donde algo se desplaza por
+  detrás**: sidebar, cajón móvil, barra superior, diálogos y el botón flotante de voz. NO en las
+  tarjetas del dashboard: no tienen nada que difuminar y solo costaría scroll en iOS. Incluye
+  `@supports not (backdrop-filter)` → superficie opaca, para no quedar ilegible.
+- **Paridad móvil**: todo el trabajo de tablas vivía detrás de `hidden lg:block`; desde el celular
+  no se veía nada. Las listas de tarjetas (`lg:hidden`) de Gastos, Deudas, Activos y DPF ahora
+  muestran la misma información enriquecida.
+- **Tablas con el idioma de la plantilla**: cada celda es una pila de dos líneas (dato arriba,
+  contexto abajo) y las razones usan `ProgressCircle` con el número dentro.
+- **Widgets que ya no recortan texto**: las grillas de KPI saltaban a 4/6 columnas en `lg`, dejando
+  ~180 px por tarjeta entre 1024 y 1280 px. El salto se movió a `xl`; las cifras usan tamaño fluido
+  con `clamp` y **se parten en dos líneas antes que recortarse**; etiquetas con `line-clamp-2`.
+  Verificado renderizando a 390/768/1024/1280/1536 px y comprobando `scrollWidth` en cada uno.
+
+**Calidad:**
+- **ESLint configurado** (`eslint.config.mjs`, flat config con `next/core-web-vitals` +
+  `next/typescript`). Antes NO había configuración, así que `next build` no linteaba nada.
+  `referencia/`, `scripts/` y `supabase/` quedan excluidos. `@typescript-eslint/no-explicit-any` es
+  **error**: en una app de dinero perder el tipo de un monto es justo donde aparecen los bugs caros.
+  `npm run lint` → limpio, y el lint corre dentro de `npm run build`.
+- **Paleta de gráficos unificada** en `lib/charts.ts` (`PALETA_CATEGORICA`). Estaba duplicada en
+  tres componentes y arrancaba en verde, del tema viejo.
+- `.vercelignore` nuevo: `referencia/`, `claude/`, `docs/` y `scripts/` no se suben al despliegue.
+
+### Estado de los pendientes que traía la lista de mejoras
+- ✅ Desplegado en Vercel; migraciones `0013` y `0014` aplicadas; foto auto del 3-sep regenerada;
+  clave del service account rotada.
+- ✅ Consistencia de datos saneada (fotos auto históricas regeneradas).
+- ❌ **Deudas que yo debo: NO se hará** — el usuario no tiene pasivos (decisión E2).
+- ❌ **Respaldos a Google Drive: NO se harán** (decisión E3).
+- ⏳ Sigue pendiente: tests automatizados, recordatorios, `api/estado`, alertas de presupuesto.
+
+---
+
+## Update previo: 2026-09-03 (sesión 18 — plantilla Tremor: primitivos y tablas enriquecidas)
 
 ### Sesión 18 — lo hecho ✅
 - **Plantilla de referencia** en `referencia/template-overview` (Tremor "template-overview":
@@ -534,12 +597,25 @@ DB password, Google Client ID/Secret, project ref. Falta: `sb_secret_...` (serve
 - Hallazgo clave: la columna `Debts` de CONTEOS se **suma** al patrimonio (activo por cobrar), no
   se resta como pasivo. Discrepa de la spec §7.2 → decisión abierta C1 en `decisiones.md`.
 
-### Punto de retome (próximo paso)
-1. ~~**Inversiones DPF**~~ ✅ hecho en sesión 5 (panel + registros/ABM + simulador). Falta aplicar
-   `0006_datos_dpf.sql` en Supabase para ver los 5 DPF reales.
-2. **Deudas** (grid simple sobre `debts`) — siguiente módulo por roadmap.
-3. Fase 2 restante: voz (Gemini), recordatorios/correos (Nodemailer), respaldos a Drive.
-4. (Opcional DPF) integrar DPF con patrimonio/cuentas cuando el usuario lo pida (hoy independiente).
+### Punto de retome (próximo paso) — vigente al cierre de la sesión 19
+
+Todos los módulos de Tracking están **en producción**: Patrimonio, Gastos, Presupuestos,
+Inversiones DPF (panel + registros + simulador), Activos, Deudas por cobrar, Tipo de cambio,
+Tendencias y Asistente IA (voz + atajo de iOS). Migraciones `0001`–`0014` aplicadas.
+
+Lo que queda, por prioridad:
+1. **Tests automatizados (Vitest).** Es lo de mayor retorno: los tres últimos bugs eran detectables
+   automáticamente. Mínimo: `lib/patrimonio.ts`, `lib/jobs/patrimonio-diario.ts` (con Supabase
+   simulado) y `lib/tendencias.ts`, con la invariante `total = Σ(saldos)` como test permanente.
+2. **Recordatorios** (`api/recordatorios`, tabla `reminders`): vencimiento de DPF y deudas por
+   cobrar. La ruta está reservada en el middleware pero nunca se escribió; el SMTP ya funciona.
+3. **`api/estado`**: endpoint de salud (job y DB responden) — también reservado y vacío.
+4. **Alertas de presupuesto** por correo al superar el umbral.
+5. **Registros de Patrimonio con primitivos Tremor** (única pantalla con tabla propia; es la matriz
+   estilo Excel, hay que hacerla con cuidado).
+6. Revisión de accesibilidad (contraste y foco visible) tras el cambio de paleta.
+
+**Fuera de alcance por decisión del usuario:** deudas propias (E2) y respaldos a Drive (E3).
 
 ### Notas para el usuario (operación)
 - El job de patrimonio corre solo a las 00:30 (Bolivia). Para probar a mano: GitHub → Actions →

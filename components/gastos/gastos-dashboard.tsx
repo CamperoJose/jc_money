@@ -15,14 +15,11 @@ import {
 } from "recharts";
 import { TrendDown, TrendUp, Calendar, ChartBar } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PALETA_CATEGORICA } from "@/lib/charts";
 import { formatBob, formatBobCompact, formatPercent } from "@/lib/format";
 import type { ResumenGastos } from "@/lib/queries/gastos";
 
-const PALETA = [
-  "#16a34a", "#0891b2", "#2563eb", "#7c3aed", "#db2777",
-  "#ea580c", "#ca8a04", "#0d9488", "#4f46e5", "#65a30d",
-  "#e11d48", "#0284c7",
-];
+const PALETA = PALETA_CATEGORICA;
 
 const tooltipStyle = {
   background: "var(--color-popover)",

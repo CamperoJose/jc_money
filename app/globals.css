@@ -43,9 +43,9 @@
   --sidebar-accent-foreground: oklch(0.2100 0.0340 264.6650);
   --sidebar-border: oklch(0.9280 0.0060 264.5310);
   --sidebar-ring: oklch(0.4240 0.1650 264.8000);
-  --font-sans: Geist, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-serif: Geist, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--fuente-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--fuente-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--fuente-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: 0.5rem;
 
   /* --- Sistema de superficies: degradados y texturas internas --- */
@@ -108,9 +108,9 @@
   --sidebar-accent-foreground: oklch(0.9850 0.0020 247.8390);
   --sidebar-border: oklch(0.2850 0.0250 264.5000);
   --sidebar-ring: oklch(0.6000 0.1900 264.0000);
-  --font-sans: Geist, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-serif: Geist, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--fuente-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--fuente-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--fuente-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: 0.5rem;
 
   /* --- Sistema de superficies en oscuro --- */

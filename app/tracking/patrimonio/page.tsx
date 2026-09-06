@@ -29,7 +29,6 @@ import {
   formatBob,
   formatUsd,
   formatBobCompact,
-  formatUsdCompact,
   formatNumber,
   formatDate,
   formatPercent,
@@ -127,7 +126,6 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
     disponibilidadRapida,
     disponibilidadPct,
   } = resumen;
-  const sube = (variacionBob ?? 0) >= 0;
   const subeTotal = (variacionTotalBob ?? 0) >= 0;
 
   const totalMoneda = distribucionMoneda

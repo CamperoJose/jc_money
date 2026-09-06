@@ -39,7 +39,7 @@ Meta: esquema de DB + autenticación funcionando **antes** de tocar la interfaz.
 - [x] 🤖 Scaffold Next.js (App Router) + Tailwind v4 + shadcn/ui + Phosphor.
 - [x] 👤/🤖 Tema de tweakcn exportado y aplicado en `app/globals.css`.
 - [x] 🤖 Login con Google + middleware de lista blanca (solo el correo del usuario).
-- [ ] 👤 Deploy en Vercel (repo importado; falta env vars + rama de producción).
+- [x] 👤 Deploy en Vercel (en producción; la promoción a producción es **manual**).
 
 Detalle: `claude/todos/fase-0-preparacion.md`.
 
@@ -48,31 +48,40 @@ Detalle: `claude/todos/fase-0-preparacion.md`.
 Meta: migrar el Excel y construir Tracking (híbrido: grid en PC, tarjetas/dashboards en celular).
 **Orden: Patrimonio → Gastos → DPF → Deudas.**
 
-- [x] 🤖 Script de migración en Python con **dry-run** (CONTEOS → patrimonio). [ ] 👤 ejecutarlo.
-- [~] 🤖 API + UI **Patrimonio**: lectura (curva BOB/USD, distribución por moneda, tabla) HECHA;
-      falta grid editable AG Grid, alta/edición desde la web, y distribución por cuenta.
-- [ ] 🤖 API + UI **Gastos** (grid con filtros, dashboard categoría/mes, ingreso vs gasto).
-- [ ] 🤖 API + UI **Inversiones DPF** (grid + panel de indicadores).
-- [ ] 🤖 API + UI **Deudas** (grid simple).
-- [ ] (Opcional) `budgets` en UI o pospuesto.
+- [x] 🤖 Script de migración en Python con **dry-run** (CONTEOS → patrimonio). [x] 👤 ejecutado.
+- [x] 🤖 API + UI **Patrimonio**: dashboard, ABM, registros con diff por cuenta, tendencias y
+      tipo de cambio. (Se descartó AG Grid: la matriz propia cubre el caso.)
+- [x] 🤖 API + UI **Gastos** (filtros, dashboard categoría/mes, ingreso vs gasto).
+- [x] 🤖 API + UI **Inversiones DPF** (registros + panel de indicadores + simulador de laddering).
+- [x] 🤖 API + UI **Deudas por cobrar** (incluye "recibir cobro" hacia una cuenta destino).
+- [x] 🤖 API + UI **Activos** (bienes vendibles, con venta hacia una cuenta destino).
+- [x] 🤖 `budgets` en UI (**Presupuestos**, con avance mensual).
+
+> **Fuera de alcance:** deudas propias (pasivos). El usuario no tiene. Ver decisión E2.
 
 Detalle: `claude/todos/fase-1-tracking.md`.
 
 ## Fase 2 — Automatización
 
-- [ ] 🤖 Registro de gasto por **voz** con Gemini Flash (audio → JSON → validación → insert).
-- [ ] 🤖 Recordatorios por correo (vencimiento DPF, deudas) — Nodemailer + SMTP Gmail.
-- [ ] 🤖 Correo de estado periódico (patrimonio, gasto del mes, próximos vencimientos).
-- [ ] 🤖 Scheduler externo (GitHub Actions / cron-job.org) que llama a rutas protegidas por token.
-- [ ] 🤖 Respaldos a Google Drive (SQL + CSV) con service account, versionados por fecha.
+- [x] 🤖 Registro por **voz** con Gemini/Vertex (audio → JSON → validación → insert), asíncrono,
+      con correo-recibo y pestaña de auditoría "Solicitudes por voz".
+- [x] 🤖 Ingesta por token de larga duración para el **Atajo / botón de acción de iOS**.
+- [x] 🤖 Correo de estado periódico (`api/jobs/correos`, Nodemailer + SMTP Gmail).
+- [x] 🤖 Scheduler externo (GitHub Actions) que llama a rutas protegidas por token.
+- [x] 🤖 Job diario de patrimonio (cierre a las 00:30 Bolivia).
+- [ ] 🤖 Recordatorios por correo (vencimiento de DPF, deudas por cobrar) — ruta reservada, sin implementar.
+- [ ] 🤖 `api/estado`: endpoint de salud — ruta reservada, sin implementar.
+- [ ] 🤖 Alertas de presupuesto al superar el umbral.
+- ~~Respaldos a Google Drive~~ — **descartado por el usuario** (decisión E3).
 
 Detalle: `claude/todos/fase-2-automatizacion.md`.
 
 ## Fase 3 — Avanzado
 
-- [ ] 🤖 Simulador de proyección de laddering pulido (recalcula al vuelo).
+- [x] 🤖 Simulador de proyección de laddering (recalcula al vuelo).
+- [x] 🤖 Ruta de ingesta lista para el Atajo de iOS (token Bearer de larga duración).
+- [ ] 🤖 **Tests automatizados (Vitest)** — la prioridad actual. Ver `claude/estado.md`.
 - [ ] 🤖 Documentación de la API.
-- [ ] 🤖 Ruta de ingesta lista para el Atajo de Siri (token Bearer).
 
 Detalle: `claude/todos/fase-3-avanzado.md`.
 

@@ -25,25 +25,11 @@ import {
   propsEjeTiempo,
   formatoFechaTooltip,
   diasEntreTs,
+  PALETA_CATEGORICA,
 } from "@/lib/charts";
 import type { DistribucionCuenta, SerieCuenta } from "@/lib/queries/patrimonio";
 
-// Paleta categórica multi-tono para distinguir cuentas (el tema base solo
-// tiene verdes). Legible en claro y oscuro.
-const PALETA = [
-  "#16a34a", // verde
-  "#0891b2", // cian
-  "#2563eb", // azul
-  "#7c3aed", // violeta
-  "#db2777", // rosa
-  "#ea580c", // naranja
-  "#ca8a04", // ámbar
-  "#0d9488", // teal
-  "#4f46e5", // índigo
-  "#65a30d", // lima
-  "#e11d48", // carmín
-  "#0284c7", // celeste
-];
+const PALETA = PALETA_CATEGORICA;
 
 const tooltipStyle = {
   background: "var(--color-popover)",

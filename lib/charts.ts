@@ -10,6 +10,28 @@ import { BOLIVIA_OFFSET } from "@/lib/format";
 
 const DIA_MS = 86_400_000;
 
+/**
+ * Paleta categórica única para todos los gráficos con varias series (cuentas,
+ * categorías, entidades). Arranca con las mismas cinco familias de la plantilla
+ * —azul, esmeralda, violeta, ámbar, cian— para que el primer color coincida con
+ * el primario del tema, y sigue con tonos extra para listas largas. Todos los
+ * tonos son legibles sobre fondo claro y oscuro.
+ */
+export const PALETA_CATEGORICA = [
+  "#2563eb", // azul (primario)
+  "#059669", // esmeralda
+  "#7c3aed", // violeta
+  "#d97706", // ámbar
+  "#0891b2", // cian
+  "#db2777", // rosa
+  "#4f46e5", // índigo
+  "#0d9488", // teal
+  "#ea580c", // naranja
+  "#65a30d", // lima
+  "#e11d48", // carmín
+  "#0284c7", // celeste
+];
+
 /** Fecha 'YYYY-MM-DD' → epoch ms al mediodía de Bolivia. */
 export function tsDeFecha(fecha: string): number {
   // Mediodía y no medianoche: así ningún desfase de zona horaria mueve el punto

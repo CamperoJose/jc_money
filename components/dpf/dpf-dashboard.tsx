@@ -31,15 +31,13 @@ import {
   Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PALETA_CATEGORICA } from "@/lib/charts";
 import { Badge } from "@/components/ui/badge";
 import { formatBob, formatBobCompact, formatPercent, formatDate } from "@/lib/format";
 import type { ResumenDpf } from "@/lib/dpf";
 import type { DpfDepositUI } from "@/lib/types";
 
-const PALETA = [
-  "#16a34a", "#0891b2", "#2563eb", "#7c3aed", "#db2777",
-  "#ea580c", "#ca8a04", "#0d9488", "#4f46e5", "#65a30d",
-];
+const PALETA = PALETA_CATEGORICA;
 
 const tooltipStyle = {
   background: "var(--color-popover)",
