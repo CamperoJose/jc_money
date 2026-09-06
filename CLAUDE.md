@@ -101,6 +101,14 @@ luego Inversiones DPF, y al final Deudas. Ver `claude/roadmap.md`.
 - **Texturas y vidrio**: `app/globals.css` define un sistema de superficies (`.superficie`,
   `.trama-*`, `.resplandor`, `.canal`, `.relleno-brillo`, `.vidrio*`). Reúsalo en vez de inventar
   degradados sueltos. El vidrio solo va donde algo se desplaza por detrás.
+- **Confirma cada acción con un aviso**: `useAvisos()` de `components/ui/toast.tsx`. Los errores no
+  se cierran solos.
+- **Los filtros van en la URL** (`lib/hooks/estado-url.ts`), no en estado local: así el botón atrás
+  funciona y la vista se puede compartir.
+- **Las tablas nuevas usan los primitivos de `components/tremor/table.tsx`** con `useOrden` y
+  `usePaginacion` de `lib/hooks/tabla.ts`. La cabecera fija necesita `altoMaximo` en `TableRoot`.
+- **Contraste**: cualquier color nuevo de texto debe llegar a 4,5:1 sobre su fondo (3:1 si es un
+  contorno de control). Se mide, no se estima.
 - **Toda pantalla nueva necesita su versión móvil.** Las tablas viven detrás de `hidden lg:block`;
   si solo tocas la tabla, desde el celular no se ve nada (pasó en la sesión 19).
 - **Datos sensibles / cuentas externas**: nunca los pongas en el repo. Van en `.env.local` (no versionado)

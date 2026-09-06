@@ -2,7 +2,55 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-04 (sesión 19 — paleta/tipografía de la plantilla, ejes de tiempo, ESLint)
+## Última actualización: 2026-09-04 (sesión 20 — accesibilidad y pase completo de UX)
+
+### Sesión 20 — lo hecho ✅
+
+**Accesibilidad (contraste medido, no estimado).** Se convirtieron los tokens
+`oklch` a sRGB y además se verificó renderizando en un navegador (Chrome
+devuelve los colores computados en `oklch`, así que hay que pintarlos en un
+`<canvas>` para leer el sRGB real). 13 pares comprobados, 5 fallos corregidos:
+botón destructivo (3,82:1), cifras rojas como texto, **azul como texto en modo
+oscuro (2,99:1 — el peor, y afectaba a las cifras de "por cobrar" y patrimonio)**,
+borde de los campos de formulario (1,47:1, WCAG 1.4.11 pide 3:1) y los tintes
+ámbar/cielo del sidebar. En oscuro los botones primario y destructivo llevan
+**texto oscuro** sobre el color: con un tono claro suficiente para leerse como
+texto, el blanco encima ya no alcanza. Resultado: sin fallos en ambos temas.
+
+También: foco visible en todo lo interactivo (los 14 enlaces del sidebar no lo
+tenían), enlace "saltar al contenido", `prefers-reduced-motion`, objetivos
+táctiles de 44 px, `aria-current` en el enlace activo, `scope="col"` y
+contenedor de tabla alcanzable con teclado, `accessibilityLayer` de Recharts y
+nombres accesibles en el selector de tema.
+
+**Ocho mejoras de UX, una por commit:**
+1. **Sistema de avisos** (`components/ui/toast.tsx`). No existía ninguno: tras
+   guardar o borrar solo se llamaba a `router.refresh()` en 14 sitios y no había
+   señal de si había funcionado. Los errores **no se cierran solos**.
+2. **Formularios**: `inputMode` en los 19 campos numéricos (faltaba en el
+   formulario de patrimonio y el simulador → teclado de letras en el iPhone),
+   foco automático al abrir un diálogo, trampa de foco, restauración del foco al
+   cerrar y **Enter para guardar** (ningún formulario es un `<form>`).
+3. **Filtros en la URL** (`lib/hooks/estado-url.ts`). Ningún componente usaba
+   `useSearchParams`: el botón atrás perdía los filtros y no se podía compartir
+   una vista.
+4. **Tablas**: ordenamiento por columna con `aria-sort`, cabecera fija (requiere
+   altura máxima en el contenedor, si no `sticky` no hace nada) y paginación de
+   50 filas, en escritorio y en móvil. Los totales del pie siguen calculándose
+   sobre la lista completa.
+5. **Gráficos**: selector de rango 3M/6M/1A/Todo, midiendo el corte desde la
+   última muestra y no desde hoy; preferencias de moneda y rango recordadas.
+6. **Límites de error**: 15 `error.tsx` + `global-error` + `not-found`, en
+   español y mostrando el `digest` con el que se encuentra el error en Vercel.
+7. **PWA**: service worker con página `/sin-conexion`. Regla explícita: **nunca
+   se sirve contenido financiero cacheado como si fuera actual**; solo se cachean
+   estáticos, y `/api` y `/auth` jamás.
+8. **Registros de Patrimonio** convertido a los primitivos Tremor: era la última
+   pantalla con tabla propia.
+
+---
+
+## Update previo: 2026-09-04 (sesión 19 — paleta/tipografía de la plantilla, ejes de tiempo, ESLint)
 
 ### Sesión 19 — lo hecho ✅
 
@@ -609,9 +657,8 @@ Lo que queda, por prioridad:
    cobrar. La ruta está reservada en el middleware pero nunca se escribió; el SMTP ya funciona.
 2. **`api/estado`**: endpoint de salud (job y DB responden) — también reservado y vacío.
 3. **Alertas de presupuesto** por correo al superar el umbral.
-4. **Registros de Patrimonio con primitivos Tremor** (única pantalla con tabla propia; es la matriz
-   estilo Excel, hay que hacerla con cuidado).
-5. Revisión de accesibilidad (contraste y foco visible) tras el cambio de paleta.
+4. ~~Registros de Patrimonio con primitivos Tremor~~ — ✅ hecho en la sesión 20.
+5. ~~Revisión de accesibilidad~~ — ✅ hecha en la sesión 20.
 
 **Fuera de alcance por decisión del usuario:** deudas propias (E2), respaldos a Drive (E3) y
 **tests automatizados (E6)**.
