@@ -21,6 +21,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  TableRoot,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/tremor/table";
+import {
   Dialog,
   DialogHeader,
   DialogTitle,
@@ -130,22 +139,25 @@ export function RegistrosClient({
         </Card>
       ) : (
         <Card className="overflow-hidden py-0">
-          <div className="relative w-full overflow-x-auto">
-            <table className="w-full caption-bottom border-separate border-spacing-0 text-sm">
-              <thead>
-                <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:border-b [&>th]:border-border [&>th]:bg-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:text-left [&>th]:font-semibold [&>th]:text-muted-foreground">
-                  <th className="w-8" />
-                  <th>Fecha y hora</th>
-                  <th>Tipo</th>
-                  <th className="hidden text-right md:table-cell">T/C</th>
-                  <th className="text-right">Total BOB</th>
-                  <th className="hidden text-right lg:table-cell">Total USD</th>
-                  <th className="text-right">Δ vs. anterior</th>
-                  <th className="hidden text-center sm:table-cell">Cuentas</th>
-                  <th className="text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
+          {/* Los mismos primitivos que el resto de la app: cabecera fija (que
+              ahora sí funciona, porque el contenedor tiene altura máxima),
+              `scope="col"` y contenedor alcanzable con teclado. */}
+          <TableRoot altoMaximo="calc(100dvh - 20rem)" aria-label="Registros de patrimonio">
+            <Table>
+              <TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHeaderCell className="w-8" />
+                  <TableHeaderCell>Fecha y hora</TableHeaderCell>
+                  <TableHeaderCell>Tipo</TableHeaderCell>
+                  <TableHeaderCell className="hidden text-right md:table-cell">T/C</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Total BOB</TableHeaderCell>
+                  <TableHeaderCell className="hidden text-right lg:table-cell">Total USD</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Δ vs. anterior</TableHeaderCell>
+                  <TableHeaderCell className="hidden text-center sm:table-cell">Cuentas</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Acciones</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {filas.map(({ s, prev, diffBob, diffPct }, idx) => (
                   <FilaSnapshot
                     key={s.id}
@@ -164,9 +176,9 @@ export function RegistrosClient({
                     }}
                   />
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableRoot>
         </Card>
       )}
 
@@ -240,18 +252,14 @@ function FilaSnapshot({
     return vb - va;
   });
 
-  const celda = "border-b border-border/60 px-3 py-2.5";
+  // `TableCell` ya aporta padding, y `TableBody` la línea divisoria: aquí solo
+  // quedan los ajustes propios de cada columna.
+  const celda = "";
 
   return (
     <>
-      <tr
-        className={cn(
-          "transition-colors hover:bg-accent/40",
-          zebra && "bg-muted/30",
-          destacado && "bg-primary/5"
-        )}
-      >
-        <td className={cn(celda, "text-center")}>
+      <TableRow className={cn(zebra && "bg-muted/30", destacado && "bg-primary/5")}>
+        <TableCell className={cn(celda, "text-center")}>
           <button
             onClick={onToggle}
             className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -259,16 +267,16 @@ function FilaSnapshot({
           >
             {abierto ? <CaretDown className="size-4" /> : <CaretRight className="size-4" />}
           </button>
-        </td>
-        <td className={cn(celda, "whitespace-nowrap font-medium")}>
+        </TableCell>
+        <TableCell className={cn(celda, "whitespace-nowrap font-medium")}>
           {formatDateTime(s.snapshot_at)}
           {destacado && (
             <Badge variant="secondary" className="ml-2 align-middle text-[10px]">
               Última
             </Badge>
           )}
-        </td>
-        <td className={celda}>
+        </TableCell>
+        <TableCell className={celda}>
           {esAuto ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               <Robot weight="fill" className="size-3.5" />
@@ -280,21 +288,21 @@ function FilaSnapshot({
               Manual
             </span>
           )}
-        </td>
-        <td className={cn(celda, "hidden text-right tabular-nums text-muted-foreground md:table-cell")}>
+        </TableCell>
+        <TableCell className={cn(celda, "hidden text-right tabular-nums text-muted-foreground md:table-cell")}>
           {formatNumber(s.exchange_rate, 2)}
-        </td>
-        <td className={cn(celda, "text-right font-semibold tabular-nums")}>{formatBob(s.total_bob)}</td>
-        <td className={cn(celda, "hidden text-right tabular-nums text-muted-foreground lg:table-cell")}>
+        </TableCell>
+        <TableCell className={cn(celda, "text-right font-semibold tabular-nums")}>{formatBob(s.total_bob)}</TableCell>
+        <TableCell className={cn(celda, "hidden text-right tabular-nums text-muted-foreground lg:table-cell")}>
           {formatUsd(s.total_usd)}
-        </td>
-        <td className={cn(celda, "text-right")}>
+        </TableCell>
+        <TableCell className={cn(celda, "text-right")}>
           <DiffCelda diffBob={diffBob} diffPct={diffPct} />
-        </td>
-        <td className={cn(celda, "hidden text-center tabular-nums text-muted-foreground sm:table-cell")}>
+        </TableCell>
+        <TableCell className={cn(celda, "hidden text-center tabular-nums text-muted-foreground sm:table-cell")}>
           {s.balances.length}
-        </td>
-        <td className={celda}>
+        </TableCell>
+        <TableCell className={celda}>
           <div className="flex items-center justify-end gap-1">
             {esAuto ? (
               <span
@@ -318,11 +326,11 @@ function FilaSnapshot({
               <Trash className="size-4" />
             </Button>
           </div>
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {abierto && (
-        <tr className="bg-muted/20">
-          <td colSpan={9} className="border-b border-border/60 px-4 py-3">
+        <TableRow className="bg-muted/20 hover:bg-muted/20">
+          <TableCell colSpan={9} className="border-b border-border/60 px-4 py-3">
             {s.note && (
               <div className="mb-2 text-xs italic text-muted-foreground">{s.note}</div>
             )}
@@ -383,8 +391,8 @@ function FilaSnapshot({
                 })}
               </div>
             )}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
