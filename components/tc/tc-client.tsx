@@ -13,6 +13,13 @@ import { CurrencyDollar, TrendUp, TrendDown, Bank, ArrowsClockwise } from "@phos
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Kpi } from "@/components/tremor/kpi-card";
 import { conTs, rangoEnDias, propsEjeTiempo, formatoFechaTooltip } from "@/lib/charts";
+import { usePreferencia } from "@/lib/hooks/preferencia";
+import {
+  SelectorRango,
+  recortarPorRango,
+  IDS_RANGO,
+  type RangoId,
+} from "@/components/tremor/selector-rango";
 import {
   TableRoot,
   Table,
@@ -42,6 +49,7 @@ export function TcClient({
   rates: ExchangeRate[]; // más reciente primero
   config: TcConfig;
 }) {
+  const [rango, setRango] = usePreferencia<RangoId>("tc.rango", "todo", IDS_RANGO as RangoId[]);
   const ultimo = rates[0] ?? null;
   const anterior = rates[1] ?? null;
   const variacion =
@@ -55,7 +63,7 @@ export function TcClient({
     // Los registros de T/C son irregulares: el eje debe ser de tiempo, no
     // categórico, o meses sin registro se ven como un solo paso.
     .map((r) => ({ fecha: r.rate_date, valor: r.valor }));
-  const serieTs = conTs(serie);
+  const serieTs = recortarPorRango(conTs(serie), rango);
   const rangoTc = rangoEnDias(serieTs.map((p) => p.ts));
 
   const min = serie.length ? Math.min(...serie.map((s) => s.valor)) : 0;
@@ -118,8 +126,9 @@ export function TcClient({
           </div>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
               <CardTitle>Evolución del tipo de cambio</CardTitle>
+              <SelectorRango valor={rango} onChange={setRango} />
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>

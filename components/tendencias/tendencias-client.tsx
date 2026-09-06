@@ -22,6 +22,13 @@ import {
   formatoFechaTooltip,
   tsDeFecha,
 } from "@/lib/charts";
+import { usePreferencia } from "@/lib/hooks/preferencia";
+import {
+  SelectorRango,
+  recortarPorRango,
+  IDS_RANGO,
+  type RangoId,
+} from "@/components/tremor/selector-rango";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { formatBob, formatBobCompact, formatPercent, formatDate } from "@/lib/format";
 import type { ResumenTendencias } from "@/lib/tendencias";
@@ -35,6 +42,13 @@ const tooltipStyle = {
 };
 
 export function TendenciasClient({ t }: { t: ResumenTendencias }) {
+  // Antes del early return: las reglas de hooks exigen que se llame siempre.
+  const [rangoElegido, setRangoElegido] = usePreferencia<RangoId>(
+    "tendencias.rango",
+    "todo",
+    IDS_RANGO as RangoId[]
+  );
+
   if (!t.suficienteData) {
     return (
       <div className="space-y-6">
@@ -52,7 +66,12 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
   // Eje de tiempo real: el histórico viene de fotos irregulares y la proyección
   // es mensual, así que en un eje categórico ambos tramos se veían con el mismo
   // paso y la pendiente resultaba engañosa.
-  const data = conTs(t.puntos);
+  // El rango recorta solo el tramo histórico: la proyección se muestra siempre
+  // completa, porque es justo lo que se quiere ver en esta pantalla.
+  const todos = conTs(t.puntos);
+  const historico = todos.filter((p) => p.real != null);
+  const proyectado = todos.filter((p) => p.real == null);
+  const data = [...recortarPorRango(historico, rangoElegido), ...proyectado];
   const rango = rangoEnDias(data.map((p) => p.ts));
   const ultimoRealIdx = t.puntos.reduce((acc, p, i) => (p.real != null ? i : acc), 0);
   const fechaCorte = t.puntos[ultimoRealIdx]?.fecha;
@@ -134,8 +153,9 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
 
       {/* Gráfico proyectado */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
           <CardTitle>Proyección a futuro</CardTitle>
+          <SelectorRango valor={rangoElegido} onChange={setRangoElegido} />
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={320}>

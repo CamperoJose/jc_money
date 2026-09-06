@@ -27,6 +27,13 @@ import {
   diasEntreTs,
   PALETA_CATEGORICA,
 } from "@/lib/charts";
+import { usePreferencia } from "@/lib/hooks/preferencia";
+import {
+  SelectorRango,
+  recortarPorRango,
+  IDS_RANGO,
+  type RangoId,
+} from "@/components/tremor/selector-rango";
 import type { DistribucionCuenta, SerieCuenta } from "@/lib/queries/patrimonio";
 
 const PALETA = PALETA_CATEGORICA;
@@ -48,14 +55,17 @@ interface Punto {
 
 /** Evolución del patrimonio con toggle BOB / USD. */
 export function EvolucionChart({ serie }: { serie: Punto[] }) {
-  const [moneda, setMoneda] = useState<"bob" | "usd">("bob");
+  // La moneda y el rango se recuerdan entre visitas: antes el gráfico volvía a
+  // BOB y al histórico completo en cada carga.
+  const [moneda, setMoneda] = usePreferencia<"bob" | "usd">("grafico.moneda", "bob", ["bob", "usd"]);
+  const [rango, setRango] = usePreferencia<RangoId>("grafico.rango", "todo", IDS_RANGO as RangoId[]);
   const fmt = moneda === "bob" ? formatBob : formatUsd;
 
   // Las fotos son irregulares (a veces meses entre una y otra), así que el eje
   // X es numérico con escala de tiempo: la distancia horizontal representa el
   // tiempo transcurrido de verdad.
-  const datos = useMemo(() => conTs(serie), [serie]);
-  const rango = useMemo(() => rangoEnDias(datos.map((d) => d.ts)), [datos]);
+  const datos = useMemo(() => recortarPorRango(conTs(serie), rango), [serie, rango]);
+  const amplitud = useMemo(() => rangoEnDias(datos.map((d) => d.ts)), [datos]);
 
   if (serie.length === 0) {
     return <Vacio />;
@@ -63,7 +73,8 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
 
   return (
     <div>
-      <div className="mb-3 flex gap-1">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-1">
         {(["bob", "usd"] as const).map((m) => (
           <button
             key={m}
@@ -78,6 +89,8 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
             {m.toUpperCase()}
           </button>
         ))}
+        </div>
+        <SelectorRango valor={rango} onChange={setRango} />
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart accessibilityLayer data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
@@ -89,7 +102,7 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
-            {...propsEjeTiempo(rango)}
+            {...propsEjeTiempo(amplitud)}
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
             stroke="var(--color-border)"
           />
@@ -254,12 +267,17 @@ export function CrecimientoCuentasChart({
     return Number(ult[b.key] ?? 0) - Number(ult[a.key] ?? 0);
   });
   const [ocultas, setOcultas] = useState<Set<string>>(new Set());
+  const [rango, setRango] = usePreferencia<RangoId>("cuentas.rango", "todo", IDS_RANGO as RangoId[]);
 
   const datos = useMemo(
-    () => conTs(puntos as Array<{ fecha: string } & Record<string, number | string | null>>),
-    [puntos]
+    () =>
+      recortarPorRango(
+        conTs(puntos as Array<{ fecha: string } & Record<string, number | string | null>>),
+        rango
+      ),
+    [puntos, rango]
   );
-  const rango = useMemo(() => rangoEnDias(datos.map((d) => d.ts)), [datos]);
+  const amplitud = useMemo(() => rangoEnDias(datos.map((d) => d.ts)), [datos]);
 
   if (puntos.length < 2) {
     return <Vacio texto="Se necesitan al menos dos fotos para ver el crecimiento por cuenta." />;
@@ -269,11 +287,14 @@ export function CrecimientoCuentasChart({
 
   return (
     <div>
+      <div className="mb-3 flex justify-end">
+        <SelectorRango valor={rango} onChange={setRango} />
+      </div>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart accessibilityLayer data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
-            {...propsEjeTiempo(rango)}
+            {...propsEjeTiempo(amplitud)}
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
             stroke="var(--color-border)"
           />
