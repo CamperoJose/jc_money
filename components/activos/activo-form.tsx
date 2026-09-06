@@ -133,7 +133,7 @@ export function ActivoForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} onEnviar={enviando ? undefined : guardar}>
       <DialogHeader>
         <DialogTitle>{editando ? "Editar activo" : "Nuevo activo"}</DialogTitle>
         <DialogDescription>Un bien vendible (vehículo, equipo, etc.). Puede contar en tu patrimonio.</DialogDescription>

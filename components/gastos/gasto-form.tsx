@@ -128,7 +128,7 @@ export function GastoForm({
   const esGasto = tipo === "gasto";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} onEnviar={enviando ? undefined : guardar}>
       <DialogHeader>
         <DialogTitle>{editando ? "Editar movimiento" : "Nuevo movimiento"}</DialogTitle>
         <DialogDescription>
@@ -217,6 +217,7 @@ export function GastoForm({
               type="number"
               step="0.01"
               min="0"
+              inputMode="decimal"
               value={tc}
               onChange={(e) => setTc(e.target.value)}
             />

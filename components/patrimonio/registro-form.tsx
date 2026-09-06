@@ -162,7 +162,7 @@ export function RegistroForm({
   const pasivos = cuentas.filter((c) => c.is_liability);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} onEnviar={enviando ? undefined : guardar}>
       <DialogHeader>
         <DialogTitle>{editando ? "Editar foto de patrimonio" : "Nueva foto de patrimonio"}</DialogTitle>
         <DialogDescription>
@@ -185,6 +185,7 @@ export function RegistroForm({
             <Input
               id="tc"
               type="number"
+              inputMode="decimal"
               step="0.00001"
               min="0"
               placeholder="0.00"
@@ -260,6 +261,7 @@ function CamposCuentas({
             <Input
               id={`m-${c.id}`}
               type="number"
+              inputMode="decimal"
               step="0.01"
               className="w-36"
               placeholder="0.00"

@@ -141,7 +141,7 @@ export function DpfForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} onEnviar={enviando ? undefined : guardar}>
       <DialogHeader>
         <DialogTitle>{editando ? "Editar DPF" : "Nuevo DPF"}</DialogTitle>
         <DialogDescription>

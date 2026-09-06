@@ -102,25 +102,25 @@ export function SimuladorClient() {
           </CardHeader>
           <CardContent className="space-y-3.5">
             <Campo label="Capital inicial (Bs)">
-              <Input type="number" min="0" step="100" value={montoInicial} onChange={(e) => setMontoInicial(e.target.value)} />
+              <Input type="number" inputMode="decimal" min="0" step="100" value={montoInicial} onChange={(e) => setMontoInicial(e.target.value)} />
             </Campo>
             <Campo label="Aporte por periodo (Bs)">
-              <Input type="number" min="0" step="100" value={aportePeriodico} onChange={(e) => setAportePeriodico(e.target.value)} />
+              <Input type="number" inputMode="decimal" min="0" step="100" value={aportePeriodico} onChange={(e) => setAportePeriodico(e.target.value)} />
             </Campo>
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Cada (meses)">
-                <Input type="number" min="1" step="1" value={cadenciaMeses} onChange={(e) => setCadenciaMeses(e.target.value)} />
+                <Input type="number" inputMode="numeric" min="1" step="1" value={cadenciaMeses} onChange={(e) => setCadenciaMeses(e.target.value)} />
               </Campo>
               <Campo label="Plazo (meses)">
-                <Input type="number" min="1" step="1" value={plazoMeses} onChange={(e) => setPlazoMeses(e.target.value)} />
+                <Input type="number" inputMode="numeric" min="1" step="1" value={plazoMeses} onChange={(e) => setPlazoMeses(e.target.value)} />
               </Campo>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Tasa anual (%)">
-                <Input type="number" min="0" step="0.01" value={tasa} onChange={(e) => setTasa(e.target.value)} />
+                <Input type="number" inputMode="decimal" min="0" step="0.01" value={tasa} onChange={(e) => setTasa(e.target.value)} />
               </Campo>
               <Campo label="Nº de aportes">
-                <Input type="number" min="1" max="240" step="1" value={periodos} onChange={(e) => setPeriodos(e.target.value)} />
+                <Input type="number" inputMode="numeric" min="1" max="240" step="1" value={periodos} onChange={(e) => setPeriodos(e.target.value)} />
               </Campo>
             </div>
             <Campo label="Fecha de inicio">

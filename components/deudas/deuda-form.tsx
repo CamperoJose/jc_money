@@ -118,7 +118,7 @@ export function DeudaForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} onEnviar={enviando ? undefined : guardar}>
       <DialogHeader>
         <DialogTitle>{editando ? "Editar deuda" : "Nueva deuda"}</DialogTitle>
         <DialogDescription>Registra un préstamo que te deben. Suma a tu patrimonio (por cobrar).</DialogDescription>
