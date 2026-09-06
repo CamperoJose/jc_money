@@ -449,7 +449,7 @@ export function GastosClient({
                       <div className="flex flex-col items-end gap-2">
                         <MontoCelda t={t} />
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="size-7" onClick={() => editar(t)} aria-label="Editar">
+                          <Button variant="ghost" size="icon" className="toque-comodo size-7" onClick={() => editar(t)} aria-label="Editar">
                             <PencilSimple className="size-4" />
                           </Button>
                           <Button

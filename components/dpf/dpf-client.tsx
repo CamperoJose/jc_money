@@ -382,7 +382,7 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
                               : `faltan ${d.diasRestantes} d`}
                       </span>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="size-7" onClick={() => editar(d)} aria-label="Editar">
+                        <Button variant="ghost" size="icon" className="toque-comodo size-7" onClick={() => editar(d)} aria-label="Editar">
                           <PencilSimple className="size-4" />
                         </Button>
                         <Button

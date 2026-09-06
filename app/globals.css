@@ -24,10 +24,10 @@
   --muted-foreground: oklch(0.5510 0.0270 264.3640); /* gray-500 */
   --accent: oklch(0.9670 0.0030 264.5420);
   --accent-foreground: oklch(0.2100 0.0340 264.6650);
-  --destructive: oklch(0.6370 0.2370 25.3310);     /* red-500 */
+  --destructive: oklch(0.5200 0.2050 27.5000);     /* rojo oscuro: 4.5:1 como texto y con texto blanco encima */
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.9280 0.0060 264.5310);         /* gray-200 */
-  --input: oklch(0.8720 0.0100 258.3380);          /* gray-300 */
+  --input: oklch(0.6300 0.0200 258.0000);          /* 3:1 contra el fondo (WCAG 1.4.11, contorno de control) */
   --ring: oklch(0.4240 0.1650 264.8000);
   /* Serie de gráficos de la plantilla: blue, emerald, violet, amber, cyan. */
   --chart-1: oklch(0.4880 0.2100 264.3760);
@@ -82,18 +82,18 @@
   --card-foreground: oklch(0.9850 0.0020 247.8390);
   --popover: oklch(0.2200 0.0250 264.5000);
   --popover-foreground: oklch(0.9850 0.0020 247.8390);
-  --primary: oklch(0.5100 0.1900 264.5000);        /* azul oscuro, legible sobre el fondo */
-  --primary-foreground: oklch(0.9850 0.0020 247.8390);
+  --primary: oklch(0.6300 0.1850 264.0000);        /* sube lo justo para llegar a 4.5:1 como texto sobre la tarjeta */
+  --primary-foreground: oklch(0.1600 0.0300 264.0000); /* texto oscuro sobre el azul: blanco encima daba 3.45:1 */
   --secondary: oklch(0.2600 0.0270 264.5000);
   --secondary-foreground: oklch(0.9850 0.0020 247.8390);
   --muted: oklch(0.2450 0.0250 264.5000);
   --muted-foreground: oklch(0.7250 0.0250 262.0000);
   --accent: oklch(0.2900 0.0300 264.5000);
   --accent-foreground: oklch(0.9850 0.0020 247.8390);
-  --destructive: oklch(0.6500 0.2200 25.3310);
-  --destructive-foreground: oklch(0.9850 0.0020 247.8390);
+  --destructive: oklch(0.7000 0.1850 25.3310);     /* rojo claro: legible como texto sobre fondo oscuro */
+  --destructive-foreground: oklch(0.1800 0.0300 264.0000); /* texto oscuro encima del rojo claro */
   --border: oklch(0.2850 0.0250 264.5000);
-  --input: oklch(0.3400 0.0280 264.5000);
+  --input: oklch(0.5300 0.0250 264.0000);          /* 3:1 contra el fondo (WCAG 1.4.11) */
   --ring: oklch(0.6000 0.1900 264.0000);
   --chart-1: oklch(0.5800 0.2000 264.0000);
   --chart-2: oklch(0.6960 0.1700 162.4800);
@@ -102,8 +102,8 @@
   --chart-5: oklch(0.7150 0.1430 215.2210);
   --sidebar: oklch(0.1650 0.0250 264.5000);
   --sidebar-foreground: oklch(0.9850 0.0020 247.8390);
-  --sidebar-primary: oklch(0.5100 0.1900 264.5000);
-  --sidebar-primary-foreground: oklch(0.9850 0.0020 247.8390);
+  --sidebar-primary: oklch(0.6300 0.1850 264.0000);
+  --sidebar-primary-foreground: oklch(0.1600 0.0300 264.0000);
   --sidebar-accent: oklch(0.2900 0.0300 264.5000);
   --sidebar-accent-foreground: oklch(0.9850 0.0020 247.8390);
   --sidebar-border: oklch(0.2850 0.0250 264.5000);
@@ -229,6 +229,36 @@
   .overflow-x-auto,
   .overflow-auto {
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* Foco visible para TODO lo interactivo, no solo los botones. Los enlaces del
+     sidebar y las filas navegables no tenían indicador: quien navega con teclado
+     se perdía. `:focus-visible` no molesta al usar el mouse. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible,
+  [tabindex]:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Respeta "reducir movimiento" del sistema: en iOS y macOS es un ajuste real
+     de accesibilidad (mareo, vértigo). Se anulan animaciones y transiciones,
+     pero NO se ocultan estados: todo sigue siendo visible, solo deja de moverse. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -378,6 +408,22 @@
     .vidrio-velo {
       background-color: oklch(0.1450 0.0250 264 / 0.7);
     }
+  }
+
+  /* Amplía el área tocable a 44x44 px (mínimo de Apple y de WCAG 2.5.8) sin
+     cambiar el tamaño visual del botón. Se usa en los iconos de acción de las
+     tarjetas móviles, que dibujan 28 px. */
+  .toque-comodo {
+    position: relative;
+  }
+  .toque-comodo::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
   }
 
   /* Áreas seguras (notch / home indicator) para iPhone en modo standalone. */

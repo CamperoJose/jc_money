@@ -56,7 +56,7 @@ const GROUPS: NavGroup[] = [
     label: "Patrimonio",
     icon: ChartLineUp,
     ready: true,
-    tint: { icon: "text-blue-500", active: "bg-blue-600", hover: "hover:bg-blue-500/10", dot: "bg-blue-500" },
+    tint: { icon: "text-blue-600 dark:text-blue-400", active: "bg-blue-600", hover: "hover:bg-blue-500/10", dot: "bg-blue-500" },
     items: [
       { href: "/tracking/patrimonio", label: "Dashboard", icon: ChartPieSlice },
       { href: "/tracking/patrimonio/tendencias", label: "Tendencias", icon: ChartLineUp },
@@ -68,7 +68,7 @@ const GROUPS: NavGroup[] = [
     label: "Gastos",
     icon: Wallet,
     ready: true,
-    tint: { icon: "text-rose-500", active: "bg-rose-600", hover: "hover:bg-rose-500/10", dot: "bg-rose-500" },
+    tint: { icon: "text-rose-600 dark:text-rose-400", active: "bg-rose-600", hover: "hover:bg-rose-500/10", dot: "bg-rose-500" },
     items: [
       { href: "/tracking/gastos", label: "Dashboard", icon: ChartPieSlice },
       { href: "/tracking/gastos/registros", label: "Movimientos", icon: Receipt },
@@ -79,7 +79,7 @@ const GROUPS: NavGroup[] = [
     label: "Inversiones",
     icon: Bank,
     ready: true,
-    tint: { icon: "text-violet-500", active: "bg-violet-600", hover: "hover:bg-violet-500/10", dot: "bg-violet-500" },
+    tint: { icon: "text-violet-600 dark:text-violet-400", active: "bg-violet-600", hover: "hover:bg-violet-500/10", dot: "bg-violet-500" },
     items: [
       { href: "/tracking/inversiones/dpf", label: "DPF", icon: Vault },
       { href: "/tracking/inversiones/dpf/registros", label: "Registros", icon: ListBullets },
@@ -90,28 +90,28 @@ const GROUPS: NavGroup[] = [
     label: "Activos",
     icon: Package,
     ready: true,
-    tint: { icon: "text-amber-500", active: "bg-amber-600", hover: "hover:bg-amber-500/10", dot: "bg-amber-500" },
+    tint: { icon: "text-amber-600 dark:text-amber-400", active: "bg-amber-700", hover: "hover:bg-amber-500/10", dot: "bg-amber-500" },
     items: [{ href: "/tracking/activos", label: "Bienes vendibles", icon: Package }],
   },
   {
     label: "Deudas",
     icon: HandCoins,
     ready: true,
-    tint: { icon: "text-sky-500", active: "bg-sky-600", hover: "hover:bg-sky-500/10", dot: "bg-sky-500" },
+    tint: { icon: "text-sky-600 dark:text-sky-400", active: "bg-sky-700", hover: "hover:bg-sky-500/10", dot: "bg-sky-500" },
     items: [{ href: "/tracking/deudas", label: "Que me deben", icon: HandCoins }],
   },
   {
     label: "Asistente IA",
     icon: Sparkle,
     ready: true,
-    tint: { icon: "text-fuchsia-500", active: "bg-fuchsia-600", hover: "hover:bg-fuchsia-500/10", dot: "bg-fuchsia-500" },
+    tint: { icon: "text-fuchsia-600 dark:text-fuchsia-400", active: "bg-fuchsia-600", hover: "hover:bg-fuchsia-500/10", dot: "bg-fuchsia-500" },
     items: [{ href: "/tracking/asistente", label: "Solicitudes por voz", icon: Microphone }],
   },
   {
     label: "Configuración",
     icon: Gear,
     ready: true,
-    tint: { icon: "text-slate-400", active: "bg-slate-600", hover: "hover:bg-slate-500/10", dot: "bg-slate-400" },
+    tint: { icon: "text-slate-600 dark:text-slate-400", active: "bg-slate-600", hover: "hover:bg-slate-500/10", dot: "bg-slate-400" },
     items: [{ href: "/tracking/configuracion/parametros", label: "Parámetros", icon: Faders }],
   },
 ];
@@ -207,6 +207,9 @@ export function Sidebar({ email }: { email?: string | null }) {
                       href={item.href}
                       onClick={() => setOpenMobile(false)}
                       title={mini ? item.label : undefined}
+                      // El activo se comunicaba solo por color; `aria-current`
+                      // lo hace explícito para un lector de pantalla.
+                      aria-current={active ? "page" : undefined}
                       className={cn(
                         "group relative flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
                         mini ? "justify-center px-2 py-2.5" : "px-3 py-2",
@@ -313,6 +316,8 @@ export function Sidebar({ email }: { email?: string | null }) {
           onClick={() => setOpenMobile(true)}
           className="rounded-lg p-1.5 text-foreground transition-colors hover:bg-accent"
           aria-label="Abrir menú"
+          aria-expanded={openMobile}
+          aria-controls="menu-lateral"
         >
           <ListIcon weight="bold" className="size-5" />
         </button>
@@ -334,6 +339,7 @@ export function Sidebar({ email }: { email?: string | null }) {
 
       {/* Drawer móvil */}
       <div
+        id="menu-lateral"
         className={cn(
           "fixed inset-0 z-50 lg:hidden",
           openMobile ? "pointer-events-auto" : "pointer-events-none"

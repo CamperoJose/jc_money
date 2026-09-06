@@ -232,7 +232,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
             <Vacio texto="Sin datos de rotación." />
           ) : (
             <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={dataRotacion} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+              <ComposedChart accessibilityLayer data={dataRotacion} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                 <YAxis
@@ -309,7 +309,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
               <Vacio texto="Sin ganancias todavía." />
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={gananciaData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <BarChart accessibilityLayer data={gananciaData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                   <YAxis
@@ -340,7 +340,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
             <Vacio texto="Sin vencimientos futuros." />
           ) : (
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={porMes} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+              <BarChart accessibilityLayer data={porMes} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                 <YAxis

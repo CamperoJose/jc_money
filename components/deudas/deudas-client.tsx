@@ -335,8 +335,8 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                       {d.outstanding > 0 && (
                         <Button variant="outline" size="sm" className="mr-auto h-7" onClick={() => setCobrar(d)}><Coins weight="fill" className="size-4" />Recibir cobro</Button>
                       )}
-                      <Button variant="ghost" size="icon" className="size-7" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="toque-comodo size-7" onClick={() => { setEditando(d); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="toque-comodo size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(d); }} aria-label="Borrar"><Trash className="size-4" /></Button>
                     </div>
                   </CardContent>
                 </Card>

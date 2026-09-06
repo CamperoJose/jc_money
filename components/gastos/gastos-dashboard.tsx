@@ -113,7 +113,7 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={serie7dias} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+            <BarChart accessibilityLayer data={serie7dias} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="etiqueta" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
               <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => formatBobCompact(v)} width={64} />
@@ -135,7 +135,7 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
               <Vacio />
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={dataMes} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <BarChart accessibilityLayer data={dataMes} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                   <YAxis

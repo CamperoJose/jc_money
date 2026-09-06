@@ -9,8 +9,19 @@ export function TableRoot({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
+  // `role="region"` sin nombre accesible es ruido para un lector de pantalla:
+  // solo se declara región si quien la usa le puso etiqueta.
+  const tieneNombre = Boolean(props["aria-label"] || props["aria-labelledby"]);
   return (
-    <div className={cn("w-full overflow-x-auto", className)} {...props}>
+    // `tabIndex=0` + `role="region"`: un contenedor con scroll horizontal debe
+    // poder desplazarse con el teclado, si no el contenido cortado es
+    // inalcanzable sin mouse.
+    <div
+      className={cn("w-full overflow-x-auto", className)}
+      tabIndex={0}
+      role={tieneNombre ? "region" : undefined}
+      {...props}
+    >
       {children}
     </div>
   );
@@ -47,6 +58,9 @@ export function TableHeaderCell({
 }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
+      // `scope="col"` es lo que permite a un lector de pantalla anunciar el
+      // encabezado correcto al leer cada celda de una tabla ancha.
+      scope="col"
       className={cn(
         "whitespace-nowrap border-b border-border px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground",
         className

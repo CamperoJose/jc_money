@@ -60,6 +60,7 @@ export function ThemeToggle({ mini }: { mini?: boolean }) {
         type="button"
         onClick={() => elegir(orden[(orden.indexOf(tema) + 1) % orden.length])}
         title={`Tema: ${actual.label} (clic para cambiar)`}
+        aria-label={`Tema: ${actual.label}. Clic para cambiar.`}
         className="flex w-full items-center justify-center rounded-lg py-2 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       >
         <Icono weight="duotone" className="size-[18px]" />
@@ -77,6 +78,10 @@ export function ThemeToggle({ mini }: { mini?: boolean }) {
             type="button"
             onClick={() => elegir(o.id)}
             title={o.label}
+            // La etiqueta de texto se oculta en móvil (`hidden sm:inline`), así
+            // que el nombre accesible tiene que venir del aria-label.
+            aria-label={`Tema ${o.label}`}
+            aria-pressed={activo}
             className={cn(
               "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors",
               activo

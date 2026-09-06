@@ -298,8 +298,8 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
                     </div>
 
                     <div className="mt-2 flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="size-7" onClick={() => { setEditando(a); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(a); }} aria-label="Borrar"><Trash className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="toque-comodo size-7" onClick={() => { setEditando(a); setFormOpen(true); }} aria-label="Editar"><PencilSimple className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" className="toque-comodo size-7 text-destructive hover:text-destructive" onClick={() => { setErrorBorrar(null); setBorrar(a); }} aria-label="Borrar"><Trash className="size-4" /></Button>
                     </div>
                   </CardContent>
                 </Card>

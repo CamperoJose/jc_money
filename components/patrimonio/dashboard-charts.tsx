@@ -80,7 +80,7 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
         ))}
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+        <AreaChart accessibilityLayer data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <defs>
             <linearGradient id="gradPatri" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
@@ -138,7 +138,7 @@ export function VariacionChart({ serie }: { serie: Punto[] }) {
 
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+      <BarChart accessibilityLayer data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
         <XAxis
           dataKey="fecha"
@@ -270,7 +270,7 @@ export function CrecimientoCuentasChart({
   return (
     <div>
       <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+        <LineChart accessibilityLayer data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
             {...propsEjeTiempo(rango)}
