@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAvisos } from "@/components/ui/toast";
+import { useFiltrosUrl } from "@/lib/hooks/estado-url";
 import {
   Plus,
   PencilSimple,
@@ -12,6 +13,7 @@ import {
   TrendDown,
   TrendUp,
   Receipt,
+  X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,9 +86,15 @@ export function GastosClient({
   const [borrando, setBorrando] = useState(false);
   const [errorBorrar, setErrorBorrar] = useState<string | null>(null);
 
-  const [busqueda, setBusqueda] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "gasto" | "ingreso">("todos");
-  const [filtroCategoria, setFiltroCategoria] = useState("");
+  // Los filtros viven en la URL: sobreviven al botón atrás y la vista se puede
+  // guardar o compartir tal cual.
+  const { obtener, asignar, limpiar, hayFiltros } = useFiltrosUrl();
+  const busqueda = obtener("q");
+  const filtroTipo = obtener("tipo", "todos") as "todos" | "gasto" | "ingreso";
+  const filtroCategoria = obtener("cat");
+  const setBusqueda = (v: string) => asignar({ q: v });
+  const setFiltroTipo = (v: string) => asignar({ tipo: v === "todos" ? null : v });
+  const setFiltroCategoria = (v: string) => asignar({ cat: v });
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -197,7 +205,7 @@ export function GastosClient({
         <Select
           className="sm:w-40"
           value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value as typeof filtroTipo)}
+          onChange={(e) => setFiltroTipo(e.target.value)}
         >
           <option value="todos">Todos</option>
           <option value="gasto">Gastos</option>
@@ -215,6 +223,12 @@ export function GastosClient({
             </option>
           ))}
         </Select>
+        {hayFiltros && (
+          <Button variant="ghost" onClick={limpiar} className="sm:w-auto">
+            <X weight="bold" className="size-4" />
+            Limpiar
+          </Button>
+        )}
       </div>
 
       {filtradas.length === 0 ? (

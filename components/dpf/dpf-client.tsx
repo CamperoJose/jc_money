@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAvisos } from "@/components/ui/toast";
+import { useFiltrosUrl } from "@/lib/hooks/estado-url";
 import {
   Plus,
   PencilSimple,
@@ -10,6 +11,7 @@ import {
   Warning,
   MagnifyingGlass,
   Vault,
+  X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,8 +52,12 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
   const [borrando, setBorrando] = useState(false);
   const [errorBorrar, setErrorBorrar] = useState<string | null>(null);
 
-  const [busqueda, setBusqueda] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todos");
+  // Filtros en la URL: sobreviven al botón atrás y la vista se puede compartir.
+  const { obtener, asignar, limpiar, hayFiltros } = useFiltrosUrl();
+  const busqueda = obtener("q");
+  const filtroEstado = obtener("estado", "todos") as FiltroEstado;
+  const setBusqueda = (v: string) => asignar({ q: v });
+  const setFiltroEstado = (v: string) => asignar({ estado: v === "todos" ? null : v });
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -128,7 +134,7 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
         <Select
           className="sm:w-52"
           value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value as FiltroEstado)}
+          onChange={(e) => setFiltroEstado(e.target.value)}
         >
           <option value="todos">Todos los estados</option>
           <option value="activo">Activos</option>
@@ -136,6 +142,12 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
           <option value="vencido">Vencidos</option>
           <option value="pagado">Cobrados</option>
         </Select>
+        {hayFiltros && (
+          <Button variant="ghost" onClick={limpiar} className="sm:w-auto">
+            <X weight="bold" className="size-4" />
+            Limpiar
+          </Button>
+        )}
       </div>
 
       {filtradas.length === 0 ? (
