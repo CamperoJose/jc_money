@@ -130,7 +130,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
       )}
 
       {/* Hero KPIs */}
-      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <KpiHero
           icon={<Vault weight="fill" className="size-5" />}
           label="Capital en DPF"
@@ -158,7 +158,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
       </div>
 
       {/* Métricas secundarias */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Metric
           icon={HandCoins}
           label="Ganancia realizada"
@@ -435,13 +435,13 @@ function KpiHero({
     <Card className="trama-puntos resplandor">
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+          <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5 text-primary ring-1 ring-inset ring-primary/20">
             {icon}
           </span>
         </div>
-        <div className="mt-1 truncate text-3xl font-semibold tabular-nums text-primary">{valor}</div>
-        {sub && <div className="mt-1 truncate text-sm text-muted-foreground">{sub}</div>}
+        <div className="mt-1 break-words text-[clamp(1.375rem,1.05rem+1.1vw,1.875rem)] font-semibold leading-tight tabular-nums text-primary">{valor}</div>
+        {sub && <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{sub}</div>}
       </CardContent>
     </Card>
   );
@@ -463,12 +463,12 @@ function Metric({
   const texto = tone === "pos" ? "text-primary" : tone === "neg" ? "text-destructive" : "text-foreground";
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon weight="duotone" className="size-3.5 shrink-0" />
-        <span className="truncate">{label}</span>
+      <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+        <Icon weight="duotone" className="mt-px size-3.5 shrink-0" />
+        <span className="line-clamp-2">{label}</span>
       </div>
-      <div className={`mt-1 truncate text-lg font-semibold tabular-nums ${texto}`}>{valor}</div>
-      {hint && <div className="truncate text-xs text-muted-foreground">{hint}</div>}
+      <div className={`mt-1 break-words text-lg font-semibold leading-tight tabular-nums ${texto}`} title={valor}>{valor}</div>
+      {hint && <div className="line-clamp-2 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
 }

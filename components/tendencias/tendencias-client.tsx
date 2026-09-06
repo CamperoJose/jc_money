@@ -15,6 +15,13 @@ import {
 import { TrendUp, ChartLineUp, Target, Percent, Sparkle } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Kpi } from "@/components/tremor/kpi-card";
+import {
+  conTs,
+  rangoEnDias,
+  propsEjeTiempo,
+  formatoFechaTooltip,
+  tsDeFecha,
+} from "@/lib/charts";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { formatBob, formatBobCompact, formatPercent, formatDate } from "@/lib/format";
 import type { ResumenTendencias } from "@/lib/tendencias";
@@ -26,11 +33,6 @@ const tooltipStyle = {
   color: "var(--color-popover-foreground)",
   fontSize: 12,
 };
-
-function etiquetaMesCorta(iso: string): string {
-  const [y, m] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("es-BO", { month: "short", year: "2-digit" }).format(new Date(Date.UTC(y, m - 1, 1)));
-}
 
 export function TendenciasClient({ t }: { t: ResumenTendencias }) {
   if (!t.suficienteData) {
@@ -47,7 +49,11 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
     );
   }
 
-  const data = t.puntos.map((p) => ({ ...p, etiqueta: etiquetaMesCorta(p.fecha) }));
+  // Eje de tiempo real: el histórico viene de fotos irregulares y la proyección
+  // es mensual, así que en un eje categórico ambos tramos se veían con el mismo
+  // paso y la pendiente resultaba engañosa.
+  const data = conTs(t.puntos);
+  const rango = rangoEnDias(data.map((p) => p.ts));
   const ultimoRealIdx = t.puntos.reduce((acc, p, i) => (p.real != null ? i : acc), 0);
   const fechaCorte = t.puntos[ultimoRealIdx]?.fecha;
 
@@ -77,7 +83,7 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
       </Card>
 
       {/* KPIs + confianza del ajuste */}
-      <div className="grid gap-3 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
           etiqueta="Ritmo mensual"
           valor={`${(t.ritmoMensual ?? 0) >= 0 ? "+" : ""}${formatBobCompact(t.ritmoMensual)}`}
@@ -141,12 +147,12 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis dataKey="etiqueta" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} interval="preserveStartEnd" minTickGap={20} />
+              <XAxis {...propsEjeTiempo(rango)} tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
               <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => formatBobCompact(v)} width={70} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [formatBob(v), n === "real" ? "Real" : "Proyección"]} labelFormatter={(l) => l} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [formatBob(v), n === "real" ? "Real" : "Proyección"]} labelFormatter={(l) => formatoFechaTooltip(Number(l))} />
               <Legend formatter={(v) => (v === "real" ? "Histórico" : "Proyección")} wrapperStyle={{ fontSize: 12 }} />
               {fechaCorte && (
-                <ReferenceLine x={etiquetaMesCorta(fechaCorte)} stroke="var(--color-muted-foreground)" strokeDasharray="4 3" label={{ value: "hoy", position: "top", fontSize: 10, fill: "var(--color-muted-foreground)" }} />
+                <ReferenceLine x={tsDeFecha(fechaCorte)} stroke="var(--color-muted-foreground)" strokeDasharray="4 3" label={{ value: "hoy", position: "top", fontSize: 10, fill: "var(--color-muted-foreground)" }} />
               )}
               <Area type="monotone" dataKey="real" stroke="var(--color-chart-1)" fill="url(#gradReal)" strokeWidth={2.5} connectNulls dot={{ r: 2 }} />
               <Line type="monotone" dataKey="proyeccion" stroke="var(--color-chart-3)" strokeWidth={2} strokeDasharray="6 4" dot={false} />

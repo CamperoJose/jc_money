@@ -12,6 +12,7 @@ import {
 import { CurrencyDollar, TrendUp, TrendDown, Bank, ArrowsClockwise } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Kpi } from "@/components/tremor/kpi-card";
+import { conTs, rangoEnDias, propsEjeTiempo, formatoFechaTooltip } from "@/lib/charts";
 import {
   TableRoot,
   Table,
@@ -51,7 +52,11 @@ export function TcClient({
   // Serie cronológica ascendente para el gráfico.
   const serie = [...rates]
     .sort((a, b) => a.rate_date.localeCompare(b.rate_date))
-    .map((r) => ({ fecha: r.rate_date, valor: r.valor, etiqueta: formatDate(r.rate_date) }));
+    // Los registros de T/C son irregulares: el eje debe ser de tiempo, no
+    // categórico, o meses sin registro se ven como un solo paso.
+    .map((r) => ({ fecha: r.rate_date, valor: r.valor }));
+  const serieTs = conTs(serie);
+  const rangoTc = rangoEnDias(serieTs.map((p) => p.ts));
 
   const min = serie.length ? Math.min(...serie.map((s) => s.valor)) : 0;
   const max = serie.length ? Math.max(...serie.map((s) => s.valor)) : 0;
@@ -78,7 +83,7 @@ export function TcClient({
         </Card>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi
               etiqueta="Último T/C"
               valor={`Bs ${formatNumber(ultimo!.valor, 2)}`}
@@ -118,7 +123,7 @@ export function TcClient({
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={serie} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <AreaChart data={serieTs} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                   <defs>
                     <linearGradient id="gradTc" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
@@ -126,14 +131,14 @@ export function TcClient({
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="etiqueta" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} interval="preserveStartEnd" />
+                  <XAxis {...propsEjeTiempo(rangoTc)} tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                   <YAxis
                     domain={["auto", "auto"]}
                     tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
                     tickFormatter={(v) => formatNumber(v, 2)}
                     width={56}
                   />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`Bs ${formatNumber(v, 5)}`, "T/C"]} />
+                  <Tooltip contentStyle={tooltipStyle} labelFormatter={(v) => formatoFechaTooltip(Number(v))} formatter={(v: number) => [`Bs ${formatNumber(v, 5)}`, "T/C"]} />
                   <Area type="monotone" dataKey="valor" stroke="var(--color-chart-1)" fill="url(#gradTc)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>

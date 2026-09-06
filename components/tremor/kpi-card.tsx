@@ -51,14 +51,24 @@ export function Kpi({
       <div className={cn("h-0.5 w-full", tonoBarra[tono])} />
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{etiqueta}</span>
+          {/* Hasta dos líneas: una etiqueta larga se envuelve en vez de cortarse. */}
+          <span className="line-clamp-2 text-sm font-medium text-foreground">{etiqueta}</span>
           {icono && <span className="shrink-0 text-muted-foreground">{icono}</span>}
         </div>
-        <div className={cn("mt-1 truncate text-3xl font-semibold tabular-nums", tonoTexto[tono])}>
+        {/* La cifra escala con el ancho de la ventana (clamp) y, si aun así no
+            entra, se parte en dos líneas. Nunca se recorta: un número a medias
+            es peor que un número en dos renglones. */}
+        <div
+          className={cn(
+            "mt-1 break-words text-[clamp(1.375rem,1.05rem+1.1vw,1.875rem)] font-semibold leading-tight tabular-nums",
+            tonoTexto[tono]
+          )}
+          title={valor}
+        >
           {valor}
         </div>
         {detalle && (
-          <div className="mt-1 truncate text-sm text-muted-foreground">{detalle}</div>
+          <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{detalle}</div>
         )}
         {progreso != null && (
           <div className="canal mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">

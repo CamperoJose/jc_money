@@ -137,7 +137,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
   return (
     <>
       {/* Hero + KPIs */}
-      <section className="grid gap-4 lg:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {/* Patrimonio neto (hero) */}
         <Card className="trama-rejilla resplandor lg:col-span-2">
           <CardContent className="flex h-full flex-col justify-between gap-4 p-6">
@@ -150,10 +150,10 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
               </span>
             </div>
             <div className="min-w-0">
-              <div className="truncate text-3xl font-bold text-primary tabular-nums sm:text-4xl">
+              <div className="break-words text-[clamp(1.75rem,1.2rem+1.8vw,2.25rem)] font-bold leading-tight text-primary tabular-nums">
                 {formatBob(ultimo?.total_bob)}
               </div>
-              <div className="mt-1 truncate text-sm text-muted-foreground tabular-nums">
+              <div className="mt-1 text-sm text-muted-foreground tabular-nums">
                 {formatUsd(ultimo?.total_usd)} · T/C {formatNumber(ultimo?.exchange_rate, 2)}
               </div>
             </div>
@@ -199,7 +199,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-primary tabular-nums">{formatBob(disponibilidadRapida)}</div>
+              <div className="break-words text-[clamp(1.375rem,1.05rem+1.1vw,1.75rem)] font-bold leading-tight text-primary tabular-nums">{formatBob(disponibilidadRapida)}</div>
               {disponibilidadPct != null && (
                 <div className="text-xs text-muted-foreground tabular-nums">
                   {formatPercent(disponibilidadPct)} del patrimonio
@@ -211,7 +211,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
       )}
 
       {/* Métricas de decisión */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Metric
           icon={ChartLineUp}
           label="Crecimiento mensual"
@@ -400,15 +400,15 @@ function Kpi({
     <Card>
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+          <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className={"flex size-8 shrink-0 items-center justify-center rounded-lg " + chip}>
             <Icon weight="duotone" className="size-4" />
           </span>
         </div>
-        <div className={"mt-1 truncate text-3xl font-semibold tabular-nums " + texto} title={valorFull}>
+        <div className={"mt-1 break-words text-[clamp(1.375rem,1.05rem+1.1vw,1.875rem)] font-semibold leading-tight tabular-nums " + texto} title={valorFull}>
           {valor}
         </div>
-        <div className="mt-1 truncate text-sm text-muted-foreground">{sub}</div>
+        <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{sub}</div>
       </CardContent>
     </Card>
   );
@@ -430,12 +430,12 @@ function Metric({
   const texto = tone === "pos" ? "text-primary" : tone === "neg" ? "text-destructive" : "text-foreground";
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon weight="duotone" className="size-3.5 shrink-0" />
-        <span className="truncate">{label}</span>
+      <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+        <Icon weight="duotone" className="mt-px size-3.5 shrink-0" />
+        <span className="line-clamp-2">{label}</span>
       </div>
-      <div className={"mt-1 truncate text-lg font-semibold tabular-nums " + texto}>{valor}</div>
-      {hint && <div className="truncate text-xs text-muted-foreground">{hint}</div>}
+      <div className={"mt-1 break-words text-lg font-semibold leading-tight tabular-nums " + texto} title={valor}>{valor}</div>
+      {hint && <div className="line-clamp-2 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
 }

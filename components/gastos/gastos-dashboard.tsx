@@ -69,7 +69,7 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
           icon={<TrendDown weight="duotone" className="size-5 text-destructive" />}
           label="Gasto del mes"
@@ -249,11 +249,11 @@ function Kpi({
     <Card>
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+          <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className="shrink-0">{icon}</span>
         </div>
         <div
-          className={`mt-1 truncate text-3xl font-semibold tabular-nums ${
+          className={`mt-1 break-words text-[clamp(1.375rem,1.05rem+1.1vw,1.875rem)] font-semibold leading-tight tabular-nums ${
             tono === "malo" ? "text-destructive" : tono === "bueno" ? "text-primary" : ""
           }`}
         >

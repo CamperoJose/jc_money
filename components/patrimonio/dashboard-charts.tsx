@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -19,6 +19,13 @@ import {
   ReferenceLine,
 } from "recharts";
 import { formatBob, formatUsd, formatDate, formatNumber } from "@/lib/format";
+import {
+  conTs,
+  rangoEnDias,
+  propsEjeTiempo,
+  formatoFechaTooltip,
+  diasEntreTs,
+} from "@/lib/charts";
 import type { DistribucionCuenta, SerieCuenta } from "@/lib/queries/patrimonio";
 
 // Paleta categórica multi-tono para distinguir cuentas (el tema base solo
@@ -58,6 +65,12 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
   const [moneda, setMoneda] = useState<"bob" | "usd">("bob");
   const fmt = moneda === "bob" ? formatBob : formatUsd;
 
+  // Las fotos son irregulares (a veces meses entre una y otra), así que el eje
+  // X es numérico con escala de tiempo: la distancia horizontal representa el
+  // tiempo transcurrido de verdad.
+  const datos = useMemo(() => conTs(serie), [serie]);
+  const rango = useMemo(() => rangoEnDias(datos.map((d) => d.ts)), [datos]);
+
   if (serie.length === 0) {
     return <Vacio />;
   }
@@ -81,7 +94,7 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
         ))}
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={serie} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+        <AreaChart data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <defs>
             <linearGradient id="gradPatri" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
@@ -90,11 +103,9 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
-            dataKey="fecha"
-            tickFormatter={(v) => formatDate(v)}
+            {...propsEjeTiempo(rango)}
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
             stroke="var(--color-border)"
-            minTickGap={24}
           />
           <YAxis
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
@@ -103,8 +114,8 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
             tickFormatter={(v) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(v)}
           />
           <Tooltip
-            labelFormatter={(v) => formatDate(String(v))}
-            formatter={(value: number) => [fmt(value), moneda === "bob" ? "Patrimonio" : "Patrimonio"]}
+            labelFormatter={(v) => formatoFechaTooltip(Number(v))}
+            formatter={(value: number) => [fmt(value), "Patrimonio"]}
             contentStyle={tooltipStyle}
           />
           <Area
@@ -124,7 +135,19 @@ export function EvolucionChart({ serie }: { serie: Punto[] }) {
 
 /** Variación (BOB) foto a foto — barras verdes/rojas. */
 export function VariacionChart({ serie }: { serie: Punto[] }) {
-  const datos = serie.filter((p) => p.variacion != null);
+  // Cada barra es un evento discreto (una foto respecto de la anterior), así que
+  // el eje sigue siendo categórico: en un eje de tiempo continuo las barras de
+  // períodos cortos quedarían como astillas invisibles. Lo que sí se agrega es
+  // el intervalo real que cubre cada barra, que es la información que faltaba.
+  const datos = useMemo(() => {
+    const conVariacion = conTs(serie).filter((p) => p.variacion != null);
+    return conVariacion.map((p, i) => {
+      const previo = i > 0 ? conVariacion[i - 1] : null;
+      const dias = previo ? diasEntreTs(previo.ts, p.ts) : null;
+      return { ...p, dias };
+    });
+  }, [serie]);
+
   if (datos.length === 0) return <Vacio texto="Se necesita más de una foto para ver variaciones." />;
 
   return (
@@ -145,7 +168,12 @@ export function VariacionChart({ serie }: { serie: Punto[] }) {
           tickFormatter={(v) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(v)}
         />
         <Tooltip
-          labelFormatter={(v) => formatDate(String(v))}
+          labelFormatter={(v, carga) => {
+            const dias = (carga?.[0]?.payload as { dias: number | null } | undefined)?.dias;
+            return dias != null
+              ? `${formatDate(String(v))} · ${dias} ${dias === 1 ? "día" : "días"} desde la foto anterior`
+              : formatDate(String(v));
+          }}
           formatter={(value: number) => [formatBob(value), "Variación"]}
           contentStyle={tooltipStyle}
         />
@@ -241,6 +269,12 @@ export function CrecimientoCuentasChart({
   });
   const [ocultas, setOcultas] = useState<Set<string>>(new Set());
 
+  const datos = useMemo(
+    () => conTs(puntos as Array<{ fecha: string } & Record<string, number | string | null>>),
+    [puntos]
+  );
+  const rango = useMemo(() => rangoEnDias(datos.map((d) => d.ts)), [datos]);
+
   if (puntos.length < 2) {
     return <Vacio texto="Se necesitan al menos dos fotos para ver el crecimiento por cuenta." />;
   }
@@ -250,14 +284,12 @@ export function CrecimientoCuentasChart({
   return (
     <div>
       <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={puntos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+        <LineChart data={datos} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
-            dataKey="fecha"
-            tickFormatter={(v) => formatDate(String(v))}
+            {...propsEjeTiempo(rango)}
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
             stroke="var(--color-border)"
-            minTickGap={24}
           />
           <YAxis
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
@@ -266,7 +298,7 @@ export function CrecimientoCuentasChart({
             tickFormatter={(v) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(v)}
           />
           <Tooltip
-            labelFormatter={(v) => formatDate(String(v))}
+            labelFormatter={(v) => formatoFechaTooltip(Number(v))}
             formatter={(value: number, key) => [
               formatBob(value),
               ordenadas.find((c) => c.key === key)?.nombre ?? key,
