@@ -143,14 +143,18 @@ interface MovimientoDia {
 }
 
 /**
- * Movimientos puntuales que ingresan dinero a una cuenta destino y cuyo evento
- * cae DESPUÉS de la base y hasta `targetDate` (se inyecta una sola vez, el día
- * que el cierre cruza el evento; luego el saldo queda copiado de la base):
- *   - Venta de activos → precio de venta a la cuenta destino (`sold_account_id`).
- *   - Cobro de deudas  → monto cobrado a la cuenta destino (`paid_account_id`).
- * El activo/deuda ya salió de su cuenta derivada (Activos / Por Cobrar), así que
- * el efecto neto en patrimonio es exactamente el resultado realizado (venta) o
- * cero (un cobro solo mueve valor de «por cobrar» a una cuenta real).
+ * Movimientos puntuales que mueven dinero entre una cuenta real y una cuenta
+ * derivada, cuyo evento cae DESPUÉS de la base y hasta `targetDate` (se inyecta
+ * una sola vez, el día que el cierre cruza el evento; luego el saldo queda
+ * copiado de la base):
+ *   - Venta de activos  → ENTRA el precio de venta a `sold_account_id`.
+ *   - Cobro de deudas   → ENTRA el monto cobrado a `paid_account_id`.
+ *   - Préstamo otorgado → SALE el monto prestado de `source_account_id`.
+ * En los tres casos la contraparte es una cuenta derivada (Activos / Por
+ * Cobrar), que el job recalcula por su cuenta. Por eso el efecto neto en el
+ * patrimonio total es el resultado realizado (venta) o CERO (cobrar y prestar
+ * solo mueven valor entre "por cobrar" y una cuenta real: cambia la
+ * disponibilidad, no el patrimonio).
  * Resiliente: si la columna aún no existe (migración sin aplicar), se omite.
  */
 async function getMovimientosDelDia(
@@ -188,6 +192,32 @@ async function getMovimientosDelDia(
         destAccountId: a.sold_account_id,
         proceedsBob: bob,
         destIncrement: redondear(aNativo(bob, a.sold_account_id)),
+      });
+    }
+  } catch { /* columna no lista: se omite */ }
+
+  // Préstamos otorgados: el dinero SALE de la cuenta de origen el día del
+  // préstamo. La contraparte es la cuenta derivada "Por Cobrar", que sube el
+  // mismo monto, así que el patrimonio total no se mueve.
+  try {
+    const { data, error } = await admin
+      .from("debts")
+      .select("amount, debt_date, source_account_id")
+      .eq("user_id", userId)
+      .gt("debt_date", baseDate)
+      .lte("debt_date", targetDate)
+      .not("source_account_id", "is", null);
+    if (error) throw error;
+    for (const r of data ?? []) {
+      const d = r as { amount: number | null; source_account_id: string };
+      const monto = Number(d.amount);
+      if (!d.source_account_id || !Number.isFinite(monto) || monto <= 0) continue;
+      const bob = redondear(monto);
+      out.push({
+        label: "Préstamo otorgado",
+        destAccountId: d.source_account_id,
+        proceedsBob: -bob,
+        destIncrement: -redondear(aNativo(bob, d.source_account_id)),
       });
     }
   } catch { /* columna no lista: se omite */ }
@@ -440,7 +470,9 @@ export async function ejecutarPatrimonioDiario(
         `Autocalculado: base del ${base.snapshot_date} (${baseTotalBob}) ` +
         `${netoDia >= 0 ? "+" : "−"} ${Math.abs(netoDia)} de neto del día` +
         (derivadas.length ? ` ${ajusteDerivadas >= 0 ? "+" : "−"} ${Math.abs(ajusteDerivadas)} de ajuste derivadas (${detalleDerivadas})` : "") +
-        (movimientos.length ? ` + ${ajusteMovimientos} de movimientos (${detalleMovimientos})` : "") +
+        (movimientos.length
+          ? ` ${ajusteMovimientos >= 0 ? "+" : "−"} ${Math.abs(ajusteMovimientos)} de movimientos (${detalleMovimientos})`
+          : "") +
         (netoSinCuentaBob !== 0 ? ` (incluye ${netoSinCuentaBob} sin cuenta asignada)` : "") +
         ".",
     })

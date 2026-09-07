@@ -135,6 +135,7 @@ export interface Debt {
   counterparty: string | null; // quién me debe
   status: DebtStatus;
   due_date: string | null; // fecha de cobro esperada (opcional)
+  source_account_id: string | null; // cuenta de la que salió el dinero al prestar
   paid_account_id: string | null; // cuenta a la que ingresó el cobro
   collected_date: string | null; // fecha en que me pagaron (YYYY-MM-DD)
 }
@@ -143,6 +144,7 @@ export interface DebtUI extends Debt {
   outstanding: number; // por cobrar = amount − paid_amount (≥ 0)
   vencida: boolean; // due_date pasada y aún no pagada
   diasVencida: number | null; // días desde due_date (si venció)
+  sourceAccount?: Account | null; // cuenta de origen resuelta (opcional)
   paidAccount?: Account | null; // cuenta de cobro resuelta (opcional)
 }
 

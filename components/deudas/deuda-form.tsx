@@ -56,6 +56,7 @@ export function DeudaForm({
   const [motivo, setMotivo] = useState(registro?.reason ?? "");
   const [vence, setVence] = useState(registro?.due_date ?? "");
   const [estado, setEstado] = useState<DebtStatus>(registro?.status ?? "pendiente");
+  const [cuentaOrigen, setCuentaOrigen] = useState(registro?.source_account_id ?? "");
   const [cuentaCobro, setCuentaCobro] = useState(registro?.paid_account_id ?? "");
   const [fechaCobro, setFechaCobro] = useState(registro?.collected_date ?? hoyInput());
   const [enviando, setEnviando] = useState(false);
@@ -80,6 +81,7 @@ export function DeudaForm({
       counterparty: quien,
       status: estado,
       due_date: vence || null,
+      source_account_id: cuentaOrigen || null,
       paid_account_id: hayCobro ? cuentaCobro || null : null,
       collected_date: hayCobro ? fechaCobro || null : null,
     };
@@ -150,6 +152,20 @@ export function DeudaForm({
             <Label htmlFor="cobrado">Ya cobrado (Bs)</Label>
             <Input id="cobrado" type="number" step="0.01" min="0" inputMode="decimal" value={cobrado} onChange={(e) => setCobrado(e.target.value)} placeholder="0.00" />
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="cuentaOrigen">¿De qué cuenta salió el dinero?</Label>
+          <Select id="cuentaOrigen" value={cuentaOrigen} onChange={(e) => setCuentaOrigen(e.target.value)}>
+            <option value="">— Sin cuenta (solo registrar) —</option>
+            {destinos.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} ({c.currency})</option>
+            ))}
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            El job de medianoche descuenta el monto de esta cuenta el día del préstamo y lo
+            pasa a «Por Cobrar». Tu patrimonio total no cambia: solo cambia dónde está el dinero.
+          </p>
         </div>
 
         <div className="space-y-1.5">

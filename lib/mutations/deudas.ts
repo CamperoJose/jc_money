@@ -9,6 +9,7 @@ export interface DebtInput {
   counterparty?: string | null;
   status?: DebtStatus;
   due_date?: string | null;
+  source_account_id?: string | null;
   paid_account_id?: string | null;
   collected_date?: string | null;
 }
@@ -56,6 +57,9 @@ function filaDesde(input: DebtInput) {
     counterparty: limpiar(input.counterparty),
     status,
     due_date: input.due_date || null,
+    // La cuenta de origen se guarda siempre: el job la descuenta el día del
+    // préstamo, haya o no cobro posterior.
+    source_account_id: input.source_account_id || null,
     paid_account_id: cobrado ? input.paid_account_id || null : null,
     collected_date: cobrado ? input.collected_date || null : null,
   };

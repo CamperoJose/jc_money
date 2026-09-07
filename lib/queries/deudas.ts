@@ -3,7 +3,7 @@ import type { Debt } from "@/lib/types";
 import { resumenDeudas, type ResumenDeudas } from "@/lib/deudas";
 
 const CAMPOS =
-  "id, debt_date, amount, paid_amount, reason, counterparty, status, due_date, paid_account_id, collected_date";
+  "id, debt_date, amount, paid_amount, reason, counterparty, status, due_date, source_account_id, paid_account_id, collected_date";
 
 function aDebt(r: Record<string, unknown>): Debt {
   return {
@@ -15,6 +15,7 @@ function aDebt(r: Record<string, unknown>): Debt {
     counterparty: (r.counterparty as string) ?? null,
     status: (r.status as Debt["status"]) ?? "pendiente",
     due_date: (r.due_date as string) ?? null,
+    source_account_id: (r.source_account_id as string) ?? null,
     paid_account_id: (r.paid_account_id as string) ?? null,
     collected_date: (r.collected_date as string) ?? null,
   };

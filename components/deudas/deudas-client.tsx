@@ -169,6 +169,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                   {paginacion.pagina.map((d) => {
                     const pct = d.amount > 0 ? d.paid_amount / d.amount : 0;
                     const cuentaCobro = cuentas.find((c) => c.id === d.paid_account_id);
+                    const cuentaOrigen = cuentas.find((c) => c.id === d.source_account_id);
                     return (
                       <TableRow key={d.id}>
                         {/* Deudor + motivo */}
@@ -182,7 +183,10 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                         {/* Fecha + antigüedad */}
                         <TableCell className="whitespace-nowrap">
                           <div className="text-foreground">{formatDate(d.debt_date)}</div>
-                          <div className="text-xs text-muted-foreground">hace {diasDesde(d.debt_date)} d</div>
+                          <div className="text-xs text-muted-foreground">
+                            hace {diasDesde(d.debt_date)} d
+                            {cuentaOrigen ? ` · desde ${cuentaOrigen.name}` : ""}
+                          </div>
                         </TableCell>
 
                         {/* Vencimiento + días restantes */}
@@ -306,6 +310,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
             {paginacion.pagina.map((d) => {
               const pct = d.amount > 0 ? d.paid_amount / d.amount : 0;
               const cuentaCobro = cuentas.find((c) => c.id === d.paid_account_id);
+              const cuentaOrigen = cuentas.find((c) => c.id === d.source_account_id);
               return (
                 <Card key={d.id} className="overflow-hidden">
                   <CardContent className="p-3">
@@ -318,6 +323,7 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
                         {d.reason && <div className="truncate text-xs text-muted-foreground">{d.reason}</div>}
                         <div className="mt-1 text-xs text-muted-foreground">
                           {formatDate(d.debt_date)} · hace {diasDesde(d.debt_date)} d
+                          {cuentaOrigen ? ` · desde ${cuentaOrigen.name}` : ""}
                         </div>
                         {d.due_date && (
                           <div className={`text-xs ${d.vencida ? "font-medium text-destructive" : "text-muted-foreground"}`}>
@@ -476,6 +482,9 @@ function CobroDialog({
           reason: deuda.reason,
           counterparty: deuda.counterparty,
           due_date: deuda.due_date,
+          // El PATCH reescribe la fila entera: sin esto, registrar un cobro
+          // borraría la cuenta de origen del préstamo.
+          source_account_id: deuda.source_account_id,
           paid_account_id: cuentaId,
           collected_date: fechaBoliviaHoy(),
         }),
