@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { procesarSolicitudVoz } from "@/lib/voz/proceso";
+import { verificarLimiteVoz } from "@/lib/voz/limite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +64,18 @@ export async function POST(request: Request) {
     }
   }
   if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  // 1.b) Límite de tasa. El token del Atajo no caduca ni se puede revocar desde
+  //      la app (riesgo asumido: no se quiere tocar el cliente de iOS), así que
+  //      el tope es lo único que evita que una fuga queme la cuota de Gemini.
+  //      Se parametriza por entorno; ver lib/voz/limite.ts.
+  const limite = await verificarLimiteVoz(admin, userId);
+  if (!limite.permitido) {
+    return NextResponse.json(
+      { error: limite.motivo ?? "Demasiadas solicitudes." },
+      { status: 429, headers: { "Retry-After": String(limite.reintentarEn ?? 60) } }
+    );
+  }
 
   // 2) Fila de auditoría (procesando).
   const { data: reqRow, error: eIns } = await admin

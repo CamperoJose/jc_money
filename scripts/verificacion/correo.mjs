@@ -2,7 +2,8 @@ import { build } from "esbuild";
 await build({ entryPoints: ["/home/user/jc_money/lib/emails/plantillas.ts"], bundle: true,
   format: "esm", platform: "node", outfile: "/tmp/plantillas.mjs", logLevel: "error",
   alias: { "@": "/home/user/jc_money" } });
-const { htmlPatrimonioDiario, htmlReporteMensual } = await import("/tmp/plantillas.mjs");
+const { htmlPatrimonioDiario, htmlReporteMensual, htmlAlertaPresupuesto,
+        htmlDeudasVencidas, htmlCierreNoCorrio } = await import("/tmp/plantillas.mjs");
 
 const base = { fecha: "2026-09-03", totalBob: 65645.57, totalUsd: 5328.37, tc: 12.32,
   deltaBob: 116, deltaPct: 0.0018, disponibilidad: 13353.57, porCobrar: 1745, activos: 11571,
@@ -58,6 +59,43 @@ pruebas.push(
     mesConDatos.html.includes("Alimentación") && mesConDatos.html.includes("▲")],
   ["no quedan restos verdes del tema anterior",
     !mesConDatos.html.includes("#d1fae5") && !conGastos.html.includes("#d1fae5")],
+);
+
+// ---- Alertas nuevas ----
+// Ojo: es-BO separa "Bs" del número con un espacio DURO (U+00A0), así que las
+// comparaciones se hacen contra el mismo formateador, no contra texto a mano.
+const enBs = (n) => new Intl.NumberFormat("es-BO", { style: "currency", currency: "BOB",
+  minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const presu = htmlAlertaPresupuesto([
+  { categoria: "Alimentación", planeado: 1500, gastado: 1725, pct: 1.15, nivel: "excedido" },
+  { categoria: "Transporte", planeado: 400, gastado: 350, pct: 0.875, nivel: "alerta" },
+], "2026-09");
+const deudas = htmlDeudasVencidas([
+  { quien: "Marco", monto: 1200, vence: "2026-08-20", dias: 18, motivo: "préstamo" },
+  { quien: "Ana", monto: 545, vence: "2026-09-01", dias: 6, motivo: null },
+]);
+const cierre = htmlCierreNoCorrio(["2026-09-05", "2026-09-06"], "2026-09-04");
+
+console.log("asunto presupuesto:", presu.subject);
+console.log("asunto deudas     :", deudas.subject);
+console.log("asunto vigilancia :", cierre.subject);
+
+pruebas.push(
+  ["la alerta de presupuesto dice cuánto te pasaste",
+    presu.html.includes("te pasaste") && presu.html.includes(enBs(225)) && presu.html.includes("115,0%")],
+  ["y también lo que queda en la que solo está en alerta",
+    presu.html.includes("te quedan") && presu.html.includes(enBs(50))],
+  ["la barra del excedido no se pasa del 100% del ancho",
+    !presu.html.includes('width="115%"') && presu.html.includes('width="100%"')],
+  ["el correo de deudas suma el total y lo pone en el asunto",
+    deudas.subject.includes(enBs(1745)) && deudas.html.includes(enBs(1745))],
+  ["cada deuda muestra los días de atraso",
+    deudas.html.includes("18 día(s) de atraso") && deudas.html.includes("6 día(s) de atraso")],
+  ["una deuda sin motivo no imprime un separador suelto",
+    deudas.html.includes("<strong>Ana</strong></div>")],
+  ["la vigilancia lista los días que faltan y la última foto",
+    cierre.html.includes("05 de septiembre") && cierre.html.includes("06 de septiembre") &&
+    cierre.html.includes("04 de septiembre") && cierre.subject.includes("2 día(s)")],
 );
 
 let f = 0;

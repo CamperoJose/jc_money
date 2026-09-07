@@ -509,3 +509,141 @@ export function htmlAlertaVoz(d: {
     text: `No se pudo registrar tu solicitud por voz (${d.fechaHora}). Motivos: ${d.motivos.join("; ")}.`,
   };
 }
+
+// ============================================================================
+// Alertas: presupuesto, deudas vencidas y cierre que no corrió
+// ============================================================================
+
+export interface AlertaPresupuestoItem {
+  categoria: string;
+  planeado: number;
+  gastado: number;
+  pct: number; // 1.15 = 115%
+  nivel: "alerta" | "excedido";
+}
+
+export function htmlAlertaPresupuesto(
+  items: AlertaPresupuestoItem[],
+  period: string
+): { subject: string; html: string; text: string } {
+  const excedidas = items.filter((i) => i.nivel === "excedido");
+  const enAlerta = items.filter((i) => i.nivel === "alerta");
+
+  const fila = (i: AlertaPresupuestoItem) => {
+    const color = i.nivel === "excedido" ? "#dc2626" : "#b45309";
+    // La barra se dibuja con tablas anidadas: los clientes de correo no
+    // renderizan de forma fiable ni flex ni width en porcentaje sobre divs.
+    const ancho = Math.min(100, Math.round(i.pct * 100));
+    return `<tr>
+      <td style="padding:10px 0;border-bottom:1px solid ${BORDE};">
+        <div style="font-size:14px;color:${TEXTO};">
+          <strong>${i.categoria}</strong>
+          <span style="color:${color};font-weight:bold;"> · ${pct(i.pct)}</span>
+        </div>
+        <div style="font-size:12px;color:${GRIS};margin:3px 0 5px;">
+          ${bob(i.gastado)} de ${bob(i.planeado)}${i.gastado > i.planeado ? ` · <span style="color:${color};">te pasaste ${bob(i.gastado - i.planeado)}</span>` : ` · te quedan ${bob(i.planeado - i.gastado)}`}
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BORDE};border-radius:99px;">
+          <tr><td width="${ancho}%" style="background:${color};height:6px;border-radius:99px;font-size:0;line-height:0;">&nbsp;</td><td>&nbsp;</td></tr>
+        </table>
+      </td>
+    </tr>`;
+  };
+
+  const titulo = excedidas.length > 0
+    ? `${excedidas.length} categoría(s) pasadas de presupuesto`
+    : `${enAlerta.length} categoría(s) cerca del límite`;
+
+  const contenido = `
+    <div style="text-align:center;padding-bottom:6px;">
+      <div style="font-size:15px;font-weight:bold;color:${excedidas.length ? "#dc2626" : "#b45309"};">🎯 ${titulo}</div>
+      <div style="font-size:12px;color:${GRIS};margin-top:2px;">Presupuesto de ${nombreMesPeriodo(period)}</div>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+      ${items.map(fila).join("")}
+    </table>`;
+
+  const text = items
+    .map((i) => `${i.categoria}: ${bob(i.gastado)} de ${bob(i.planeado)} (${pct(i.pct)})`)
+    .join("\n");
+  return {
+    subject: `MyMoney · 🎯 ${titulo}`,
+    html: layout("Alerta de presupuesto", contenido),
+    text,
+  };
+}
+
+export interface DeudaVencidaItem {
+  quien: string;
+  monto: number;
+  vence: string; // YYYY-MM-DD
+  dias: number; // días vencida
+  motivo: string | null;
+}
+
+export function htmlDeudasVencidas(
+  items: DeudaVencidaItem[]
+): { subject: string; html: string; text: string } {
+  const total = items.reduce((s, i) => s + i.monto, 0);
+  const filas = items
+    .map(
+      (i) => `<tr>
+        <td style="padding:10px 0;border-bottom:1px solid ${BORDE};">
+          <div style="font-size:14px;color:${TEXTO};"><strong>${i.quien}</strong>${i.motivo ? ` <span style="color:${GRIS};">· ${i.motivo}</span>` : ""}</div>
+          <div style="font-size:12px;color:${GRIS};margin-top:2px;">Vencía el ${fechaLarga(i.vence)} · <span style="color:#dc2626;">${i.dias} día(s) de atraso</span></div>
+        </td>
+        <td align="right" style="padding:10px 0;border-bottom:1px solid ${BORDE};font-size:14px;font-weight:bold;color:${TEXTO};white-space:nowrap;">${bob(i.monto)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const contenido = `
+    <div style="text-align:center;padding-bottom:6px;">
+      <div style="font-size:15px;font-weight:bold;color:#dc2626;">⏰ ${items.length} deuda(s) por cobrar vencida(s)</div>
+      <div style="font-size:12px;color:${GRIS};margin-top:2px;">Suman ${bob(total)}</div>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+      ${filas}
+    </table>
+    <div style="margin-top:14px;font-size:12px;color:${GRIS};">Se avisa una vez por semana mientras sigan sin cobrarse.</div>`;
+
+  const text = items
+    .map((i) => `${i.quien}: ${bob(i.monto)}, vencía el ${i.vence} (${i.dias} día(s)).`)
+    .join("\n");
+  return {
+    subject: `MyMoney · ⏰ ${items.length} deuda(s) vencida(s) · ${bob(total)}`,
+    html: layout("Deudas por cobrar", contenido),
+    text,
+  };
+}
+
+export function htmlCierreNoCorrio(
+  diasFaltantes: string[],
+  ultimaFoto: string | null
+): { subject: string; html: string; text: string } {
+  const lista = diasFaltantes
+    .map((d) => `<li style="margin:2px 0;">${fechaLarga(d)}</li>`)
+    .join("");
+  const contenido = `
+    <div style="text-align:center;padding-bottom:6px;">
+      <div style="font-size:15px;font-weight:bold;color:#dc2626;">⚠️ El cierre diario no corrió</div>
+      <div style="font-size:12px;color:${GRIS};margin-top:2px;">
+        ${ultimaFoto ? `Última foto de patrimonio: ${fechaLarga(ultimaFoto)}` : "No hay ninguna foto de patrimonio"}
+      </div>
+    </div>
+    <div style="margin-top:10px;font-size:13px;color:${TEXTO};">
+      Falta el cierre automático de:
+      <ul style="margin:6px 0 0;padding-left:20px;color:${TEXTO};font-size:13px;">${lista}</ul>
+    </div>
+    <div style="margin-top:14px;padding:12px 14px;background:${FONDO};border:1px solid ${BORDE};border-radius:10px;font-size:13px;color:${TEXTO};">
+      Revisá la pestaña <strong>Actions</strong> del repositorio y volvé a lanzar
+      «Patrimonio diario» a mano. El cierre es idempotente y recupera los días
+      intermedios, así que no se pierde nada por correrlo tarde.
+    </div>`;
+  const text = `El cierre diario no corrió. Faltan: ${diasFaltantes.join(", ")}. Última foto: ${ultimaFoto ?? "ninguna"}.`;
+  return {
+    subject: `MyMoney · ⚠️ El cierre diario no corrió (${diasFaltantes.length} día(s))`,
+    html: layout("Aviso del sistema", contenido),
+    text,
+  };
+}

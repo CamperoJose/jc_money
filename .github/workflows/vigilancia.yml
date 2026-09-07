@@ -1,0 +1,43 @@
+name: Vigilancia del cierre diario
+
+# Corre a media mañana de Bolivia (09:23 GMT-4 = 13:23 UTC), a propósito lejos
+# del cierre de las 00:17 y en un workflow aparte: si el cierre no corrió, esto
+# lo detecta y manda un correo.
+#
+# Límite conocido: si GitHub Actions se cae entero, esta vigilancia tampoco
+# corre. Vigilar desde otro proveedor costaría dinero, y el proyecto es de costo
+# cero (ver CLAUDE.md, principio 1).
+on:
+  schedule:
+    - cron: "23 13 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Fecha de referencia (YYYY-MM-DD). Vacío = hoy."
+        required: false
+        default: ""
+
+jobs:
+  vigilar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ¿Corrió el cierre de patrimonio?
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
+          DATE_INPUT: ${{ github.event.inputs.date }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then
+            echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN." >&2
+            exit 1
+          fi
+          URL="$APP_URL/api/jobs/vigilancia"
+          if [ -n "$DATE_INPUT" ]; then
+            URL="$URL?date=$DATE_INPUT"
+          fi
+          echo "POST $URL"
+          codigo=$(curl -sS -o vigilancia.json -w "%{http_code}" \
+            -X POST "$URL" \
+            -H "Authorization: Bearer $API_BEARER_TOKEN")
+          echo "HTTP $codigo"; cat vigilancia.json; echo
+          if [ "$codigo" -ge 300 ]; then exit 1; fi

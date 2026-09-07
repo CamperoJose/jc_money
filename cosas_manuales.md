@@ -72,6 +72,26 @@ workflow `.github/workflows/patrimonio-diario.yml` (corre 04:30 UTC = 00:30 Boli
 - [ ] (Opcional) Probarlo a mano: pestaña **Actions → Patrimonio diario → Run workflow**
       (permite indicar una fecha `YYYY-MM-DD` para recalcular/backfill un día puntual).
 
+## 8.b Vigilancia del cierre diario — GRATIS
+El workflow **Vigilancia del cierre diario** corre a las 09:23 de Bolivia y, si el cierre de las
+00:17 no dejó su foto, te manda un correo. Usa los mismos secrets (`APP_URL`, `API_BEARER_TOKEN`),
+así que **no hay nada que configurar**: se activa solo con el push.
+- [ ] (Opcional) Probarlo a mano: **Actions → Vigilancia del cierre diario → Run workflow**.
+- ⚠️ Límite conocido: si GitHub Actions se cae entero, esta vigilancia tampoco corre.
+
+## 8.c Límite de la ingesta por voz — opcional
+El endpoint `/api/voz/ingesta` acepta el token del Atajo de iOS, que (por decisión tuya) no caduca
+ni se revoca desde la app. Para que una fuga no queme la cuota de Gemini hay un tope, ajustable con
+estas variables en Vercel (todas opcionales, traen valores por defecto razonables):
+
+| Variable | Default | Qué hace |
+|----------|---------|----------|
+| `VOZ_LIMITE_VENTANA_MIN` | `10` | Tamaño en minutos de la ventana corta |
+| `VOZ_LIMITE_POR_VENTANA` | `10` | Solicitudes permitidas en esa ventana (`0` = sin tope) |
+| `VOZ_LIMITE_POR_DIA` | `120` | Tope diario (`0` = sin tope) |
+
+- [ ] Si alguna vez el Atajo devuelve **HTTP 429**, subí `VOZ_LIMITE_POR_VENTANA` en Vercel.
+
 ## 9. Google Drive (respaldos) — GRATIS · Fase 2
 - [ ] En Google Cloud crea un **service account** y habilita la **Google Drive API**.
 - [ ] Descarga el JSON de credenciales del service account y pásamelo (va en variable de entorno, no al repo).

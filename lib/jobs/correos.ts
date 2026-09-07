@@ -6,6 +6,10 @@ import {
   htmlDpfAlerta,
   htmlResumenSemanal,
   htmlReporteMensual,
+  htmlAlertaPresupuesto,
+  htmlDeudasVencidas,
+  type AlertaPresupuestoItem,
+  type DeudaVencidaItem,
   type PatrimonioEmailData,
   type DpfAlertaItem,
 } from "@/lib/emails/plantillas";
@@ -13,6 +17,8 @@ import { getDpfs } from "@/lib/queries/dpf";
 import { TIPOS_LIQUIDOS } from "@/lib/patrimonio";
 import { resumenDpf, type ResumenDpf } from "@/lib/dpf";
 import { getResumenPresupuestos } from "@/lib/queries/presupuestos";
+import { getResumenDeudas } from "@/lib/queries/deudas";
+import { leerAviso, guardarAviso } from "@/lib/jobs/avisos";
 
 export interface ResultadoCorreos {
   ok: boolean;
@@ -22,6 +28,8 @@ export interface ResultadoCorreos {
   dpf_vencen_hoy?: number;
   semanal_enviado?: boolean;
   mensual_enviado?: boolean;
+  alerta_presupuesto?: number; // categorías avisadas (0 = no se envió correo)
+  alerta_deudas?: number; // deudas vencidas avisadas (0 = no se envió correo)
 }
 
 /** Día de la semana (0=Dom … 1=Lun) de una fecha 'YYYY-MM-DD'. */
@@ -222,7 +230,78 @@ export async function ejecutarCorreos(
     alertaEnviada = true;
   }
 
-  // 3) Correos periódicos: semanal (lunes) y mensual (el día 1, sobre el mes
+  // 3) Alerta de presupuesto. Se avisa al cruzar 85% y otra vez al pasar el
+  //     100%, una sola vez por nivel y categoría en el mes: si no, el mismo
+  //     correo llegaría todos los días hasta fin de mes y se dejaría de leer.
+  let alertaPresupuesto = 0;
+  try {
+    const period = hoy.slice(0, 7);
+    const rp = await getResumenPresupuestos(admin, period);
+    const claveP = `aviso_presupuesto:${period}`;
+    const avisados = (await leerAviso<Record<string, number>>(admin, userId, claveP)) ?? {};
+    const nuevos: AlertaPresupuestoItem[] = [];
+    const marcas: Record<string, number> = { ...avisados };
+
+    for (const f of rp.filas) {
+      if (f.planned <= 0) continue;
+      const nivelActual = f.estado === "excedido" ? 100 : f.estado === "alerta" ? 85 : 0;
+      if (nivelActual === 0) continue;
+      if ((avisados[f.category_id] ?? 0) >= nivelActual) continue; // ya se avisó este nivel
+      marcas[f.category_id] = nivelActual;
+      nuevos.push({
+        categoria: f.category_name,
+        planeado: f.planned,
+        gastado: f.spent,
+        pct: f.pct,
+        nivel: nivelActual === 100 ? "excedido" : "alerta",
+      });
+    }
+
+    if (nuevos.length > 0) {
+      const al = htmlAlertaPresupuesto(nuevos, period);
+      await enviarCorreo({ subject: al.subject, html: al.html, text: al.text });
+      await guardarAviso(admin, userId, claveP, marcas);
+      alertaPresupuesto = nuevos.length;
+    }
+  } catch {
+    // Sin presupuestos o con la migración a medias: el resto de correos sigue.
+  }
+
+  // 4) Recordatorio de deudas por cobrar vencidas. Como una deuda vencida sigue
+  //    vencida mañana, se repite a lo sumo una vez por semana; pero si aparece
+  //    una deuda vencida nueva, se avisa el mismo día.
+  let alertaDeudas = 0;
+  try {
+    const rd = await getResumenDeudas(admin);
+    const vencidas = rd.deudas.filter((d) => d.vencida && d.outstanding > 0);
+    if (vencidas.length > 0) {
+      const claveD = "aviso_deudas_vencidas";
+      const previo = await leerAviso<{ fecha: string; ids: string[] }>(admin, userId, claveD);
+      const ids = vencidas.map((d) => d.id).sort();
+      const hayNuevas = !previo || ids.some((id) => !previo.ids.includes(id));
+      const pasoUnaSemana = !previo || diasEntreISO(previo.fecha, hoy) >= 7;
+
+      if (hayNuevas || pasoUnaSemana) {
+        const items: DeudaVencidaItem[] = vencidas.map((d) => ({
+          quien: d.counterparty || "Sin nombre",
+          monto: d.outstanding,
+          vence: d.due_date ?? "",
+          dias: d.diasVencida ?? 0,
+          motivo: d.reason,
+        }));
+        const al = htmlDeudasVencidas(items);
+        await enviarCorreo({ subject: al.subject, html: al.html, text: al.text });
+        await guardarAviso(admin, userId, claveD, { fecha: hoy, ids });
+        alertaDeudas = items.length;
+      }
+    } else {
+      await guardarAviso(admin, userId, "aviso_deudas_vencidas", null);
+    }
+  } catch {
+    // Sin deudas o migración a medias: el resto de correos sigue.
+  }
+
+  // 5) Correos periódicos: semanal (lunes) y mensual (el día 1, sobre el mes
   //    que acaba de cerrar). Antes el mensual salía el primer lunes, así que un
   //    cierre de agosto podía llegar el 7 de septiembre y leerse como atrasado.
   let semanalEnviado = false;
@@ -363,6 +442,8 @@ export async function ejecutarCorreos(
 
   return {
     ok: true,
+    alerta_presupuesto: alertaPresupuesto,
+    alerta_deudas: alertaDeudas,
     patrimonio_enviado: true,
     alerta_enviada: alertaEnviada,
     dpf_vencen_hoy: vencenHoy.length,
