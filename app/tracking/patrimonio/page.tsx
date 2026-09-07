@@ -12,6 +12,14 @@ import {
   CalendarBlank,
 } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
+import {
+  calcularEstadoPatrimonio,
+  disponibilidadDe,
+  distribucionMonedaDe,
+  type EstadoPatrimonio,
+} from "@/lib/patrimonio/estado";
+import { fechaBoliviaHoy } from "@/lib/datetime";
+import { EstadoEnVivo } from "@/components/patrimonio/estado-en-vivo";
 import { getResumen, type ResumenPatrimonio } from "@/lib/queries/patrimonio";
 import { getResumenDpf } from "@/lib/queries/dpf";
 import type { ResumenDpf } from "@/lib/dpf";
@@ -38,11 +46,20 @@ export const dynamic = "force-dynamic";
 
 export default async function PatrimonioDashboard() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // Ambas consultas en paralelo (menor tiempo de carga del dashboard).
-  const [resPatrimonio, resDpf] = await Promise.allSettled([
+  // Las tres consultas en paralelo (menor tiempo de carga del dashboard).
+  // `calcularEstadoPatrimonio` es el MISMO cálculo que hace el cierre de
+  // medianoche, aplicado a hoy: así el número que ves ahora es exactamente el
+  // que el job guardará esta noche.
+  const [resPatrimonio, resDpf, resEstado] = await Promise.allSettled([
     getResumen(supabase),
     getResumenDpf(supabase),
+    user
+      ? calcularEstadoPatrimonio(supabase, user.id, fechaBoliviaHoy())
+      : Promise.resolve(null),
   ]);
 
   let resumen: ResumenPatrimonio | null = null;
@@ -56,6 +73,10 @@ export default async function PatrimonioDashboard() {
 
   // DPF: tolerante a que la tabla/migración aún no exista (no rompe el dashboard).
   const resumenDpf: ResumenDpf | null = resDpf.status === "fulfilled" ? resDpf.value : null;
+  // El estado en vivo es un extra: si falla, el dashboard sigue mostrando la
+  // última foto como siempre.
+  const estado: EstadoPatrimonio | null =
+    resEstado.status === "fulfilled" ? resEstado.value : null;
 
   return (
     <div className="space-y-8">
@@ -97,7 +118,7 @@ export default async function PatrimonioDashboard() {
             </CardContent>
           </Card>
         ) : (
-          <Contenido resumen={resumen} />
+          <Contenido resumen={resumen} estado={estado} />
         ))}
 
       {resumenDpf && resumenDpf.totalHistorico > 0 && <DpfResumenCard resumen={resumenDpf} />}
@@ -105,7 +126,13 @@ export default async function PatrimonioDashboard() {
   );
 }
 
-function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
+function Contenido({
+  resumen,
+  estado,
+}: {
+  resumen: ResumenPatrimonio;
+  estado: EstadoPatrimonio | null;
+}) {
   const {
     ultimo,
     variacionBob,
@@ -128,9 +155,18 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
   } = resumen;
   const subeTotal = (variacionTotalBob ?? 0) >= 0;
 
-  const totalMoneda = distribucionMoneda
-    ? distribucionMoneda.BOB + distribucionMoneda.USD + distribucionMoneda.USDT
-    : 0;
+  // Disponibilidad y distribución también en vivo: si el bloque de arriba
+  // muestra el patrimonio de ahora, estas tarjetas no pueden mostrar el de la
+  // última foto — se leerían como una contradicción.
+  const disponible = estado ? disponibilidadDe(estado) : disponibilidadRapida;
+  const disponiblePct = estado
+    ? estado.totalBob > 0
+      ? disponibilidadDe(estado) / estado.totalBob
+      : null
+    : disponibilidadPct;
+  const monedas = estado ? distribucionMonedaDe(estado) : distribucionMoneda;
+
+  const totalMoneda = monedas ? monedas.BOB + monedas.USD + monedas.USDT : 0;
 
   return (
     <>
@@ -148,16 +184,35 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
               </span>
             </div>
             <div className="min-w-0">
+              {/* La cifra grande es el patrimonio AHORA: la última foto más todo
+                  lo registrado después. Si el cálculo en vivo no está
+                  disponible, se muestra la última foto, como antes. */}
               <div className="break-words text-[clamp(1.75rem,1.2rem+1.8vw,2.25rem)] font-bold leading-tight text-primary tabular-nums">
-                {formatBob(ultimo?.total_bob)}
+                {formatBob(estado ? estado.totalBob : ultimo?.total_bob)}
               </div>
               <div className="mt-1 text-sm text-muted-foreground tabular-nums">
-                {formatUsd(ultimo?.total_usd)} · T/C {formatNumber(ultimo?.exchange_rate, 2)}
+                {formatUsd(estado ? estado.totalUsd : ultimo?.total_usd)} · T/C{" "}
+                {formatNumber(estado ? estado.rate : ultimo?.exchange_rate, 2)}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <DeltaPill valor={variacionBob} pct={variacionPct} label="vs. anterior" />
-              <span className="text-muted-foreground">al {formatDate(ultimo?.snapshot_date)}</span>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <DeltaPill valor={variacionBob} pct={variacionPct} label="vs. foto anterior" />
+                <span className="text-muted-foreground">
+                  última foto: {formatDate(ultimo?.snapshot_date)}
+                </span>
+              </div>
+              {estado && (
+                <EstadoEnVivo
+                  baseTotalBob={estado.baseTotalBob}
+                  totalBob={estado.totalBob}
+                  baseFecha={estado.base.snapshot_at}
+                  baseTipo={estado.base.kind}
+                  movimientos={estado.cantidadMovimientosDia}
+                  ajusteDerivadas={estado.ajusteDerivadas}
+                  ajusteMovimientos={estado.ajusteMovimientos}
+                />
+              )}
             </div>
           </CardContent>
         </Card>
@@ -182,7 +237,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
       </section>
 
       {/* Disponibilidad rápida (dinero líquido) */}
-      {disponibilidadRapida != null && (
+      {disponible != null && (
         <Card className="trama-diagonal">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div className="flex items-center gap-3">
@@ -197,10 +252,10 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
               </div>
             </div>
             <div className="text-right">
-              <div className="break-words text-[clamp(1.375rem,1.05rem+1.1vw,1.75rem)] font-bold leading-tight text-primary tabular-nums">{formatBob(disponibilidadRapida)}</div>
-              {disponibilidadPct != null && (
+              <div className="break-words text-[clamp(1.375rem,1.05rem+1.1vw,1.75rem)] font-bold leading-tight text-primary tabular-nums">{formatBob(disponible)}</div>
+              {disponiblePct != null && (
                 <div className="text-xs text-muted-foreground tabular-nums">
-                  {formatPercent(disponibilidadPct)} del patrimonio
+                  {formatPercent(disponiblePct)} del patrimonio
                 </div>
               )}
             </div>
@@ -294,12 +349,12 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
             <CardDescription>Valor en BOB de cada moneda (última foto).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {distribucionMoneda && (
+            {monedas && (
               <>
                 <CategoryBar
                   segmentos={(["BOB", "USD", "USDT"] as const).map((m, i) => ({
                     etiqueta: m,
-                    valor: distribucionMoneda[m],
+                    valor: monedas[m],
                     color: `var(--color-chart-${i + 1})`,
                   }))}
                   formato="bob"
@@ -307,7 +362,7 @@ function Contenido({ resumen }: { resumen: ResumenPatrimonio }) {
                 {/* Detalle con participación de cada moneda */}
                 <div className="space-y-1.5 border-t pt-3">
                   {(["BOB", "USD", "USDT"] as const).map((m, i) => {
-                    const val = distribucionMoneda[m];
+                    const val = monedas[m];
                     const pct = totalMoneda ? val / totalMoneda : 0;
                     return (
                       <div key={m} className="flex items-center gap-2 text-sm">

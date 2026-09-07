@@ -50,7 +50,12 @@ export interface EstadoPatrimonio {
   balances: Array<{
     account_id: string;
     amount: number;
-    account: { currency: "BOB" | "USD" | "USDT"; is_liability: boolean };
+    account: {
+      name: string;
+      type: string;
+      currency: "BOB" | "USD" | "USDT";
+      is_liability: boolean;
+    };
   }>;
   totalBob: number;
   totalUsd: number | null;
@@ -332,12 +337,21 @@ export async function calcularEstadoPatrimonio(
   // Cuentas: moneda y si son pasivo.
   const { data: cuentasData } = await db
     .from("accounts")
-    .select("id, currency, is_liability")
+    .select("id, name, type, currency, is_liability")
     .eq("user_id", userId);
   const metaCuenta = new Map(
     (cuentasData ?? []).map((c) => {
-      const r = c as { id: string; currency: "BOB" | "USD" | "USDT"; is_liability: boolean };
-      return [r.id, { currency: r.currency, is_liability: !!r.is_liability }];
+      const r = c as {
+        id: string;
+        name: string;
+        type: string;
+        currency: "BOB" | "USD" | "USDT";
+        is_liability: boolean;
+      };
+      return [
+        r.id,
+        { name: r.name, type: r.type, currency: r.currency, is_liability: !!r.is_liability },
+      ];
     })
   );
   const monedaCuenta = new Map([...metaCuenta].map(([id, m]) => [id, m.currency] as const));
@@ -430,6 +444,8 @@ export async function calcularEstadoPatrimonio(
     account_id,
     amount,
     account: {
+      name: metaCuenta.get(account_id)?.name ?? "—",
+      type: metaCuenta.get(account_id)?.type ?? "otro",
       currency: metaCuenta.get(account_id)?.currency ?? ("BOB" as const),
       is_liability: metaCuenta.get(account_id)?.is_liability ?? false,
     },
@@ -470,4 +486,30 @@ export async function calcularEstadoPatrimonio(
     cantidadMovimientosDia: (txns ?? []).length,
     nota,
   };
+}
+
+const TIPOS_LIQUIDOS = new Set(["banco", "efectivo", "stablecoin"]);
+
+/** Dinero disponible ya (efectivo, banco, stablecoins), en BOB. */
+export function disponibilidadDe(estado: EstadoPatrimonio): number {
+  const liquido = estado.balances.reduce((acc, b) => {
+    if (b.account.is_liability || !TIPOS_LIQUIDOS.has(b.account.type)) return acc;
+    return acc + (b.account.currency === "BOB" ? b.amount : b.amount * estado.rate);
+  }, 0);
+  return redondear(liquido);
+}
+
+/** Valor en BOB por moneda, para la barra de distribución. */
+export function distribucionMonedaDe(estado: EstadoPatrimonio): {
+  BOB: number;
+  USD: number;
+  USDT: number;
+} {
+  const out = { BOB: 0, USD: 0, USDT: 0 };
+  for (const b of estado.balances) {
+    if (b.account.is_liability) continue;
+    const bob = b.account.currency === "BOB" ? b.amount : b.amount * estado.rate;
+    out[b.account.currency] += bob;
+  }
+  return { BOB: redondear(out.BOB), USD: redondear(out.USD), USDT: redondear(out.USDT) };
 }
