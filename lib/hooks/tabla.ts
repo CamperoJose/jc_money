@@ -22,6 +22,12 @@ export function useOrden<T>(
 ): { ordenadas: T[]; orden: Orden | null; ordenarPor: (campo: string) => void } {
   const [orden, setOrden] = useState<Orden | null>(inicial);
 
+  // `valores` se pasa como objeto literal en cada llamada, así que cambia de
+  // identidad en cada render. Por referencia, para que el memo no se invalide y
+  // la lista no se reordene en cada pulsación de tecla del buscador.
+  const valoresRef = useRef(valores);
+  valoresRef.current = valores;
+
   const ordenarPor = useCallback((campo: string) => {
     setOrden((prev) => {
       // Tercer clic: vuelve al orden natural de la lista.
@@ -31,8 +37,9 @@ export function useOrden<T>(
   }, []);
 
   const ordenadas = useMemo(() => {
-    if (!orden || !valores[orden.campo]) return filas;
-    const extraer = valores[orden.campo];
+    const extractores = valoresRef.current;
+    if (!orden || !extractores[orden.campo]) return filas;
+    const extraer = extractores[orden.campo];
     const signo = orden.asc ? 1 : -1;
     return [...filas].sort((a, b) => {
       const va = extraer(a);
@@ -45,7 +52,7 @@ export function useOrden<T>(
       if (typeof va === "number" && typeof vb === "number") return (va - vb) * signo;
       return String(va).localeCompare(String(vb), "es") * signo;
     });
-  }, [filas, orden, valores]);
+  }, [filas, orden]);
 
   return { ordenadas, orden, ordenarPor };
 }

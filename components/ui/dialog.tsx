@@ -29,6 +29,18 @@ export function Dialog({
   const panel = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => setMounted(true), []);
 
+  // Los callbacks van por referencia y NO en las dependencias del efecto.
+  // `onEnviar` se pasa como `enviando ? undefined : guardar` y `onOpenChange` a
+  // veces es una función anónima: ambas cambian de identidad en cada render. Si
+  // estuvieran en las dependencias, cada tecla pulsada volvería a montar el
+  // efecto y su enfoque inicial devolvería el cursor al primer campo.
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  const onEnviarRef = React.useRef(onEnviar);
+  React.useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+    onEnviarRef.current = onEnviar;
+  });
+
   React.useEffect(() => {
     if (!open) return;
 
@@ -45,10 +57,11 @@ export function Dialog({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onOpenChange(false);
+        onOpenChangeRef.current(false);
         return;
       }
-      if (e.key === "Enter" && onEnviar) {
+      const enviar = onEnviarRef.current;
+      if (e.key === "Enter" && enviar) {
         const el = document.activeElement as HTMLElement | null;
         // Solo desde un <input>. En un <select> Enter confirma la opción
         // elegida, y en un <textarea> es un salto de línea; en un <button>, la
@@ -56,7 +69,7 @@ export function Dialog({
         const esCampo = el?.tagName === "INPUT";
         if (esCampo && panel.current?.contains(el)) {
           e.preventDefault();
-          onEnviar();
+          enviar();
           return;
         }
       }
@@ -95,7 +108,7 @@ export function Dialog({
       document.body.style.overflow = "";
       previo?.focus?.();
     };
-  }, [open, onOpenChange, onEnviar]);
+  }, [open]);
 
   if (!mounted || !open) return null;
 
