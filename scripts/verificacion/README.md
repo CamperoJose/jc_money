@@ -23,7 +23,7 @@ dashboard y el cierre del job dan exactamente lo mismo.
 ## Qué comprueba
 
 Siembra el caso real del 3 de septiembre de 2026 (foto manual de las 09:06, tres
-gastos en efectivo, deuda nueva del día) y verifica 13 propiedades, entre ellas:
+gastos en efectivo, deuda nueva del día) y verifica 22 propiedades, entre ellas:
 
 - El neto cuenta el **día entero** cuando la base es manual (decisión E4).
 - **`total = Σ(saldos)`**, la invariante que rompió el bug de la sesión 19.
@@ -32,9 +32,16 @@ gastos en efectivo, deuda nueva del día) y verifica 13 propiedades, entre ellas
 - Un gasto nuevo se refleja **sin esperar al cierre**.
 - Con base auto no se recuentan los gastos del día ya cerrado.
 - El job es idempotente.
+- **El ciclo completo de una deuda** (migración 0015): prestar descuenta de la
+  cuenta de origen y sube «Por Cobrar»; cobrar ingresa en la cuenta destino. En
+  ninguno de los dos pasos cambia el patrimonio total.
 - **Las cuentas derivadas se evalúan a la fecha pedida, no a hoy**: cobrar una
   deuda el día 6 no puede cambiar el «Por Cobrar» del día 3, y un DPF abierto el
   día 5 no cuenta el día 3.
+
+Cada bloque que modifica datos reinicia el escenario antes de empezar: sin eso,
+un bloque hereda lo que sembró el anterior y produce diferencias que parecen
+fallos del cálculo sin serlo.
 
 La batería **se deja el escenario como lo encontró**: puede correrse las veces
 que haga falta sin limpiar la base a mano.

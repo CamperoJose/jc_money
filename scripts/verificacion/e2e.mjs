@@ -22,6 +22,7 @@ async function reiniciarEscenario() {
   await pool.query("delete from net_worth_snapshots where kind = 'auto'");
   await pool.query("delete from transactions where txn_date <> '2026-09-03'");
   await pool.query("delete from dpf_deposits where principal = 5000");
+  await pool.query("delete from debts where counterparty = 'Préstamo con origen'");
   await pool.query(`update debts set paid_amount = 0, status = 'pendiente',
     collected_date = null, paid_account_id = null where counterparty = 'Deuda nueva del día'`);
 }
@@ -108,6 +109,36 @@ console.log("\n— DPF abierto el día 5 —");
 console.log("  DPF al día 3:", dpf3, "| al día 6:", dpf6);
 check("un DPF que aún no existía no cuenta en una fecha anterior", dpf3 === 39000);
 check("y sí cuenta desde que empieza", dpf6 === 44000);
+
+// ---------- 7. Ciclo completo de una deuda (migración 0015) ----------
+// Prestar mueve dinero de una cuenta real a «Por Cobrar»; cobrar lo devuelve a
+// otra cuenta. El patrimonio TOTAL no puede cambiar en ninguno de los dos pasos.
+//
+// Se reinicia antes de empezar: los bloques anteriores dejaron un gasto el día 4
+// y un DPF el día 5, y mezclarlos aquí daría diferencias que parecen fallos del
+// cálculo sin serlo.
+await reiniciarEscenario();
+const antes = await calcularEstadoPatrimonio(db, USER, "2026-09-03");
+await pool.query(`insert into debts (user_id,debt_date,amount,paid_amount,status,counterparty,source_account_id)
+  values ($1,'2026-09-04',300,0,'pendiente','Préstamo con origen','a0000000-0000-0000-0000-000000000001')`, [USER]);
+const trasPrestar = await calcularEstadoPatrimonio(db, USER, "2026-09-04");
+const efectivoTrasPrestar = trasPrestar.balances.find((b) => b.account.name === "Efectivo Bs").amount;
+const porCobrarTrasPrestar = trasPrestar.balances.find((b) => b.account.name === "Por Cobrar").amount;
+
+await pool.query(`update debts set paid_amount=300, status='pagado', collected_date='2026-09-05',
+  paid_account_id='a0000000-0000-0000-0000-000000000002' where counterparty='Préstamo con origen'`);
+const trasCobrar = await calcularEstadoPatrimonio(db, USER, "2026-09-05");
+const bnbTrasCobrar = trasCobrar.balances.find((b) => b.account.name === "BNB").amount;
+
+console.log("\n— Ciclo de deuda: prestar 300 desde Efectivo, cobrar en BNB —");
+console.log("  total antes:", antes.totalBob, "| tras prestar:", trasPrestar.totalBob, "| tras cobrar:", trasCobrar.totalBob);
+console.log("  Efectivo:", efectivoTrasPrestar, "| Por Cobrar:", porCobrarTrasPrestar, "| BNB:", bnbTrasCobrar);
+check("prestar descuenta de la cuenta de origen", efectivoTrasPrestar === r2(661.3 - 300));
+check("prestar sube «Por Cobrar»", porCobrarTrasPrestar === 2045);
+check("prestar NO cambia el patrimonio total", trasPrestar.totalBob === antes.totalBob);
+check("cobrar ingresa en la cuenta destino", bnbTrasCobrar === r2(603.14 + 300));
+check("cobrar tampoco cambia el patrimonio total", trasCobrar.totalBob === antes.totalBob);
+await pool.query(`delete from debts where counterparty='Préstamo con origen'`);
 
 console.log("");
 let f = 0;
