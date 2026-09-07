@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getResumen } from "@/lib/queries/patrimonio";
 import { analizarTendencia } from "@/lib/tendencias";
+import { analizarGastos, type AnalisisGastos } from "@/lib/analisis";
+import { getTransacciones } from "@/lib/queries/gastos";
+import { fechaBoliviaHoy } from "@/lib/datetime";
 import { Card, CardContent } from "@/components/ui/card";
 import { TendenciasClient } from "@/components/tendencias/tendencias-client";
 
@@ -18,6 +21,15 @@ export default async function TendenciasPage() {
     errorMsg = e instanceof Error ? e.message : "Error al leer los datos.";
   }
 
+  // Los patrones de gasto son un extra: si fallan, la pantalla de patrimonio
+  // —que es la razón de ser de esta página— tiene que salir igual.
+  let gastos: AnalisisGastos | null = null;
+  try {
+    gastos = analizarGastos(await getTransacciones(supabase), fechaBoliviaHoy());
+  } catch {
+    gastos = null;
+  }
+
   if (errorMsg) {
     return (
       <Card>
@@ -29,5 +41,5 @@ export default async function TendenciasPage() {
     );
   }
 
-  return <TendenciasClient t={analizarTendencia(serie)} />;
+  return <TendenciasClient t={analizarTendencia(serie)} gastos={gastos} />;
 }

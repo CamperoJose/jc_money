@@ -28,7 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { formatBob, formatBobCompact, formatPercent, formatDate } from "@/lib/format";
+import { formatBob, formatBobCompact, formatPercent, formatDate, formatEje } from "@/lib/format";
 import { simularLaddering, type ParamsSimulador } from "@/lib/dpf";
 
 const tooltipStyle = {
@@ -165,7 +165,7 @@ export function SimuladorClient() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => formatBobCompact(v)} width={70} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={formatEje} width={52} />
                   <Tooltip
                     contentStyle={tooltipStyle}
                     formatter={(v: number, n) => [formatBob(v), n === "capitalActivo" ? "Capital activo" : "Aportado"]}

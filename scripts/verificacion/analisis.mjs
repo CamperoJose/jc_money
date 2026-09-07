@@ -89,10 +89,40 @@ alza.push(tx("2026-09-04", 480, "Transporte", "gasolina"));
 alza.push(tx("2026-09-02", 8000, null, "sueldo", "ingreso"));
 const A = analizarGastos(alza, "2026-09-07");
 const ali = A.categoriasEnAlza.find((c) => c.categoria === "Alimentación");
-check("detecta la categoría que subió", !!ali && ali.pct === 1.5,
-  JSON.stringify(A.categoriasEnAlza));
+// Los meses previos gastaron 1000 en Alimentación el día 10, o sea NADA en los
+// días 1-7; pero septiembre lleva 2500 al día 3. Con referencia 0 el porcentaje
+// no existe, así que la categoría queda fuera: preferimos callar a inventar.
+check("sin gasto previo en esos días del mes, no se inventa un porcentaje",
+  ali == null, JSON.stringify(A.categoriasEnAlza));
 check("y NO marca en alza la que quedó igual",
   !A.categoriasEnAlza.some((c) => c.categoria === "Transporte"));
+
+// El problema que se vio en pantalla: al día 7 del mes, comparar contra meses
+// COMPLETOS ponía a −100% toda categoría todavía sin gastar.
+const parcial = [];
+for (const mes of ["2026-06", "2026-07", "2026-08"]) {
+  parcial.push(tx(`${mes}-05`, 200, "Alimentación", "mercado"));
+  parcial.push(tx(`${mes}-20`, 900, "Alimentación", "mercado"));
+  parcial.push(tx(`${mes}-21`, 600, "Servicios", "luz"));
+  parcial.push(tx(`${mes}-22`, 400, "Transporte", "taxi"));
+  parcial.push(tx(`${mes}-23`, 300, "Salud", "farmacia"));
+}
+// En septiembre se gastó en los mismos días que siempre, y algo parecido.
+parcial.push(tx("2026-09-05", 210, "Alimentación", "mercado"));
+const P = analizarGastos(parcial, "2026-09-07");
+check("a mitad de mes, gastar al ritmo normal no aparece como una caída",
+  !P.categoriasEnBaja.some((c) => c.categoria === "Alimentación"),
+  JSON.stringify(P.categoriasEnBaja));
+check("una categoría aún sin gastar no se marca −100% el día 7",
+  !P.categoriasEnBaja.some((c) => c.categoria === "Transporte" || c.categoria === "Salud"),
+  JSON.stringify(P.categoriasEnBaja.map((c) => c.categoria)));
+check("pero una que se disparó en esos mismos días sí se detecta",
+  analizarGastos([...parcial, tx("2026-09-06", 1400, "Alimentación", "banquete")], "2026-09-07")
+    .categoriasEnAlza.some((c) => c.categoria === "Alimentación"),
+  JSON.stringify(analizarGastos([...parcial, tx("2026-09-06", 1400, "Alimentación", "banquete")], "2026-09-07").categoriasEnAlza));
+check("los primeros días del mes no se compara nada (muestra ridícula)",
+  analizarGastos(parcial, "2026-09-03").categoriasEnAlza.length === 0 &&
+  analizarGastos(parcial, "2026-09-03").categoriasEnBaja.length === 0);
 const junio = A.porMes.find((m) => m.period === "2026-06");
 check("calcula la tasa de ahorro por mes",
   junio.gasto === 1560 && junio.ingreso === 8000 && junio.tasaAhorro === 0.805,

@@ -214,12 +214,20 @@ export function analizarTendencia(
     return T95 * se * Math.sqrt(1 + 1 / n + (dia - mediaX) ** 2 / sxx);
   };
 
-  const puntos: PuntoTendencia[] = puntosValidos.map((p) => ({
-    fecha: p.fecha,
-    real: r2n(p.bob),
-    proyeccion: r2n(predict(diasEntre(desde, p.fecha))),
-    banda: null, // en el tramo histórico la banda solo ensucia: ya está el real
-  }));
+  const puntos: PuntoTendencia[] = puntosValidos.map((p) => {
+    const dia = diasEntre(desde, p.fecha);
+    const centro = predict(dia);
+    // En el tramo histórico la banda solo ensucia: ya está el dato real. La
+    // excepción es la ÚLTIMA foto: sin ese punto la banda arrancaría recién a
+    // un mes vista y quedaría un hueco entre «hoy» y el rango proyectado.
+    const mrg = p.fecha === hasta ? margen(dia) : null;
+    return {
+      fecha: p.fecha,
+      real: r2n(p.bob),
+      proyeccion: r2n(centro),
+      banda: mrg == null ? null : [r2n(Math.max(0, centro - mrg)), r2n(centro + mrg)],
+    };
+  });
   for (const m of MESES_HORIZONTE) {
     const fecha = sumarMeses(hasta, m);
     const dia = diasEntre(desde, fecha);

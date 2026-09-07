@@ -90,6 +90,12 @@ check("con una sola foto no proyecta nada", !U.suficienteData && U.hallazgos.len
 const D = analizarTendencia([{ fecha: "2026-01-01", bob: 100 }, { fecha: "2026-02-01", bob: 200 }]);
 check("con dos fotos proyecta pero sin banda (0 grados de libertad)",
   D.suficienteData && D.errorEstandar === null && D.puntos.every((p) => p.banda === null));
+check("la banda arranca en la última foto, no un mes después",
+  R.puntos.filter((p) => p.real != null && p.banda != null).length === 1 &&
+  R.puntos.find((p) => p.banda != null).fecha === R.hasta,
+  R.puntos.find((p) => p.banda != null)?.fecha);
+check("y en el resto del histórico no hay banda",
+  R.puntos.filter((p) => p.real != null).slice(0, -1).every((p) => p.banda === null));
 check("y avisa de que son pocos datos", D.hallazgos.some((h) => h.id === "pocas-fotos"));
 const Z = analizarTendencia([{ fecha: "2026-01-01", bob: 0 }, { fecha: "2026-02-01", bob: 0 }]);
 check("una serie en cero no rompe ni produce NaN",

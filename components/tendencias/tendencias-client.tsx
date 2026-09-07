@@ -12,7 +12,20 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
-import { TrendUp, ChartLineUp, Target, Percent, Sparkle } from "@phosphor-icons/react";
+import {
+  Bar,
+  BarChart,
+  Cell,
+} from "recharts";
+import {
+  TrendUp,
+  ChartLineUp,
+  Target,
+  Percent,
+  Sparkle,
+  Speedometer,
+  ArrowLineDown,
+} from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Kpi } from "@/components/tremor/kpi-card";
 import {
@@ -30,8 +43,11 @@ import {
   type RangoId,
 } from "@/components/tremor/selector-rango";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
-import { formatBob, formatBobCompact, formatPercent, formatDate } from "@/lib/format";
+import { formatBob, formatBobCompact, formatPercent, formatDate, formatEje } from "@/lib/format";
 import type { ResumenTendencias } from "@/lib/tendencias";
+import type { AnalisisGastos } from "@/lib/analisis";
+import { ListaHallazgos } from "@/components/tendencias/hallazgos";
+import { PatronesGasto } from "@/components/tendencias/patrones-gasto";
 
 const tooltipStyle = {
   background: "var(--color-popover)",
@@ -41,7 +57,13 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
-export function TendenciasClient({ t }: { t: ResumenTendencias }) {
+export function TendenciasClient({
+  t,
+  gastos,
+}: {
+  t: ResumenTendencias;
+  gastos: AnalisisGastos | null;
+}) {
   // Antes del early return: las reglas de hooks exigen que se llame siempre.
   const [rangoElegido, setRangoElegido] = usePreferencia<RangoId>(
     "tendencias.rango",
@@ -59,6 +81,14 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
             {t.narrativa}
           </CardContent>
         </Card>
+        {/* Aunque falten fotos de patrimonio puede haber gastos de sobra que
+            analizar; no tiene sentido esconderlos detrás del mismo vacío. */}
+        {gastos?.suficienteData && (
+          <>
+            <ListaHallazgos hallazgos={gastos.hallazgos} titulo="Patrones en tus gastos" />
+            <PatronesGasto a={gastos} />
+          </>
+        )}
       </div>
     );
   }
@@ -101,6 +131,9 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
         </CardContent>
       </Card>
 
+      {/* Lo que los datos dicen, en frases */}
+      <ListaHallazgos hallazgos={t.hallazgos} />
+
       {/* KPIs + confianza del ajuste */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
@@ -122,6 +155,42 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
           valor={formatBobCompact(t.valorActual)}
           detalle={formatBob(t.valorActual)}
           icono={<Target weight="duotone" className="size-4" />}
+        />
+        <Kpi
+          etiqueta="Ritmo de los últimos 90 días"
+          valor={
+            t.aceleracion.ritmoReciente == null
+              ? "—"
+              : `${t.aceleracion.ritmoReciente >= 0 ? "+" : ""}${formatBobCompact(t.aceleracion.ritmoReciente)}`
+          }
+          detalle={
+            t.aceleracion.direccion === "sin_datos"
+              ? "Sin tramo previo con el que comparar"
+              : t.aceleracion.direccion === "estable"
+                ? "En línea con el ritmo anterior"
+                : `${t.aceleracion.direccion === "acelerando" ? "Más rápido" : "Más lento"} que antes (${t.aceleracion.ritmoPrevio! >= 0 ? "+" : ""}${formatBobCompact(t.aceleracion.ritmoPrevio)}/mes)`
+          }
+          icono={<Speedometer weight="duotone" className="size-4" />}
+          tono={(t.aceleracion.ritmoReciente ?? 0) >= 0 ? "pos" : "neg"}
+        />
+        <Kpi
+          etiqueta="Distancia al máximo"
+          valor={t.drawdown && t.drawdown.monto > 0 ? `−${formatBobCompact(t.drawdown.monto)}` : "En el pico"}
+          detalle={
+            t.maximo
+              ? t.drawdown && t.drawdown.monto > 0
+                ? `${formatPercent(t.drawdown.pct, 1)} bajo el máximo del ${formatDate(t.maximo.fecha)}`
+                : `Tu máximo histórico es ahora: ${formatBob(t.maximo.valor)}`
+              : "—"
+          }
+          icono={<ArrowLineDown weight="duotone" className="size-4" />}
+          tono={t.drawdown && t.drawdown.monto > 0 ? "neg" : "pos"}
+        />
+        <Kpi
+          etiqueta="Volatilidad mensual"
+          valor={t.volatilidadMensual == null ? "—" : `±${formatBobCompact(t.volatilidadMensual)}`}
+          detalle="Cuánto varía un mes respecto de otro"
+          icono={<ChartLineUp weight="duotone" className="size-4" />}
         />
         {/* Confianza del ajuste (R²) como anillo */}
         <Card>
@@ -168,18 +237,102 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis {...propsEjeTiempo(rango)} tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
-              <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => formatBobCompact(v)} width={70} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [formatBob(v), n === "real" ? "Real" : "Proyección"]} labelFormatter={(l) => formatoFechaTooltip(Number(l))} />
-              <Legend formatter={(v) => (v === "real" ? "Histórico" : "Proyección")} wrapperStyle={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={formatEje} width={52} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number | [number, number], n) =>
+                  Array.isArray(v)
+                    ? [`${formatBob(v[0])} – ${formatBob(v[1])}`, "Rango probable"]
+                    : [formatBob(v), n === "real" ? "Real" : "Proyección"]
+                } labelFormatter={(l) => formatoFechaTooltip(Number(l))} />
+              <Legend
+                formatter={(v) => (v === "real" ? "Histórico" : v === "banda" ? "Rango probable (95%)" : "Proyección")}
+                wrapperStyle={{ fontSize: 12 }}
+              />
               {fechaCorte && (
                 <ReferenceLine x={tsDeFecha(fechaCorte)} stroke="var(--color-muted-foreground)" strokeDasharray="4 3" label={{ value: "hoy", position: "top", fontSize: 10, fill: "var(--color-muted-foreground)" }} />
               )}
+              {/* La banda va PRIMERO para quedar por detrás de las líneas. */}
+              <Area
+                type="monotone"
+                dataKey="banda"
+                stroke="none"
+                fill="var(--color-chart-3)"
+                fillOpacity={0.14}
+                connectNulls
+                activeDot={false}
+                isAnimationActive={false}
+              />
               <Area type="monotone" dataKey="real" stroke="var(--color-chart-1)" fill="url(#gradReal)" strokeWidth={2.5} connectNulls dot={{ r: 2 }} />
               <Line type="monotone" dataKey="proyeccion" stroke="var(--color-chart-3)" strokeWidth={2} strokeDasharray="6 4" dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            La banda es el rango donde, con los datos actuales, caería el valor real 19 de cada 20
+            veces. Se ensancha con el horizonte porque la incertidumbre crece: la línea del centro
+            es lo más probable, no una promesa.
+          </p>
         </CardContent>
       </Card>
+
+      {/* Cambio mes a mes: dónde se ganó y dónde se perdió */}
+      {t.porMes.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Cuánto sumó o restó cada mes</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Diferencia entre el cierre de cada mes y el del mes anterior.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                accessibilityLayer
+                data={t.porMes.map((m) => ({ ...m, etiqueta: etiquetaMes(m.period) }))}
+                margin={{ top: 6, right: 6, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                <XAxis dataKey="etiqueta" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={formatEje} width={48} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
+                  formatter={(v: number) => [`${v >= 0 ? "+" : ""}${formatBob(v)}`, "Cambio"]}
+                />
+                {/* La línea del cero es imprescindible en un gráfico con signo:
+                    sin ella no se distingue un mes flojo de uno negativo. */}
+                <ReferenceLine y={0} stroke="var(--color-border)" />
+                <Bar dataKey="cambio" radius={[4, 4, 0, 0]}>
+                  {t.porMes.map((m) => (
+                    <Cell
+                      key={m.period}
+                      fill={m.cambio >= 0 ? "var(--color-chart-1)" : "var(--color-destructive)"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            {t.mejorMes && t.peorMes && t.mejorMes.period !== t.peorMes.period && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] px-3 py-2">
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Mejor mes</div>
+                  <div className="text-sm font-semibold">
+                    {etiquetaMes(t.mejorMes.period)} ·{" "}
+                    <span className="tabular-nums text-emerald-700 dark:text-emerald-400">
+                      +{formatBob(t.mejorMes.cambio)}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-destructive/30 bg-destructive/[0.06] px-3 py-2">
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Peor mes</div>
+                  <div className="text-sm font-semibold">
+                    {etiquetaMes(t.peorMes.period)} ·{" "}
+                    <span className="tabular-nums text-destructive">{formatBob(t.peorMes.cambio)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Proyecciones por horizonte */}
@@ -239,7 +392,29 @@ export function TendenciasClient({ t }: { t: ResumenTendencias }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Patrones de gasto: el otro lado de la misma historia */}
+      {gastos?.suficienteData && (
+        <>
+          <div className="border-b border-border pb-3 pt-2">
+            <h2 className="text-lg font-semibold text-foreground">Patrones en tus gastos</h2>
+            <p className="text-sm text-muted-foreground">
+              Sobre {gastos.movimientos} movimientos registrados desde {formatDate(gastos.desde)}.
+            </p>
+          </div>
+          <ListaHallazgos hallazgos={gastos.hallazgos} titulo="Qué se repite en tus gastos" />
+          <PatronesGasto a={gastos} />
+        </>
+      )}
     </div>
+  );
+}
+
+/** 'YYYY-MM' → "sep 2026", corto para que entre en el eje del gráfico. */
+function etiquetaMes(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-BO", { month: "short", year: "2-digit" }).format(
+    new Date(Date.UTC(y, m - 1, 1))
   );
 }
 

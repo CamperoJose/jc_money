@@ -41,7 +41,8 @@ export interface GastoPorDiaSemana {
 export interface CategoriaEnMovimiento {
   categoria: string;
   actual: number; // gastado en el mes en curso
-  referencia: number; // promedio de los meses previos completos
+  /** Promedio de lo gastado en los mismos días del mes, en los meses previos. */
+  referencia: number;
   variacion: number; // actual − referencia
   pct: number | null; // variacion / referencia
   meses: number; // meses de referencia usados
@@ -189,9 +190,31 @@ export function analizarGastos(
     const m = gastoPorCatMes.get(cat)!;
     m.set(mes, (m.get(mes) ?? 0) + t.amount_bob);
   }
+  // El mes en curso está a medias, así que compararlo con meses COMPLETOS haría
+  // que el día 7 toda categoría sin gastar todavía apareciera con «−100%».
+  //
+  // Prorratear el promedio mensual tampoco sirve: asume que el gasto se reparte
+  // parejo, y no es así (el alquiler cae el 1, el mercado el 20…). Se compara
+  // la MISMA ventana de días: lo que va del 1 al día de hoy contra lo que iba
+  // del 1 al mismo día en cada mes previo. Sin supuestos y exacto.
+  const diaDelMes = Number(hoy.slice(8, 10));
+
   const enMovimiento: CategoriaEnMovimiento[] = [];
-  if (previos.length >= 2) {
-    for (const [categoria, porM] of gastoPorCatMes) {
+  // Los primeros días la muestra es tan chica que un gasto suelto se dispara a
+  // porcentajes absurdos; por debajo de una semana no se compara nada.
+  if (previos.length >= 2 && diaDelMes >= 7) {
+    // Gasto por categoría y mes, contando solo los días 1..diaDelMes.
+    const hastaElDia = new Map<string, Map<string, number>>();
+    for (const t of gastos) {
+      if (Number(t.txn_date.slice(8, 10)) > diaDelMes) continue;
+      const cat = t.category?.name ?? "Sin categoría";
+      const mes = t.txn_date.slice(0, 7);
+      if (!hastaElDia.has(cat)) hastaElDia.set(cat, new Map());
+      const m = hastaElDia.get(cat)!;
+      m.set(mes, (m.get(mes) ?? 0) + t.amount_bob);
+    }
+
+    for (const [categoria, porM] of hastaElDia) {
       const refs = previos.map((m) => porM.get(m) ?? 0);
       const referencia = refs.reduce((a, b) => a + b, 0) / refs.length;
       const actual = porM.get(mesActual) ?? 0;
@@ -298,7 +321,7 @@ export function analizarGastos(
     hallazgos.push({
       id: `alza-${c.categoria}`,
       titulo: `${c.categoria} subió ${Math.round(c.pct! * 100)}% este mes`,
-      detalle: `Vas ${fmt(c.actual)} Bs contra ${fmt(c.referencia)} Bs de promedio en los ${c.meses} meses previos.`,
+      detalle: `Vas ${fmt(c.actual)} Bs contra los ${fmt(c.referencia)} Bs que llevabas a esta altura del mes en los ${c.meses} meses previos.`,
       tono: "aviso",
     });
   }
@@ -306,7 +329,7 @@ export function analizarGastos(
     hallazgos.push({
       id: `baja-${c.categoria}`,
       titulo: `${c.categoria} bajó ${Math.round(Math.abs(c.pct!) * 100)}% este mes`,
-      detalle: `Vas ${fmt(c.actual)} Bs contra ${fmt(c.referencia)} Bs de promedio previo.`,
+      detalle: `Vas ${fmt(c.actual)} Bs contra los ${fmt(c.referencia)} Bs que llevabas a esta altura del mes.`,
       tono: "bueno",
     });
   }

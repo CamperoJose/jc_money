@@ -33,7 +33,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PALETA_CATEGORICA } from "@/lib/charts";
 import { Badge } from "@/components/ui/badge";
-import { formatBob, formatBobCompact, formatPercent, formatDate } from "@/lib/format";
+import { formatBob, formatBobCompact, formatPercent, formatDate, formatEje } from "@/lib/format";
 import type { ResumenDpf } from "@/lib/dpf";
 import type { DpfDepositUI } from "@/lib/types";
 
@@ -237,7 +237,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
                 <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                 <YAxis
                   tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                  tickFormatter={(v) => formatBobCompact(v)}
+                  tickFormatter={formatEje}
                   width={70}
                 />
                 <Tooltip
@@ -314,7 +314,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                   <YAxis
                     tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                    tickFormatter={(v) => formatBobCompact(v)}
+                    tickFormatter={formatEje}
                     width={70}
                   />
                   <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatBob(v), "Ganancia líquida"]} />
@@ -345,7 +345,7 @@ export function DpfDashboard({ resumen }: { resumen: ResumenDpf }) {
                 <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                 <YAxis
                   tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                  tickFormatter={(v) => formatBobCompact(v)}
+                  tickFormatter={formatEje}
                   width={70}
                 />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatBob(v), "Al vencimiento"]} />

@@ -16,7 +16,7 @@ import {
 import { TrendDown, TrendUp, Calendar, ChartBar } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PALETA_CATEGORICA } from "@/lib/charts";
-import { formatBob, formatBobCompact, formatPercent } from "@/lib/format";
+import { formatBob, formatPercent, formatEje } from "@/lib/format";
 import type { ResumenGastos } from "@/lib/queries/gastos";
 
 const PALETA = PALETA_CATEGORICA;
@@ -116,7 +116,7 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
             <BarChart accessibilityLayer data={serie7dias} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="etiqueta" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
-              <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => formatBobCompact(v)} width={64} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} tickFormatter={formatEje} width={64} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatBob(v), "Gasto"]} cursor={{ fill: "var(--color-muted)", opacity: 0.4 }} />
               <Bar dataKey="gastoBob" fill="var(--color-destructive)" radius={[6, 6, 0, 0]} />
             </BarChart>
@@ -140,7 +140,7 @@ export function GastosDashboard({ resumen }: { resumen: ResumenGastos }) {
                   <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} />
                   <YAxis
                     tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                    tickFormatter={(v) => formatBobCompact(v)}
+                    tickFormatter={formatEje}
                     width={70}
                   />
                   <Tooltip
