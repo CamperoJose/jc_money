@@ -32,6 +32,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatNumber, formatDate, formatPercent } from "@/lib/format";
 import { descripcionMoneda } from "@/lib/bcb";
+import { PronosticoTc } from "@/components/tc/pronostico-tc";
+import type { ResultadoPronostico } from "@/lib/pronostico";
 import type { ExchangeRate, TcConfig } from "@/lib/types";
 
 const tooltipStyle = {
@@ -45,9 +47,11 @@ const tooltipStyle = {
 export function TcClient({
   rates,
   config,
+  pronostico,
 }: {
   rates: ExchangeRate[]; // más reciente primero
   config: TcConfig;
+  pronostico: ResultadoPronostico | null;
 }) {
   const [rango, setRango] = usePreferencia<RangoId>("tc.rango", "todo", IDS_RANGO as RangoId[]);
   const ultimo = rates[0] ?? null;
@@ -216,6 +220,10 @@ export function TcClient({
               </div>
             </CardContent>
           </Card>
+
+          {/* Mini-dashboard de pronóstico, al final: primero los hechos, después
+              la proyección. Al revés se lee la estimación como si fuera un dato. */}
+          {pronostico && <PronosticoTc p={pronostico} historico={serie} />}
         </>
       )}
     </div>

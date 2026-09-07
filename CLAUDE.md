@@ -41,6 +41,10 @@ Módulos desplegados:
 - **Correos de alerta**: cierre que no corrió (job `vigilancia`, 09:23 Bolivia, workflow aparte),
   presupuesto al cruzar 85% y 100%, y deudas por cobrar vencidas. La memoria de «ya avisé esto» vive
   en `app_settings`, para no repetir el mismo correo a diario.
+- **Pronóstico del T/C**: `lib/pronostico/` (SARIMA por Hannan-Rissanen, Holt y caminata aleatoria,
+  elegidos por backtest de origen móvil). ⚠️ El T/C oficial del BCB está **anclado**: el módulo lo
+  detecta y NO pronostica una constante. Solo tiene sentido si se cambia `tc_cod_moneda` a una
+  moneda que sí se mueva (UFV 76, EUR 53). Sin variables exógenas disponibles, es SARIMA, no SARIMAX.
 - **Análisis y patrones**: `lib/tendencias.ts` (banda de predicción, drawdown, aceleración, racha,
   volatilidad), `lib/analisis.ts` (día de la semana más caro, categorías en movimiento, gastos
   recurrentes, tasa de ahorro) y `lib/agenda.ts` («qué se viene»). Todo puro y sin red.

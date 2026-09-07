@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getExchangeRates, getTcConfig } from "@/lib/queries/tc";
 import { Card, CardContent } from "@/components/ui/card";
 import { TcClient } from "@/components/tc/tc-client";
+import { pronosticarTipoCambio, type ResultadoPronostico } from "@/lib/pronostico";
 import type { ExchangeRate, TcConfig } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -32,5 +33,17 @@ export default async function TipoCambioPage() {
     );
   }
 
-  return <TcClient rates={rates} config={config} />;
+  // El pronóstico se calcula aquí, en el servidor: es el cálculo más pesado de
+  // la app (decenas de ajustes durante el backtest) y no hay razón para mandarlo
+  // al navegador. Si algo falla, la pantalla de T/C sale igual sin él.
+  let pronostico: ResultadoPronostico | null = null;
+  try {
+    pronostico = pronosticarTipoCambio(
+      rates.map((r) => ({ fecha: r.rate_date, valor: r.valor }))
+    );
+  } catch {
+    pronostico = null;
+  }
+
+  return <TcClient rates={rates} config={config} pronostico={pronostico} />;
 }

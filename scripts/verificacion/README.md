@@ -22,6 +22,7 @@ dashboard y el cierre del job dan exactamente lo mismo.
 | `vigilancia.mjs` | El job que avisa si el cierre diario no corrió, contra Postgres real. |
 | `tendencias.mjs` | Banda de predicción, drawdown, aceleración, racha y meses. |
 | `analisis.mjs` | Patrones de gasto, incluidos los falsos positivos que NO debe detectar. |
+| `pronostico.mjs` | Los modelos de T/C sobre series sintéticas con respuesta conocida. |
 | `supa-pg.mjs` | Adaptador mínimo de la API de supabase-js sobre Postgres. |
 
 ## Qué comprueba
