@@ -70,6 +70,12 @@ export interface LecturaHorizonte {
   /** P(el T/C esté por ENCIMA del de hoy en esa fecha). */
   probabilidadSubir: number;
   /**
+   * ¿El horizonte va más allá de lo que el historial sostiene? Extrapolar 90
+   * días con 73 observaciones es exactamente el pronóstico que sale mal: el
+   * modelo prolonga una tendencia de diez semanas como si fuera una ley.
+   */
+  masAllaDelHistorial: boolean;
+  /**
    * ¿El movimiento esperado se distingue del ruido? Una caminata aleatoria
    * finita SIEMPRE estima alguna deriva, así que a 90 días puede salir un
    * «24% de probabilidad de subir» que en realidad es ruido con decimales.
@@ -92,6 +98,8 @@ export interface ResultadoPronostico {
   regimen: Regimen;
   /** Registros totales disponibles (la serie sin recortar). */
   nDisponibles: number;
+  /** Cambio de régimen detectado, si lo hay. */
+  quiebre: Quiebre | null;
   /** Días con cambio respecto al día anterior, sobre el total. */
   diasConCambio: number;
   proporcionCambio: number;
@@ -132,11 +140,21 @@ export function phiNormal(x: number): number {
  * del propio intervalo, así que respeta el modelo que haya ganado en vez de
  * suponer uno.
  */
+/**
+ * Horizonte máximo que el historial sostiene: un tercio de las observaciones.
+ * No hay una regla universal, pero proyectar más allá de eso convierte al
+ * modelo en una regla de tres con decimales.
+ */
+export function horizonteFiable(n: number): number {
+  return Math.floor(n / 3);
+}
+
 function lecturas(
   puntos: PuntoPronostico[],
   ultimo: number,
   z: number,
-  horizontes: number[]
+  horizontes: number[],
+  n: number
 ): LecturaHorizonte[] {
   const out: LecturaHorizonte[] = [];
   for (const h of horizontes) {
@@ -156,6 +174,7 @@ function lecturas(
       inferior: p.inferior,
       superior: p.superior,
       probabilidadSubir,
+      masAllaDelHistorial: h > horizonteFiable(n),
       direccionSignificativa,
       cambioPct: ultimo > 0 ? (p.valor - ultimo) / ultimo : 0,
       efectoEn1000Usd: (p.valor - ultimo) * 1000,
@@ -175,6 +194,77 @@ const CONFIANZA = 0.95;
  * 2,1 s en renderizar, y esto lo deja en medio segundo.
  */
 const VENTANA_MAXIMA = 750;
+
+/**
+ * Salto diario, en términos relativos, a partir del cual se considera que hubo
+ * un CAMBIO DE RÉGIMEN y no una variación de mercado.
+ *
+ * El caso que motiva esto es real y reciente: Bolivia sostuvo el dólar oficial
+ * en 6,96 desde 2011 y el 29 de junio de 2026 pasó a un régimen flexible
+ * abriendo en 9,73 — un +39,8% en un día. Ajustar un modelo a caballo de ese
+ * salto es peor que no ajustar ninguno: la volatilidad sale inflada, la deriva
+ * apunta a donde no va, y el intervalo hereda un shock que no se va a repetir.
+ * Un 8% diario no lo produce ningún mercado cambiario normal.
+ */
+const UMBRAL_QUIEBRE = 0.08;
+
+/** Días de valor idéntico que bastan para llamarlo «tramo anclado». */
+const RACHA_ANCLA = 30;
+
+export interface Quiebre {
+  fecha: string;
+  valorAntes: number;
+  valorDespues: number;
+  saltoPct: number;
+  /** 'salto' = variación brusca; 'fin-ancla' = una serie plana que echó a andar. */
+  tipo: "salto" | "fin-ancla";
+}
+
+/**
+ * Busca el ÚLTIMO cambio de régimen de la serie. Se devuelve el índice desde el
+ * que conviene modelar, que es el propio punto de quiebre: el primer valor del
+ * régimen nuevo ya pertenece al proceso nuevo.
+ */
+export function detectarQuiebre(
+  puntos: PuntoSerie[]
+): { indice: number; quiebre: Quiebre } | null {
+  const y = puntos.map((p) => p.valor);
+  for (let i = y.length - 1; i >= 1; i--) {
+    if (y[i - 1] <= 0 || y[i] <= 0) continue;
+    const salto = Math.abs(Math.log(y[i] / y[i - 1]));
+    if (salto > UMBRAL_QUIEBRE) {
+      return {
+        indice: i,
+        quiebre: {
+          fecha: puntos[i].fecha,
+          valorAntes: y[i - 1],
+          valorDespues: y[i],
+          saltoPct: y[i] / y[i - 1] - 1,
+          tipo: "salto",
+        },
+      };
+    }
+    // Una serie que estuvo plana mucho tiempo y de pronto se mueve también es
+    // un cambio de régimen, aunque el primer movimiento sea pequeño.
+    if (Math.abs(y[i] - y[i - 1]) > 1e-9) {
+      let racha = 0;
+      for (let j = i - 1; j >= 1 && Math.abs(y[j] - y[j - 1]) < 1e-9; j--) racha++;
+      if (racha >= RACHA_ANCLA) {
+        return {
+          indice: i,
+          quiebre: {
+            fecha: puntos[i].fecha,
+            valorAntes: y[i - 1],
+            valorDespues: y[i],
+            saltoPct: y[i] / y[i - 1] - 1,
+            tipo: "fin-ancla",
+          },
+        };
+      }
+    }
+  }
+  return null;
+}
 /** Horizontes que se muestran, en días de calendario. */
 export const HORIZONTES = [7, 15, 30, 60, 90];
 
@@ -321,8 +411,15 @@ export function pronosticarTipoCambio(
   const limpia = serie
     .filter((p) => p.fecha && Number.isFinite(p.valor) && p.valor > 0)
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  // 0. Cambio de régimen. Si lo hay y deja datos suficientes, se modela SOLO
+  //    desde ahí: mezclar dos regímenes da un modelo que no describe a ninguno.
+  const det = detectarQuiebre(limpia);
+  const MIN_TRAS_QUIEBRE = 30;
+  const hayQuiebreUtil = det != null && limpia.length - det.indice >= MIN_TRAS_QUIEBRE;
+  const trasQuiebre = hayQuiebreUtil ? limpia.slice(det!.indice) : limpia;
+
   // Se modela sobre la ventana reciente; la serie completa se sigue mostrando.
-  const usada = limpia.length > VENTANA_MAXIMA ? limpia.slice(-VENTANA_MAXIMA) : limpia;
+  const usada = trasQuiebre.length > VENTANA_MAXIMA ? trasQuiebre.slice(-VENTANA_MAXIMA) : trasQuiebre;
   const y = usada.map((p) => p.valor);
   const n = y.length;
 
@@ -335,6 +432,7 @@ export function pronosticarTipoCambio(
     ultimo: y[n - 1] ?? null,
     regimen: "movil",
     nDisponibles: limpia.length,
+    quiebre: det?.quiebre ?? null,
     diasConCambio: 0,
     proporcionCambio: 0,
     volatilidadDiaria: null,
@@ -395,6 +493,7 @@ export function pronosticarTipoCambio(
       suficienteData: true,
       regimen,
       nDisponibles: limpia.length,
+      quiebre: det?.quiebre ?? null,
       diasConCambio,
       proporcionCambio,
       volatilidadDiaria: volDiaria,
@@ -448,6 +547,7 @@ export function pronosticarTipoCambio(
       suficienteData: false,
       regimen,
       nDisponibles: limpia.length,
+      quiebre: det?.quiebre ?? null,
       diasConCambio,
       proporcionCambio,
       volatilidadDiaria: volDiaria,
@@ -486,6 +586,34 @@ export function pronosticarTipoCambio(
   // --- 4. Diagnósticos ------------------------------------------------------
   const diagnosticos: Diagnostico[] = [];
 
+  if (det && hayQuiebreUtil) {
+    diagnosticos.push({
+      id: "quiebre",
+      titulo:
+        det.quiebre.tipo === "fin-ancla"
+          ? `El ancla se rompió el ${det.quiebre.fecha}`
+          : `Cambio de régimen el ${det.quiebre.fecha}`,
+      detalle:
+        `De ${det.quiebre.valorAntes} a ${det.quiebre.valorDespues} ` +
+        `(${det.quiebre.saltoPct >= 0 ? "+" : ""}${(det.quiebre.saltoPct * 100).toFixed(1)}%). ` +
+        `Se modela SOLO desde esa fecha: hay ${limpia.length - det.indice} registros del régimen ` +
+        "nuevo, y mezclarlos con los del anterior daría un modelo que no describe a ninguno de los dos. " +
+        "Con tan poco historial, el intervalo es ancho a propósito.",
+      tono: "aviso",
+    });
+  } else if (det) {
+    diagnosticos.push({
+      id: "quiebre-reciente",
+      titulo: `Cambio de régimen reciente el ${det.quiebre.fecha}`,
+      detalle:
+        `De ${det.quiebre.valorAntes} a ${det.quiebre.valorDespues} ` +
+        `(${det.quiebre.saltoPct >= 0 ? "+" : ""}${(det.quiebre.saltoPct * 100).toFixed(1)}%). ` +
+        `Todavía no hay ${MIN_TRAS_QUIEBRE} registros posteriores para modelar solo el régimen nuevo, ` +
+        "así que el ajuste incluye el tramo viejo y hay que leerlo con pinzas.",
+      tono: "malo",
+    });
+  }
+
   if (ganador.id === "rw") {
     diagnosticos.push({
       id: "gana-caminata",
@@ -504,6 +632,20 @@ export function pronosticarTipoCambio(
         `Reduce el error un ${(100 * (ganador.mejoraVsCaminata ?? 0)).toFixed(1)}% en validación de origen móvil ` +
         `(${ganador.evaluaciones} pronósticos fuera de muestra). Hay estructura aprovechable en la serie.`,
       tono: "bueno",
+    });
+  }
+
+  const hFiable = horizonteFiable(n);
+  if (horizonte > hFiable) {
+    diagnosticos.push({
+      id: "horizonte-largo",
+      titulo: `Más allá de ${hFiable} días esto es extrapolación`,
+      detalle:
+        `El modelo se ajustó con ${n} observaciones. Proyectar a ${horizonte} días es prolongar ` +
+        "esa tendencia como si fuera una ley, y ninguna lo es: un cambio de política, una " +
+        "intervención o un shock externo no están en la serie hasta que ocurren. El intervalo " +
+        "recoge la incertidumbre del modelo, no la del mundo.",
+      tono: "aviso",
     });
   }
 
@@ -558,6 +700,7 @@ export function pronosticarTipoCambio(
     ultimo,
     regimen,
     nDisponibles: limpia.length,
+    quiebre: det?.quiebre ?? null,
     diasConCambio,
     proporcionCambio,
     volatilidadDiaria: volDiaria,
@@ -566,7 +709,7 @@ export function pronosticarTipoCambio(
     ganador,
     puntos,
     confianza: CONFIANZA,
-    horizontes: lecturas(puntos, ultimo, z, HORIZONTES.filter((h) => h <= horizonte)),
+    horizontes: lecturas(puntos, ultimo, z, HORIZONTES.filter((h) => h <= horizonte), n),
     diagnosticos,
     narrativa,
   };

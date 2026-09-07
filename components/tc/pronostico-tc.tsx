@@ -115,7 +115,9 @@ export function PronosticoTc({
         <p className="text-sm text-muted-foreground">
           Sobre {p.n} registros entre {formatDate(p.desde)} y {formatDate(p.hasta)}
           {p.nDisponibles > p.n &&
-            ` · de ${p.nDisponibles} disponibles, se usan los más recientes: en un tipo de cambio, los datos de hace años pertenecen a otro régimen`}
+            (p.quiebre
+              ? ` · de ${p.nDisponibles} disponibles, solo se modelan los posteriores al cambio de régimen del ${formatDate(p.quiebre.fecha)}`
+              : ` · de ${p.nDisponibles} disponibles, se usan los más recientes: en un tipo de cambio, los datos de hace años pertenecen a otro régimen`)}
           .
         </p>
       </div>
@@ -232,7 +234,14 @@ export function PronosticoTc({
               {p.horizontes.map((h) => (
                 <li key={h.dias} className="rounded-lg border bg-card/60 p-3">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-semibold">{h.dias} días</span>
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                      {h.dias} días
+                      {h.masAllaDelHistorial && (
+                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                          extrapolación
+                        </span>
+                      )}
+                    </span>
                     <span className="text-[11px] text-muted-foreground">{formatDate(h.fecha)}</span>
                   </div>
                   <div className="mt-1.5 flex items-baseline justify-between gap-2">
@@ -278,7 +287,17 @@ export function PronosticoTc({
                   {p.horizontes.map((h) => (
                     <TableRow key={h.dias}>
                       <TableCell className="whitespace-nowrap">
-                        <div className="font-medium">{h.dias} días</div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {h.dias} días
+                          {h.masAllaDelHistorial && (
+                            <span
+                              className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-amber-700 dark:text-amber-400"
+                              title="Más allá de lo que sostiene el historial disponible"
+                            >
+                              extrapolación
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-muted-foreground">{formatDate(h.fecha)}</div>
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">

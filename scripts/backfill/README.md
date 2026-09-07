@@ -50,6 +50,25 @@ Si querés una serie que se mueva, la **UFV (moneda 76)** cambia todos los días
 es la unidad indexada a la inflación, y ahí el módulo de pronóstico sí tiene algo
 que modelar.
 
+## Desde un CSV (`tc-csv.mjs`)
+
+Cuando la serie ya está publicada en un CSV, esto es mucho más rápido que
+consultar el WS día por día:
+
+```bash
+node scripts/backfill/tc-csv.mjs --archivo dolarbolivia.csv
+node scripts/backfill/tc-csv.mjs --archivo ufv.csv --moneda 76
+```
+
+Detecta solo el separador (`,` o `;`), las columnas de fecha y valor, las fechas
+`YYYY-MM-DD` / `DD/MM/YYYY`, y los números con coma o punto decimal. Si el CSV es
+**intradía** (varias filas por día), se queda con la última de cada día, que es
+el cierre. Si una fecha aparece repetida, gana la última fila: los CSV suelen
+traer correcciones al final.
+
+Con `--columna` y `--fecha` se puede forzar qué columnas usar. Al terminar avisa
+si encuentra un salto mayor al 8%, que casi siempre es un cambio de régimen.
+
 ## Cargarlo
 
 El SQL generado:

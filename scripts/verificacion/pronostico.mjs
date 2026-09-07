@@ -307,6 +307,90 @@ for (const [nombre, semilla, gen] of [
     ms < 1000, `${ms.toFixed(0)} ms`);
 }
 
+// ===========================================================================
+// 11. Cambio de régimen — el caso REAL de Bolivia
+//     Ancla en 6,96 desde 2011, y el 29/06/2026 salto a 9,73 con flotación.
+//     Modelar a caballo del salto es peor que no modelar.
+// ===========================================================================
+{
+  const r = rng(2606);
+  const y = new Array(400).fill(6.96);          // el ancla
+  let v = 9.73;
+  for (let i = 0; i < 70; i++) { y.push(v); v *= 1 + 0.004 + 0.012 * normal(r); }  // flotación
+  const s = aSerie(y, "2025-05-01");
+  const fechaQuiebre = s[400].fecha;
+
+  const res = pronosticarTipoCambio(s);
+  check("detecta el quiebre de régimen en la fecha correcta",
+    res.quiebre != null && res.quiebre.fecha === fechaQuiebre,
+    `${res.quiebre?.fecha} (esperada ${fechaQuiebre})`);
+  check("y lo mide bien (+39,8%)",
+    cerca(res.quiebre.saltoPct, 9.73 / 6.96 - 1, 1e-9), `${res.quiebre?.saltoPct}`);
+  check("modela SOLO el régimen nuevo, no los 400 días del ancla",
+    res.n === 70 && res.nDisponibles === 470, `n=${res.n} de ${res.nDisponibles}`);
+  check("la volatilidad NO queda inflada por el salto",
+    res.volatilidadAnual < 0.5, `${(res.volatilidadAnual * 100).toFixed(1)}%`);
+  check("clasifica el régimen como móvil, no como anclado", res.regimen === "movil");
+  check("y avisa del quiebre en los diagnósticos",
+    res.diagnosticos.some((d) => d.id === "quiebre"));
+  check("el pronóstico arranca del nivel nuevo, no del ancla",
+    res.puntos[0].valor > 8, `${res.puntos[0]?.valor}`);
+
+  // Sin el filtro, el mismo salto arruinaría la lectura: se comprueba que
+  // efectivamente el tramo viejo NO entra.
+  check("ninguna cifra del pronóstico se acerca al valor del ancla",
+    res.puntos.every((q) => q.inferior > 7), `mín ${Math.min(...res.puntos.map(q=>q.inferior)).toFixed(2)}`);
+}
+
+{
+  // Quiebre demasiado reciente: no se puede aislar, y hay que decirlo.
+  const y = new Array(200).fill(6.96);
+  for (let i = 0; i < 10; i++) y.push(9.73 + i * 0.01);
+  const res = pronosticarTipoCambio(aSerie(y, "2025-05-01"));
+  check("con pocos datos tras el quiebre, no lo aísla pero lo advierte",
+    res.quiebre != null && res.diagnosticos.some((d) => d.id === "quiebre-reciente" && d.tono === "malo"),
+    JSON.stringify(res.diagnosticos.map((d) => d.id)));
+}
+
+{
+  // Una serie normal, sin quiebres, no debe inventarse ninguno.
+  const r = rng(31337);
+  const y = [9.7]; for (let i = 1; i < 300; i++) y.push(y[i-1] * (1 + 0.003 * normal(r)));
+  const res = pronosticarTipoCambio(aSerie(y));
+  check("una serie sin quiebres no se parte en dos",
+    res.quiebre === null && res.n === res.nDisponibles, `quiebre=${JSON.stringify(res.quiebre)}`);
+}
+
+// ===========================================================================
+// 12. No extrapolar más allá de lo que sostiene el historial
+// ===========================================================================
+{
+  // Réplica del caso real: 73 días del régimen nuevo, pedido a 90.
+  const r = rng(2606);
+  const y = new Array(400).fill(6.96);
+  let v = 9.73;
+  for (let i = 0; i < 73; i++) { y.push(v); v *= 1 + 0.004 + 0.012 * normal(r); }
+  const res = pronosticarTipoCambio(aSerie(y, "2025-05-01"), { horizonteDias: 90 });
+  const fiable = Math.floor(res.n / 3); // 24 días con n = 73
+  check("los plazos dentro del historial no se marcan como extrapolación",
+    res.horizontes.filter((h) => h.dias <= fiable).every((h) => !h.masAllaDelHistorial),
+    `fiable=${fiable}`);
+  check("y los que lo exceden sí",
+    res.horizontes.filter((h) => h.dias > fiable).every((h) => h.masAllaDelHistorial),
+    res.horizontes.map((h) => `${h.dias}:${h.masAllaDelHistorial}`).join(" "));
+  check("con un diagnóstico que lo explica",
+    res.diagnosticos.some((d) => d.id === "horizonte-largo"));
+}
+{
+  // Con historial de sobra, nada debe marcarse.
+  const r = rng(4141);
+  const y = [9.7]; for (let i = 1; i < 400; i++) y.push(y[i-1] * (1 + 0.003 * normal(r)));
+  const res = pronosticarTipoCambio(aSerie(y), { horizonteDias: 30 });
+  check("con historial de sobra, ningún plazo se marca",
+    res.horizontes.every((h) => !h.masAllaDelHistorial) &&
+    !res.diagnosticos.some((d) => d.id === "horizonte-largo"));
+}
+
 let f = 0;
 for (const [n, ok, extra] of pruebas) {
   if (!ok) f++;
