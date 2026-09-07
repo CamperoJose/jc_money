@@ -2,7 +2,74 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-07 (sesión 22 — patrimonio en vivo + resumen diario)
+## Última actualización: 2026-09-07 (sesión 23 — correos, alertas y análisis)
+
+### Sesión 23 — lo hecho ✅
+
+**1. El reporte mensual estaba roto de cinco maneras.** Llegó el cierre de agosto
+el 7 de septiembre con todo en Bs 0,00 y la tarjeta de patrimonio vacía:
+
+- La tarjeta «Patrimonio» recibía la cadena vacía como valor. Nunca mostró nada.
+- El periodo salía de `periodoActual()` (el mes de HOY) en vez de la fecha que el
+  job procesa, así que reejecutarlo para un día pasado reportaba otro mes.
+- `valorEn()` comparaba contra la última foto anterior aunque fuera de hace
+  meses, y pintaba «▲ Bs 0,00 (0,0%)» como si el patrimonio no se hubiera movido.
+  Ahora exige una foto de menos de 45 días o directamente no compara.
+- Salía el primer lunes (hasta el día 7). Ahora sale el día 1.
+- Un mes sin transacciones mostraba un tablero de ceros. Ahora lo dice en una
+  línea y muestra el patrimonio al cierre.
+
+**2. Tope en `/api/voz/ingesta`** (`lib/voz/limite.ts`), parametrizable con
+`VOZ_LIMITE_VENTANA_MIN` / `_POR_VENTANA` / `_POR_DIA`. Cuenta filas de
+`ai_requests`, que ya tiene el índice necesario. **Decisión del usuario:** el
+token del Atajo se queda sin caducidad ni revocación, y el cuerpo se sigue
+parseando antes de autenticar — riesgo asumido para no tocar el cliente de iOS.
+
+**3. Tres correos de alerta nuevos:**
+- **Cierre que no corrió**: job `vigilancia` + workflow propio a las 09:23 de
+  Bolivia, lejos del cierre de las 00:17 y en otro archivo, para no depender del
+  disparo que vigila. Avisa una vez por hueco.
+- **Presupuesto**: al cruzar 85% y otra vez al pasar 100%, una vez por nivel y
+  categoría en el mes.
+- **Deudas por cobrar vencidas**: como mucho uno por semana, inmediato si
+  aparece una vencida nueva.
+
+La memoria de avisos vive en `app_settings` (clave/valor, migración 0008).
+
+**4. Análisis mucho más rico** (`lib/tendencias.ts` ampliado, `lib/analisis.ts` y
+`lib/agenda.ts` nuevos): banda de predicción al 95%, drawdown contra el máximo,
+aceleración (últimos 90 días vs. el tramo previo), racha, volatilidad, mejor y
+peor mes; y sobre los gastos: día de la semana más caro, categorías en alza y en
+baja, gastos recurrentes, tasa de ahorro y concentración. Todo con un mínimo de
+observaciones: **no se afirma lo que los datos no sostienen**.
+
+**5. UI**: Tendencias rehecha (hallazgos, banda, barras mes a mes, patrones de
+gasto) y en el dashboard el **ritmo de gasto del mes** y **«Qué se viene»** (DPF,
+cobros y recurrentes en una sola lista).
+
+**Dos bugs encontrados al revisarlo en un navegador real:**
+- `formatBobCompact` usaba `notation: "compact"`, cuyo sufijo depende de la
+  versión de ICU: Node devolvía «Bs 110,74 K» y Chromium «Bs 110,74 k». Eso
+  **rompía la hidratación** en cualquier pantalla con cifras de seis dígitos.
+- La barra del ritmo del mes era `gastado / proyectado`, que da siempre el mismo
+  porcentaje que el avance del mes: se veía idéntica gastaras lo que gastaras.
+
+### Verificaciones (`scripts/verificacion/`)
+
+`tendencias.mjs` (26), `analisis.mjs` (24) y `correo.mjs` (21), además de las que
+ya existían contra Postgres real. No son tests automatizados (decisión E6): son
+las herramientas con las que se revisó cada módulo y quedan para volver a
+correrlas a mano.
+
+### Punto de retome
+
+Todo lo anterior está en `main` y compila. Falta **promover el deployment en
+Vercel** (es manual). Pendientes no pedidos aún: `api/estado`, reintentos del
+job y exportar a CSV.
+
+---
+
+## Sesión 22 (2026-09-07 — patrimonio en vivo + resumen diario)
 
 ### Sesión 22 — lo hecho ✅
 

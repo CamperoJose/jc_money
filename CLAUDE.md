@@ -38,6 +38,12 @@ Módulos desplegados:
   cálculo que el cierre (`lib/patrimonio/estado.ts`). Ver decisión F1.
 - **Job diario de patrimonio** (`/api/jobs/patrimonio-diario` + GitHub Actions 00:17 Bolivia): cierra
   el día y envía el correo con el resumen de lo gastado.
+- **Correos de alerta**: cierre que no corrió (job `vigilancia`, 09:23 Bolivia, workflow aparte),
+  presupuesto al cruzar 85% y 100%, y deudas por cobrar vencidas. La memoria de «ya avisé esto» vive
+  en `app_settings`, para no repetir el mismo correo a diario.
+- **Análisis y patrones**: `lib/tendencias.ts` (banda de predicción, drawdown, aceleración, racha,
+  volatilidad), `lib/analisis.ts` (día de la semana más caro, categorías en movimiento, gastos
+  recurrentes, tasa de ahorro) y `lib/agenda.ts` («qué se viene»). Todo puro y sin red.
 - Migraciones `0001`–`0014` aplicadas en Supabase.
 
 ⚠️ El despliegue a producción en Vercel es **manual** ("Promote to Production"): un push a `main`
@@ -102,6 +108,15 @@ luego Inversiones DPF, y al final Deudas. Ver `claude/roadmap.md`.
 - **El cálculo del patrimonio vive en `lib/patrimonio/estado.ts` y NO se duplica.** Lectura y cierre
   usan la misma función; la duplicación previa causó tres errores de cálculo. La invariante
   `total = Σ(saldos)` no se rompe: el total sale de los saldos, nunca de sumar piezas.
+- **Al comparar el mes en curso con meses previos, compará la MISMA ventana de días** (del 1 al día
+  de hoy contra los mismos días de cada mes previo). Contra el mes completo, el día 5 todo aparece
+  como «−90%»; y prorratear el promedio tampoco vale, porque supone que el gasto se reparte parejo.
+- **No uses `notation: "compact"` de `Intl`**: el sufijo depende de la versión de ICU y Node y
+  Chromium no coinciden («110,74 K» vs «110,74 k»), lo que rompe la hidratación. Usá
+  `formatBobCompact` / `formatEje` de `lib/format.ts`, que arman el sufijo a mano.
+- **Antes de dar por buena una pantalla, abrila en un navegador real** a 1360, 390 y 320 px y mirá
+  la consola. Los dos peores bugs de la sesión 23 (hidratación rota y una barra de progreso que
+  mostraba siempre lo mismo) solo se vieron así.
 - **Este proyecto NO lleva tests automatizados** (decisión E6): no agregues Vitest/Jest/Playwright ni
   los propongas. La red de seguridad es `lint` + `tsc --noEmit` + `build` verde + revisar el diff.
 - **Texturas y vidrio**: `app/globals.css` define un sistema de superficies (`.superficie`,
