@@ -85,6 +85,13 @@ export interface AnalisisGastos {
   categoriasEnBaja: CategoriaEnMovimiento[];
   recurrentes: GastoRecurrente[];
   porMes: MesGasto[];
+  /**
+   * Gasto de cada mes contando SOLO los días 1..(día de hoy). Sirve para
+   * comparar el mes en curso, que está a medias, contra el mismo tramo de los
+   * meses previos. Es un array y no un Map a propósito: esto cruza la frontera
+   * servidor→cliente, y un Map no se serializa.
+   */
+  hastaHoyPorMes: { period: string; gasto: number }[];
   tasaAhorroPromedio: number | null;
   /** Cuántos de los últimos 30 días no tuvieron ningún gasto. */
   diasSinGastar: number | null;
@@ -115,6 +122,7 @@ export function analizarGastos(
     categoriasEnBaja: [],
     recurrentes: [],
     porMes: [],
+    hastaHoyPorMes: [],
     tasaAhorroPromedio: null,
     diasSinGastar: null,
     concentracion: null,
@@ -171,6 +179,17 @@ export function analizarGastos(
       neto: r2n(v.ingreso - v.gasto),
       tasaAhorro: v.ingreso > 0 ? r4((v.ingreso - v.gasto) / v.ingreso) : null,
     }));
+  const diaDeHoy = Number(hoy.slice(8, 10));
+  const acumHastaHoy = new Map<string, number>();
+  for (const t of gastos) {
+    if (Number(t.txn_date.slice(8, 10)) > diaDeHoy) continue;
+    const mes = t.txn_date.slice(0, 7);
+    acumHastaHoy.set(mes, (acumHastaHoy.get(mes) ?? 0) + t.amount_bob);
+  }
+  const hastaHoyPorMes = [...acumHastaHoy.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([period, gasto]) => ({ period, gasto: r2n(gasto) }));
+
   const conIngreso = porMes.filter((m) => m.tasaAhorro != null);
   const tasaAhorroPromedio = conIngreso.length
     ? r4(conIngreso.reduce((s, m) => s + m.tasaAhorro!, 0) / conIngreso.length)
@@ -379,6 +398,7 @@ export function analizarGastos(
     categoriasEnBaja,
     recurrentes,
     porMes,
+    hastaHoyPorMes,
     tasaAhorroPromedio,
     diasSinGastar,
     concentracion,

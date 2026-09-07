@@ -22,6 +22,12 @@ import { fechaBoliviaHoy } from "@/lib/datetime";
 import { EstadoEnVivo } from "@/components/patrimonio/estado-en-vivo";
 import { getResumen, type ResumenPatrimonio } from "@/lib/queries/patrimonio";
 import { getResumenDpf } from "@/lib/queries/dpf";
+import { getResumenDeudas } from "@/lib/queries/deudas";
+import { getTransacciones } from "@/lib/queries/gastos";
+import { analizarGastos, type AnalisisGastos } from "@/lib/analisis";
+import { construirAgenda, resumirAgenda } from "@/lib/agenda";
+import { Agenda } from "@/components/patrimonio/agenda";
+import { RitmoDelMes, calcularRitmoMes } from "@/components/patrimonio/ritmo-mes";
 import type { ResumenDpf } from "@/lib/dpf";
 import { DpfResumenCard } from "@/components/dpf/dpf-resumen-card";
 import { CategoryBar } from "@/components/tremor/category-bar";
@@ -54,12 +60,13 @@ export default async function PatrimonioDashboard() {
   // `calcularEstadoPatrimonio` es el MISMO cálculo que hace el cierre de
   // medianoche, aplicado a hoy: así el número que ves ahora es exactamente el
   // que el job guardará esta noche.
-  const [resPatrimonio, resDpf, resEstado] = await Promise.allSettled([
+  const hoy = fechaBoliviaHoy();
+  const [resPatrimonio, resDpf, resEstado, resTxs, resDeudas] = await Promise.allSettled([
     getResumen(supabase),
     getResumenDpf(supabase),
-    user
-      ? calcularEstadoPatrimonio(supabase, user.id, fechaBoliviaHoy())
-      : Promise.resolve(null),
+    user ? calcularEstadoPatrimonio(supabase, user.id, hoy) : Promise.resolve(null),
+    getTransacciones(supabase),
+    getResumenDeudas(supabase),
   ]);
 
   let resumen: ResumenPatrimonio | null = null;
@@ -80,6 +87,22 @@ export default async function PatrimonioDashboard() {
   // Si el cálculo en vivo falla, se muestra la última foto — pero se dice, para
   // que nadie tome por actual una cifra que puede tener horas.
   const estadoFallo = resEstado.status === "rejected";
+
+  // Gastos y deudas son extras del dashboard: si alguno falla, el patrimonio
+  // —que es la razón de ser de esta pantalla— sale igual.
+  const analisis: AnalisisGastos | null =
+    resTxs.status === "fulfilled" ? analizarGastos(resTxs.value, hoy) : null;
+  const deudas = resDeudas.status === "fulfilled" ? resDeudas.value.deudas : null;
+
+  const eventos = construirAgenda(hoy, {
+    dpfs: resumenDpf?.dpfs ?? null,
+    deudas,
+    recurrentes: analisis?.recurrentes ?? null,
+  });
+  const resumenEventos = resumirAgenda(eventos);
+  const ritmo = analisis?.suficienteData
+    ? calcularRitmoMes(analisis.porMes, analisis.hastaHoyPorMes, hoy)
+    : null;
 
   return (
     <div className="space-y-8">
@@ -123,6 +146,11 @@ export default async function PatrimonioDashboard() {
         ) : (
           <Contenido resumen={resumen} estado={estado} estadoFallo={estadoFallo} />
         ))}
+
+      {/* Lo que se viene y el ritmo del mes: no dependen de que haya fotos de
+          patrimonio, así que van fuera del bloque de arriba. */}
+      {ritmo && <RitmoDelMes r={ritmo} />}
+      {eventos.length > 0 && <Agenda eventos={eventos} resumen={resumenEventos} />}
 
       {resumenDpf && resumenDpf.totalHistorico > 0 && <DpfResumenCard resumen={resumenDpf} />}
     </div>
