@@ -30,3 +30,7 @@ venv/
 
 # Credencial de Vertex AI: se usa vía env var GCP_SA_JSON en prod (no versionar)
 credenciales/vertex-ai.json
+
+# Salidas del backfill de T/C: se generan a demanda y pueden pesar varios MB
+.cache-tc-*.json
+tc-*.sql

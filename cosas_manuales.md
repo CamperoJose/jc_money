@@ -92,6 +92,22 @@ estas variables en Vercel (todas opcionales, traen valores por defecto razonable
 
 - [ ] Si alguna vez el Atajo devuelve **HTTP 429**, subí `VOZ_LIMITE_POR_VENTANA` en Vercel.
 
+## 8.d Histórico de tipo de cambio (opcional) — GRATIS
+El job diario solo carga el T/C de hoy en adelante. Para tener años de historia y que el módulo de
+pronóstico tenga con qué trabajar, hay un script que la trae del propio BCB:
+
+```bash
+node --experimental-strip-types scripts/backfill/tc-bcb.mjs --desde 2005-01-01
+```
+
+- [ ] Ejecutarlo (tarda ~25 min por cada 10 años; si se corta, relanzar con `--reanudar`).
+- [ ] Pegar el `.sql` que genera en **Supabase → SQL Editor**. Es idempotente.
+- ⚠️ El dólar oficial está **anclado en 6,96 desde noviembre de 2011**: cargarlo te da historial
+      real, pero el pronóstico seguirá diciendo «régimen anclado», que es lo correcto. Para una
+      serie que sí se mueva, usá `--moneda 76` (UFV).
+
+Detalle completo en `scripts/backfill/README.md`.
+
 ## 9. Google Drive (respaldos) — GRATIS · Fase 2
 - [ ] En Google Cloud crea un **service account** y habilita la **Google Drive API**.
 - [ ] Descarga el JSON de credenciales del service account y pásamelo (va en variable de entorno, no al repo).
