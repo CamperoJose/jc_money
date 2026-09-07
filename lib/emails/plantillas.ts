@@ -1,12 +1,16 @@
 // Plantillas HTML de correo (estilo inline + tablas, compatibles con Gmail).
 // Paleta verde de la marca.
 
-const VERDE = "#15803d";
-const VERDE_CLARO = "#dcfce7";
-const TEXTO = "#3a3a3a";
+// Colores del correo. Deben seguir a la paleta de la app (decisión E1: azul
+// oscuro), pero van en HEX literal a propósito: los clientes de correo no
+// soportan variables CSS ni `oklch`, así que aquí no sirven los tokens del tema.
+// Los nombres se conservan para no tocar las 40 referencias del archivo.
+const VERDE = "#1e3a8a"; // azul oscuro, el primario de la app
+const VERDE_CLARO = "#dbeafe"; // azul muy claro para los realces
+const TEXTO = "#111827";
 const GRIS = "#6b7280";
 const BORDE = "#e5e7eb";
-const FONDO = "#f5f5f0";
+const FONDO = "#f3f4f6";
 
 function bob(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -72,6 +76,15 @@ export interface PatrimonioEmailData {
   porCobrar: number | null;
   activos: number | null;
   dpf: { capital: number; gananciaLiquida: number; proxima: { titulo: string; fecha: string; monto: number; dias: number } | null } | null;
+  /** Resumen de lo gastado e ingresado en el día que se cierra. */
+  dia: {
+    gastos: number;
+    ingresos: number;
+    neto: number;
+    cantidad: number;
+    /** Categorías con más gasto, de mayor a menor. */
+    porCategoria: Array<{ nombre: string; monto: number }>;
+  } | null;
 }
 
 export function htmlPatrimonioDiario(d: PatrimonioEmailData): { subject: string; html: string; text: string } {
@@ -115,9 +128,52 @@ export function htmlPatrimonioDiario(d: PatrimonioEmailData): { subject: string;
       </table>`
     : "";
 
-  const html = layout("Resumen diario", hero + kpis + proxima);
-  const text = `Patrimonio ${fechaLarga(d.fecha)}: ${bob(d.totalBob)} (${usd(d.totalUsd)}). ${deltaTxt}. Disponibilidad: ${bob(d.disponibilidad)}.`;
-  return { subject: `MyMoney · Patrimonio ${bob(d.totalBob)} (${fechaLarga(d.fecha)})`, html, text };
+  // Resumen del día: es lo primero que se quiere saber por la mañana —cuánto se
+  // gastó ayer y en qué—, así que va con su propio bloque y en el asunto.
+  const dia = d.dia;
+  const filasCategoria = (dia?.porCategoria ?? [])
+    .slice(0, 5)
+    .map(
+      (c) => `<tr>
+          <td style="padding:4px 0;font-size:13px;color:${TEXTO};">${c.nombre}</td>
+          <td style="padding:4px 0;font-size:13px;color:${TEXTO};text-align:right;font-weight:bold;">${bob(c.monto)}</td>
+        </tr>`
+    )
+    .join("");
+
+  const bloqueDia = dia
+    ? `<table role="presentation" width="100%" style="margin-top:14px;border:1px solid #e5e7eb;border-radius:10px;">
+        <tr><td style="padding:14px;">
+          <div style="font-size:12px;color:${GRIS};text-transform:uppercase;letter-spacing:.5px;">Movimientos del día</div>
+          ${
+            dia.cantidad === 0
+              ? `<div style="font-size:14px;color:${TEXTO};margin-top:6px;">Sin movimientos registrados. 🎉</div>`
+              : `<div style="font-size:22px;font-weight:bold;color:#dc2626;margin-top:4px;">${bob(dia.gastos)} gastados</div>
+                 <div style="font-size:13px;color:${GRIS};margin-top:2px;">
+                   ${dia.cantidad} ${dia.cantidad === 1 ? "movimiento" : "movimientos"}${
+                     dia.ingresos > 0 ? ` · ${bob(dia.ingresos)} de ingresos` : ""
+                   } · neto ${dia.neto >= 0 ? "+" : "−"}${bob(Math.abs(dia.neto))}
+                 </div>
+                 ${
+                   filasCategoria
+                     ? `<table role="presentation" width="100%" style="margin-top:10px;border-top:1px solid #e5e7eb;padding-top:6px;">${filasCategoria}</table>`
+                     : ""
+                 }`
+          }
+        </td></tr>
+      </table>`
+    : "";
+
+  const html = layout("Resumen diario", hero + kpis + bloqueDia + proxima);
+  const resumenDia = dia && dia.cantidad > 0 ? ` Gastado: ${bob(dia.gastos)} en ${dia.cantidad} movimientos.` : "";
+  const text = `Patrimonio ${fechaLarga(d.fecha)}: ${bob(d.totalBob)} (${usd(d.totalUsd)}). ${deltaTxt}. Disponibilidad: ${bob(d.disponibilidad)}.${resumenDia}`;
+  // El asunto lleva lo gastado: es el dato que se lee sin abrir el correo.
+  const asuntoGasto = dia && dia.gastos > 0 ? ` · gastaste ${bob(dia.gastos)}` : "";
+  return {
+    subject: `MyMoney · Patrimonio ${bob(d.totalBob)}${asuntoGasto} (${fechaLarga(d.fecha)})`,
+    html,
+    text,
+  };
 }
 
 // ============================================================================

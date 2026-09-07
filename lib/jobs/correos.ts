@@ -139,6 +139,54 @@ export async function ejecutarCorreos(
     dpfData = null;
   }
 
+  // Resumen de los movimientos del día que se cierra: cuánto se gastó, cuántos
+  // fueron y en qué categorías. Es lo primero que se quiere saber por la mañana.
+  let dia: PatrimonioEmailData["dia"] = null;
+  try {
+    const { data: txns, error: eTx } = await admin
+      .from("transactions")
+      .select("type, amount, currency, exchange_rate, categories(name)")
+      .eq("user_id", userId)
+      .eq("txn_date", hoy);
+    if (eTx) throw eTx;
+    let gastos = 0;
+    let ingresos = 0;
+    const porCat = new Map<string, number>();
+    for (const t of txns ?? []) {
+      // El embebido de PostgREST llega como array o como objeto según la
+      // relación; se normaliza a un nombre.
+      const r = t as unknown as {
+        type: string;
+        amount: number;
+        currency: string;
+        exchange_rate: number | null;
+        categories?: { name: string } | { name: string }[] | null;
+      };
+      const cat = Array.isArray(r.categories) ? r.categories[0] : r.categories;
+      const monto = Number(r.amount);
+      const enBob = r.currency === "BOB" ? monto : monto * (Number(r.exchange_rate) || 0);
+      if (r.type === "ingreso") {
+        ingresos += enBob;
+      } else {
+        gastos += enBob;
+        const nombre = cat?.name ?? "Sin categoría";
+        porCat.set(nombre, (porCat.get(nombre) ?? 0) + enBob);
+      }
+    }
+    dia = {
+      gastos: round2(gastos),
+      ingresos: round2(ingresos),
+      neto: round2(ingresos - gastos),
+      cantidad: (txns ?? []).length,
+      porCategoria: [...porCat]
+        .map(([nombre, monto]) => ({ nombre, monto: round2(monto) }))
+        .sort((a, b) => b.monto - a.monto),
+    };
+  } catch {
+    // Si algo falla al resumir el día, el correo sale igual con el patrimonio.
+    dia = null;
+  }
+
   // 1) Correo de patrimonio.
   const data: PatrimonioEmailData = {
     fecha: last.snapshot_date as string,
@@ -151,6 +199,7 @@ export async function ejecutarCorreos(
     porCobrar,
     activos,
     dpf: dpfData,
+    dia,
   };
   const patri = htmlPatrimonioDiario(data);
   await enviarCorreo({ subject: patri.subject, html: patri.html, text: patri.text });
