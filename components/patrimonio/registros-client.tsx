@@ -19,7 +19,8 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
+import { Card } from "@/components/ui/card";
 import {
   TableRoot,
   Table,
@@ -132,11 +133,17 @@ export function RegistrosClient({
       </div>
 
       {filas.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            No hay registros aún. Crea el primero con “Nuevo registro”.
-          </CardContent>
-        </Card>
+        <EstadoVacio
+          icono={<Plus weight="bold" className="size-6" />}
+          titulo="Todavía no hay fotos de patrimonio"
+          descripcion="Una foto guarda el saldo de cada cuenta en un momento dado. Con dos o más ya verás tu evolución."
+          accion={
+            <Button onClick={nuevo}>
+              <Plus weight="bold" className="size-4" />
+              Nuevo registro
+            </Button>
+          }
+        />
       ) : (
         <Card className="overflow-hidden py-0">
           {/* Los mismos primitivos que el resto de la app: cabecera fija (que

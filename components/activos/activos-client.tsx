@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useOrden, usePaginacion } from "@/lib/hooks/tabla";
 import { Paginacion } from "@/components/tremor/paginacion";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -116,12 +117,17 @@ export function ActivosClient({ resumen, cuentas }: { resumen: ResumenActivos; c
       </div>
 
       {activos.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
-            <Package weight="duotone" className="size-8 opacity-60" />
-            No hay activos registrados. Agrega el primero con “Nuevo activo”.
-          </CardContent>
-        </Card>
+        <EstadoVacio
+          icono={<Package weight="duotone" className="size-6" />}
+          titulo="Todavía no hay activos"
+          descripcion="Anota bienes que podrías vender (un vehículo, equipos) para que cuenten en tu patrimonio."
+          accion={
+            <Button onClick={() => { setEditando(null); setFormOpen(true); }}>
+              <Plus weight="bold" className="size-4" />
+              Nuevo activo
+            </Button>
+          }
+        />
       ) : (
         <>
           {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
@@ -357,7 +363,7 @@ function EstadoBadge({ a }: { a: AssetUI }) {
 function Kpi({ icon, label, valor, sub, tono }: { icon: React.ReactNode; label: string; valor: string; sub?: string; tono?: "bueno" | "malo" }) {
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className="shrink-0">{icon}</span>

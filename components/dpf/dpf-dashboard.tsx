@@ -431,7 +431,7 @@ function KpiHero({
 }) {
   return (
     <Card className="trama-puntos resplandor">
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5 text-primary ring-1 ring-inset ring-primary/20">

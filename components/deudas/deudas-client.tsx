@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { useOrden, usePaginacion } from "@/lib/hooks/tabla";
 import { Paginacion } from "@/components/tremor/paginacion";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,12 +142,17 @@ export function DeudasClient({ resumen, cuentas }: { resumen: ResumenDeudas; cue
       )}
 
       {deudas.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
-            <HandCoins weight="duotone" className="size-8 opacity-60" />
-            No hay deudas registradas. Agrega la primera con “Nueva deuda”.
-          </CardContent>
-        </Card>
+        <EstadoVacio
+          icono={<HandCoins weight="duotone" className="size-6" />}
+          titulo="Todavía no hay deudas por cobrar"
+          descripcion="Registra un préstamo y sabrás cuánto te deben, desde qué cuenta salió y cuándo vence."
+          accion={
+            <Button onClick={() => { setEditando(null); setFormOpen(true); }}>
+              <Plus weight="bold" className="size-4" />
+              Nueva deuda
+            </Button>
+          }
+        />
       ) : (
         <>
           {/* Tabla (desktop) — estilo Tremor, con más detalle por fila */}
@@ -558,7 +564,7 @@ function EstadoBadge({ d }: { d: DebtUI }) {
 function Kpi({ icon, label, valor, sub, tono }: { icon: React.ReactNode; label: string; valor: string; sub?: string; tono?: "malo" }) {
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className="shrink-0">{icon}</span>

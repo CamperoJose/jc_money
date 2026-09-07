@@ -49,7 +49,7 @@ export function Kpi({
     <Card className={cn("trama-puntos resplandor", className)}>
       {/* Filo de acento superior, teñido según el tono del KPI. */}
       <div className={cn("h-0.5 w-full", tonoBarra[tono])} />
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           {/* Hasta dos líneas: una etiqueta larga se envuelve en vez de cortarse. */}
           <span className="line-clamp-2 text-sm font-medium text-foreground">{etiqueta}</span>

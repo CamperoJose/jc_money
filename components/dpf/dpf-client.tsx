@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
 import { useOrden, usePaginacion } from "@/lib/hooks/tabla";
 import { Paginacion } from "@/components/tremor/paginacion";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -168,14 +169,31 @@ export function DpfClient({ dpfs, cuentas }: { dpfs: DpfDepositUI[]; cuentas: Ac
       </div>
 
       {filtradas.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
-            <Vault weight="duotone" className="size-8 opacity-60" />
-            {dpfs.length === 0
-              ? "No hay DPF aún. Registra el primero con “Nuevo DPF”."
-              : "Ningún DPF coincide con los filtros."}
-          </CardContent>
-        </Card>
+        dpfs.length === 0 ? (
+          <EstadoVacio
+            icono={<Vault weight="duotone" className="size-6" />}
+            titulo="Todavía no hay DPF"
+            descripcion="Registra tus depósitos a plazo fijo para seguir vencimientos, intereses y liberaciones."
+            accion={
+              <Button onClick={nuevo}>
+                <Plus weight="bold" className="size-4" />
+                Nuevo DPF
+              </Button>
+            }
+          />
+        ) : (
+          <EstadoVacio
+            icono={<MagnifyingGlass weight="duotone" className="size-6" />}
+            titulo="Ningún DPF coincide"
+            descripcion="Prueba con otro estado o quita los filtros."
+            accion={
+              <Button variant="outline" onClick={limpiar}>
+                <X weight="bold" className="size-4" />
+                Limpiar filtros
+              </Button>
+            }
+          />
+        )
       ) : (
         <>
           <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-2.5 text-sm">

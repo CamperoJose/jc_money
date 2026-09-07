@@ -396,7 +396,7 @@ function Kpi({
         : "bg-muted text-muted-foreground";
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className={"flex size-8 shrink-0 items-center justify-center rounded-lg " + chip}>

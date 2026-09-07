@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CategoryBar } from "@/components/tremor/category-bar";
 import { ProgressCircle } from "@/components/tremor/progress-circle";
+import { EstadoVacio } from "@/components/ui/estado-vacio";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -247,14 +248,33 @@ export function GastosClient({
       </div>
 
       {filtradas.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
-            <Receipt weight="duotone" className="size-8 opacity-60" />
-            {transacciones.length === 0
-              ? "No hay movimientos aún. Registra el primero con “Nuevo movimiento”."
-              : "Ningún movimiento coincide con los filtros."}
-          </CardContent>
-        </Card>
+        // Vacío de verdad y vacío por filtros son situaciones distintas: en la
+        // primera lo útil es crear, en la segunda, quitar el filtro.
+        transacciones.length === 0 ? (
+          <EstadoVacio
+            icono={<Receipt weight="duotone" className="size-6" />}
+            titulo="Todavía no hay movimientos"
+            descripcion="Registra tus gastos e ingresos para ver en qué se te va el dinero."
+            accion={
+              <Button onClick={nuevo}>
+                <Plus weight="bold" className="size-4" />
+                Nuevo movimiento
+              </Button>
+            }
+          />
+        ) : (
+          <EstadoVacio
+            icono={<MagnifyingGlass weight="duotone" className="size-6" />}
+            titulo="Ningún movimiento coincide"
+            descripcion="Prueba con otros filtros o quítalos para ver todo."
+            accion={
+              <Button variant="outline" onClick={limpiar}>
+                <X weight="bold" className="size-4" />
+                Limpiar filtros
+              </Button>
+            }
+          />
+        )
       ) : (
         <>
           {/* Resumen del filtro */}

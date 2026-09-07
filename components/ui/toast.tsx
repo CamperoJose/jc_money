@@ -100,7 +100,10 @@ export function ProveedorAvisos({ children }: { children: React.ReactNode }) {
             // aviso sin interrumpir lo que el usuario esté haciendo.
             aria-live="polite"
             aria-atomic="false"
-            className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center gap-2 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:inset-x-auto sm:right-4 sm:items-end"
+            // Se apila POR ENCIMA del botón flotante de voz (56 px + su
+            // separación), no sobre él: si no, cada aviso tapaba el micrófono
+            // durante 4,5 s justo después de registrar algo.
+            className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center gap-2 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:inset-x-auto sm:right-4 sm:items-end"
           >
             {avisos.map((a) => {
               const e = estilos[a.tono];

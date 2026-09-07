@@ -30,7 +30,7 @@ export default async function TrackingLayout({
         </a>
         <Sidebar email={user?.email} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <main id="contenido" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-7xl flex-1 overflow-x-hidden px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:py-10">
+          <main id="contenido" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-[calc(2rem+env(safe-area-inset-bottom))] sm:px-6 lg:py-10">
             {children}
           </main>
         </div>

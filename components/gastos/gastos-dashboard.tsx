@@ -244,7 +244,7 @@ function Kpi({
 }) {
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium text-foreground">{label}</span>
           <span className="shrink-0">{icon}</span>
