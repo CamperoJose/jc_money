@@ -12,7 +12,7 @@ import {
 import { getDpfs } from "@/lib/queries/dpf";
 import { TIPOS_LIQUIDOS } from "@/lib/patrimonio";
 import { resumenDpf, type ResumenDpf } from "@/lib/dpf";
-import { getResumenPresupuestos, periodoActual } from "@/lib/queries/presupuestos";
+import { getResumenPresupuestos } from "@/lib/queries/presupuestos";
 
 export interface ResultadoCorreos {
   ok: boolean;
@@ -27,6 +27,16 @@ export interface ResultadoCorreos {
 /** Día de la semana (0=Dom … 1=Lun) de una fecha 'YYYY-MM-DD'. */
 function diaSemana(iso: string): number {
   return new Date(`${iso}T12:00:00Z`).getUTCDay();
+}
+/** Último día real del mes de un periodo 'YYYY-MM', como 'YYYY-MM-DD'. */
+function ultimoDiaDelMes(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+/** Días calendario entre dos fechas 'YYYY-MM-DD' (b − a). */
+function diasEntreISO(a: string, b: string): number {
+  const ms = Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`);
+  return Math.round(ms / 86_400_000);
 }
 function sumarDiasISO(fecha: string, dias: number): string {
   const d = new Date(`${fecha}T00:00:00Z`);
@@ -212,14 +222,18 @@ export async function ejecutarCorreos(
     alertaEnviada = true;
   }
 
-  // 3) Correos periódicos: semanal (lunes) y mensual (primer lunes del mes).
+  // 3) Correos periódicos: semanal (lunes) y mensual (el día 1, sobre el mes
+  //    que acaba de cerrar). Antes el mensual salía el primer lunes, así que un
+  //    cierre de agosto podía llegar el 7 de septiembre y leerse como atrasado.
   let semanalEnviado = false;
   let mensualEnviado = false;
   const esLunes = diaSemana(hoy) === 1;
-  const esPrimerLunes = esLunes && Number(hoy.slice(8, 10)) <= 7;
+  const esPrimerDiaDelMes = hoy.slice(8, 10) === "01";
 
-  if (esLunes) {
-    const period = periodoActual();
+  if (esLunes || esPrimerDiaDelMes) {
+    // El periodo sale de la fecha que se está procesando, NO de la de hoy: si
+    // el job se reejecuta para un día pasado tiene que reportar aquel mes.
+    const period = hoy.slice(0, 7);
     const prevPeriod = periodoAnterior(period);
 
     // Historial de patrimonio para deltas (valor a una fecha = última foto ≤ fecha).
@@ -232,10 +246,16 @@ export async function ejecutarCorreos(
       fecha: h.snapshot_date as string,
       total: Number(h.total_bob),
     }));
+    // Valor del patrimonio a una fecha = última foto ≤ esa fecha, pero solo si
+    // no está demasiado atrás: comparar contra una foto de hace meses daba
+    // "0,00 (0,0%)" con flecha verde, como si el patrimonio no se hubiera
+    // movido, cuando en realidad no había con qué comparar.
+    const MAX_ATRASO_DIAS = 45;
     const valorEn = (f: string): number | null => {
-      let v: number | null = null;
-      for (const h of historial) if (h.fecha <= f) v = h.total;
-      return v;
+      let ultima: { fecha: string; total: number } | null = null;
+      for (const h of historial) if (h.fecha <= f) ultima = h;
+      if (!ultima) return null;
+      return diasEntreISO(ultima.fecha, f) <= MAX_ATRASO_DIAS ? ultima.total : null;
     };
 
     // Transacciones desde el inicio del mes anterior (cubre semanal y mensual).
@@ -257,48 +277,52 @@ export async function ejecutarCorreos(
       return [...m.entries()].map(([nombre, monto]) => ({ nombre, monto: round2(monto) })).sort((a, b) => b.monto - a.monto).slice(0, n);
     };
 
-    // ---- Semanal ----
-    const hace7 = sumarDiasISO(hoy, -6);
-    const gastosSem = filas.filter((t) => t.type === "gasto" && (t.txn_date as string) >= hace7);
-    const gasto7 = round2(gastosSem.reduce((s, t) => s + txBob(t), 0));
-    const valHoy = valorEn(hoy);
-    const val7 = valorEn(sumarDiasISO(hoy, -7));
-    const deltaSemBob = valHoy != null && val7 != null ? round2(valHoy - val7) : null;
-    const deltaSemPct = deltaSemBob != null && val7 ? deltaSemBob / val7 : null;
-    const dpfProximos: ResumenDpfProx[] = rDpf
-      ? rDpf.dpfs
-          .filter((d) => d.status === "activo" && d.end_date >= hoy && d.end_date <= sumarDiasISO(hoy, 7))
-          .map((d) => ({ titulo: d.pizarra || d.id_dpf_externo || "DPF", fecha: d.end_date, monto: d.montoAlVencimiento, dias: d.diasRestantes }))
-      : [];
-    let presuPct: number | null = null;
-    let presuExc = 0;
-    try {
-      const rp = await getResumenPresupuestos(admin, period);
-      presuPct = rp.pctGlobal;
-      presuExc = rp.categoriasExcedidas;
-    } catch { /* budgets/migración no lista */ }
+    // ---- Semanal (solo lunes) ----
+    if (esLunes) {
+      const hace7 = sumarDiasISO(hoy, -6);
+      const gastosSem = filas.filter((t) => t.type === "gasto" && (t.txn_date as string) >= hace7);
+      const gasto7 = round2(gastosSem.reduce((s, t) => s + txBob(t), 0));
+      const valHoy = valorEn(hoy);
+      const val7 = valorEn(sumarDiasISO(hoy, -7));
+      const deltaSemBob = valHoy != null && val7 != null ? round2(valHoy - val7) : null;
+      const deltaSemPct = deltaSemBob != null && val7 ? deltaSemBob / val7 : null;
+      const dpfProximos: ResumenDpfProx[] = rDpf
+        ? rDpf.dpfs
+            .filter((d) => d.status === "activo" && d.end_date >= hoy && d.end_date <= sumarDiasISO(hoy, 7))
+            .map((d) => ({ titulo: d.pizarra || d.id_dpf_externo || "DPF", fecha: d.end_date, monto: d.montoAlVencimiento, dias: d.diasRestantes }))
+        : [];
+      let presuPct: number | null = null;
+      let presuExc = 0;
+      try {
+        const rp = await getResumenPresupuestos(admin, period);
+        presuPct = rp.pctGlobal;
+        presuExc = rp.categoriasExcedidas;
+      } catch { /* budgets/migración no lista */ }
 
-    const sem = htmlResumenSemanal({
-      fecha: hoy,
-      gasto7,
-      topCategorias: top(gastosSem, 5),
-      deltaPatrimonioBob: deltaSemBob,
-      deltaPatrimonioPct: deltaSemPct,
-      dpfProximos,
-      presupuestoPct: presuPct,
-      presupuestoExcedidas: presuExc,
-    });
-    await enviarCorreo({ subject: sem.subject, html: sem.html, text: sem.text });
-    semanalEnviado = true;
+      const sem = htmlResumenSemanal({
+        fecha: hoy,
+        gasto7,
+        topCategorias: top(gastosSem, 5),
+        deltaPatrimonioBob: deltaSemBob,
+        deltaPatrimonioPct: deltaSemPct,
+        dpfProximos,
+        presupuestoPct: presuPct,
+        presupuestoExcedidas: presuExc,
+      });
+      await enviarCorreo({ subject: sem.subject, html: sem.html, text: sem.text });
+      semanalEnviado = true;
+    }
 
-    // ---- Mensual (primer lunes) → mes que acaba de cerrar ----
-    if (esPrimerLunes) {
+    // ---- Mensual (día 1) → mes que acaba de cerrar ----
+    if (esPrimerDiaDelMes) {
       const rep = prevPeriod;
       const inRep = (d: string) => d.slice(0, 7) === rep;
-      const gastosMes = filas.filter((t) => t.type === "gasto" && inRep(t.txn_date as string));
-      const ingresosMes = filas.filter((t) => t.type === "ingreso" && inRep(t.txn_date as string));
-      const valFin = valorEn(`${rep}-31`);
+      const delMes = filas.filter((t) => inRep(t.txn_date as string));
+      const gastosMes = delMes.filter((t) => t.type === "gasto");
+      const ingresosMes = delMes.filter((t) => t.type === "ingreso");
+      const valFin = valorEn(ultimoDiaDelMes(rep));
       const valIni = valorEn(sumarDiasISO(`${rep}-01`, -1));
+
       const deltaMesBob = valFin != null && valIni != null ? round2(valFin - valIni) : null;
       const deltaMesPct = deltaMesBob != null && valIni ? deltaMesBob / valIni : null;
       let presuPlan = 0;
@@ -319,6 +343,8 @@ export async function ejecutarCorreos(
       }
       const men = htmlReporteMensual({
         period: rep,
+        movimientos: delMes.length,
+        patrimonioFin: valFin,
         gastoMes: round2(gastosMes.reduce((s, t) => s + txBob(t), 0)),
         ingresoMes: round2(ingresosMes.reduce((s, t) => s + txBob(t), 0)),
         topCategorias: top(gastosMes, 6),

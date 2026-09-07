@@ -1,12 +1,12 @@
 // Plantillas HTML de correo (estilo inline + tablas, compatibles con Gmail).
-// Paleta verde de la marca.
+
+import { fechaBoliviaHoy } from "@/lib/datetime";
 
 // Colores del correo. Deben seguir a la paleta de la app (decisión E1: azul
 // oscuro), pero van en HEX literal a propósito: los clientes de correo no
 // soportan variables CSS ni `oklch`, así que aquí no sirven los tokens del tema.
-// Los nombres se conservan para no tocar las 40 referencias del archivo.
-const VERDE = "#1e3a8a"; // azul oscuro, el primario de la app
-const VERDE_CLARO = "#dbeafe"; // azul muy claro para los realces
+const AZUL = "#1e3a8a"; // azul oscuro, el primario de la app
+const AZUL_CLARO = "#dbeafe"; // azul muy claro para los realces
 const TEXTO = "#111827";
 const GRIS = "#6b7280";
 const BORDE = "#e5e7eb";
@@ -34,15 +34,15 @@ function layout(titulo: string, contenido: string): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${FONDO};padding:24px 12px;">
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid ${BORDE};border-radius:14px;overflow:hidden;">
-        <tr><td style="background:${VERDE};padding:18px 24px;">
+        <tr><td style="background:${AZUL};padding:18px 24px;">
           <table role="presentation" width="100%"><tr>
             <td style="color:#ffffff;font-size:18px;font-weight:bold;">🪙 MyMoney</td>
-            <td align="right" style="color:#d1fae5;font-size:13px;">${titulo}</td>
+            <td align="right" style="color:#dbeafe;font-size:13px;">${titulo}</td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:24px;">${contenido}</td></tr>
         <tr><td style="padding:14px 24px;background:${FONDO};color:${GRIS};font-size:11px;text-align:center;">
-          Correo automático de MyMoney · generado el ${fechaLarga(new Date().toISOString().slice(0, 10))}
+          Correo automático de MyMoney · generado el ${fechaLarga(fechaBoliviaHoy())}
         </td></tr>
       </table>
     </td></tr>
@@ -89,7 +89,7 @@ export interface PatrimonioEmailData {
 
 export function htmlPatrimonioDiario(d: PatrimonioEmailData): { subject: string; html: string; text: string } {
   const sube = (d.deltaBob ?? 0) >= 0;
-  const deltaColor = d.deltaBob == null ? GRIS : sube ? VERDE : "#dc2626";
+  const deltaColor = d.deltaBob == null ? GRIS : sube ? AZUL : "#dc2626";
   const deltaTxt =
     d.deltaBob == null
       ? "Sin comparación"
@@ -98,15 +98,15 @@ export function htmlPatrimonioDiario(d: PatrimonioEmailData): { subject: string;
   const hero = `
     <div style="text-align:center;padding:8px 0 16px;">
       <div style="font-size:12px;color:${GRIS};text-transform:uppercase;letter-spacing:.5px;">Patrimonio neto · ${fechaLarga(d.fecha)}</div>
-      <div style="font-size:34px;font-weight:bold;color:${VERDE};margin-top:6px;">${bob(d.totalBob)}</div>
+      <div style="font-size:34px;font-weight:bold;color:${AZUL};margin-top:6px;">${bob(d.totalBob)}</div>
       <div style="font-size:14px;color:${GRIS};margin-top:2px;">${usd(d.totalUsd)} · T/C ${d.tc.toFixed(2)}</div>
-      <div style="display:inline-block;margin-top:10px;padding:5px 12px;border-radius:999px;background:${VERDE_CLARO};color:${deltaColor};font-size:13px;font-weight:bold;">${deltaTxt}</div>
+      <div style="display:inline-block;margin-top:10px;padding:5px 12px;border-radius:999px;background:${AZUL_CLARO};color:${deltaColor};font-size:13px;font-weight:bold;">${deltaTxt}</div>
     </div>`;
 
   const kpis = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;">
       <tr>
-        ${kpi("Disponibilidad rápida", bob(d.disponibilidad), "Efectivo + banco + stablecoins", VERDE)}
+        ${kpi("Disponibilidad rápida", bob(d.disponibilidad), "Efectivo + banco + stablecoins", AZUL)}
         ${kpi("Capital en DPF", d.dpf ? bob(d.dpf.capital) : "—", d.dpf ? `Ganancia líq. ${bob(d.dpf.gananciaLiquida)}` : undefined)}
       </tr>
       <tr>
@@ -116,9 +116,9 @@ export function htmlPatrimonioDiario(d: PatrimonioEmailData): { subject: string;
     </table>`;
 
   const proxima = d.dpf?.proxima
-    ? `<table role="presentation" width="100%" style="margin-top:14px;background:${VERDE_CLARO};border-radius:10px;">
+    ? `<table role="presentation" width="100%" style="margin-top:14px;background:${AZUL_CLARO};border-radius:10px;">
         <tr><td style="padding:12px 14px;">
-          <div style="font-size:12px;color:${VERDE};font-weight:bold;">📅 Próxima liberación de DPF</div>
+          <div style="font-size:12px;color:${AZUL};font-weight:bold;">📅 Próxima liberación de DPF</div>
           <div style="font-size:13px;color:${TEXTO};margin-top:4px;">
             <strong>${d.dpf.proxima.titulo}</strong> — vence ${fechaLarga(d.dpf.proxima.fecha)}
             (${d.dpf.proxima.dias < 0 ? "vencido" : `en ${d.dpf.proxima.dias} días`}) ·
@@ -198,19 +198,19 @@ export function htmlDpfAlerta(items: DpfAlertaItem[], hoy: string): { subject: s
       (i) => `<tr>
         <td style="padding:10px 12px;border-bottom:1px solid ${BORDE};font-size:13px;"><strong>${i.titulo}</strong><br><span style="color:${GRIS};font-size:11px;">${pct(i.tasa)} anual</span></td>
         <td style="padding:10px 12px;border-bottom:1px solid ${BORDE};font-size:13px;text-align:right;">${bob(i.capital)}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid ${BORDE};font-size:13px;text-align:right;color:${VERDE};"><strong>${bob(i.montoAlVencimiento)}</strong><br><span style="font-size:11px;">+${bob(i.ganancia)}</span></td>
+        <td style="padding:10px 12px;border-bottom:1px solid ${BORDE};font-size:13px;text-align:right;color:${AZUL};"><strong>${bob(i.montoAlVencimiento)}</strong><br><span style="font-size:11px;">+${bob(i.ganancia)}</span></td>
       </tr>`
     )
     .join("");
 
   const contenido = `
     <div style="text-align:center;padding-bottom:12px;">
-      <div style="font-size:15px;font-weight:bold;color:${VERDE};">🔔 Hoy se libera ${items.length === 1 ? "un DPF" : `${items.length} DPF`}</div>
+      <div style="font-size:15px;font-weight:bold;color:${AZUL};">🔔 Hoy se libera ${items.length === 1 ? "un DPF" : `${items.length} DPF`}</div>
       <div style="font-size:12px;color:${GRIS};margin-top:2px;">${fechaLarga(hoy)}</div>
     </div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
-        ${kpi("Se libera hoy", bob(totalLiberado), "Capital + interés", VERDE)}
+        ${kpi("Se libera hoy", bob(totalLiberado), "Capital + interés", AZUL)}
         ${kpi("Ganancia líquida", bob(totalGanancia))}
       </tr>
     </table>
@@ -249,8 +249,8 @@ function listaCategorias(items: { nombre: string; monto: number }[]): string {
 function deltaChip(deltaBob: number | null, deltaPct: number | null, label: string): string {
   if (deltaBob == null) return `<div style="color:${GRIS};font-size:12px;">Sin comparación de patrimonio.</div>`;
   const sube = deltaBob >= 0;
-  const color = sube ? VERDE : "#dc2626";
-  return `<div style="display:inline-block;padding:5px 12px;border-radius:999px;background:${VERDE_CLARO};color:${color};font-size:13px;font-weight:bold;">
+  const color = sube ? AZUL : "#dc2626";
+  return `<div style="display:inline-block;padding:5px 12px;border-radius:999px;background:${AZUL_CLARO};color:${color};font-size:13px;font-weight:bold;">
     ${sube ? "▲" : "▼"} ${bob(Math.abs(deltaBob))}${deltaPct != null ? ` (${pct(deltaPct)})` : ""} <span style="font-weight:normal;color:${GRIS};">${label}</span>
   </div>`;
 }
@@ -268,7 +268,7 @@ export interface SemanalEmailData {
 
 export function htmlResumenSemanal(d: SemanalEmailData): { subject: string; html: string; text: string } {
   const dpf = d.dpfProximos.length
-    ? `<div style="margin-top:14px;"><div style="font-size:12px;font-weight:bold;color:${VERDE};">📅 DPF que vencen esta semana</div>
+    ? `<div style="margin-top:14px;"><div style="font-size:12px;font-weight:bold;color:${AZUL};">📅 DPF que vencen esta semana</div>
         ${d.dpfProximos
           .map((i) => `<div style="font-size:13px;color:${TEXTO};margin-top:4px;">• <strong>${i.titulo}</strong> — ${fechaLarga(i.fecha)} (${i.dias <= 0 ? "hoy/vencido" : `en ${i.dias} d`}) · ${bob(i.monto)}</div>`)
           .join("")}</div>`
@@ -279,7 +279,7 @@ export function htmlResumenSemanal(d: SemanalEmailData): { subject: string; html
 
   const contenido = `
     <div style="text-align:center;padding-bottom:10px;">
-      <div style="font-size:15px;font-weight:bold;color:${VERDE};">🗓️ Resumen de la semana</div>
+      <div style="font-size:15px;font-weight:bold;color:${AZUL};">🗓️ Resumen de la semana</div>
       <div style="font-size:12px;color:${GRIS};">${fechaLarga(d.fecha)}</div>
     </div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -307,7 +307,9 @@ export interface MensualEmailData {
   period: string; // 'YYYY-MM' reportado
   gastoMes: number;
   ingresoMes: number;
+  movimientos: number; // cuántas transacciones tuvo el mes
   topCategorias: { nombre: string; monto: number }[];
+  patrimonioFin: number | null; // patrimonio al cierre del mes (null: sin foto)
   deltaPatrimonioBob: number | null;
   deltaPatrimonioPct: number | null;
   presupuestoPlaneado: number;
@@ -331,18 +333,24 @@ export function htmlReporteMensual(d: MensualEmailData): { subject: string; html
     ? `<div style="margin-top:8px;font-size:13px;color:${TEXTO};">🪙 DPF cobrados este mes: <strong>${d.dpfCobrados}</strong> · ganancia ${bob(d.gananciaDpfMes)}.</div>`
     : "";
 
-  const contenido = `
-    <div style="text-align:center;padding-bottom:10px;">
-      <div style="font-size:15px;font-weight:bold;color:${VERDE};">📈 Reporte de ${nombreMesPeriodo(d.period)}</div>
-    </div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  // Un mes sin ninguna transacción no merece un tablero de ceros: eso se lee
+  // como un correo roto. Se dice en una línea y se muestra solo el patrimonio.
+  const cuerpo = d.movimientos === 0
+    ? `<div style="margin:6px 0 14px;padding:12px 14px;background:${FONDO};border:1px solid ${BORDE};border-radius:10px;font-size:13px;color:${TEXTO};">
+        No se registró ningún movimiento en ${nombreMesPeriodo(d.period)}.
+      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        ${kpi("Patrimonio al cierre", bob(d.patrimonioFin), "último día del mes")}
+        ${kpi("DPF cobrados", String(d.dpfCobrados), d.dpfCobrados > 0 ? `ganancia ${bob(d.gananciaDpfMes)}` : "ninguno")}
+      </tr></table>`
+    : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
-        ${kpi("Gasto del mes", bob(d.gastoMes), undefined, "#dc2626")}
-        ${kpi("Ingreso del mes", bob(d.ingresoMes), undefined, VERDE)}
+        ${kpi("Gasto del mes", bob(d.gastoMes), `${d.movimientos} movimiento(s)`, "#dc2626")}
+        ${kpi("Ingreso del mes", bob(d.ingresoMes), undefined, AZUL)}
       </tr>
       <tr>
-        ${kpi("Balance", `${balance >= 0 ? "+" : ""}${bob(balance)}`, "Ingreso − gasto", balance >= 0 ? VERDE : "#dc2626")}
-        ${kpi("Patrimonio", "", "vs. inicio de mes")}
+        ${kpi("Balance", `${balance >= 0 ? "+" : ""}${bob(balance)}`, "Ingreso − gasto", balance >= 0 ? AZUL : "#dc2626")}
+        ${kpi("Patrimonio al cierre", bob(d.patrimonioFin), "último día del mes")}
       </tr>
     </table>
     <div style="text-align:center;margin:6px 0 4px;">${deltaChip(d.deltaPatrimonioBob, d.deltaPatrimonioPct, "en el mes")}</div>
@@ -352,8 +360,17 @@ export function htmlReporteMensual(d: MensualEmailData): { subject: string; html
     </table>
     ${presu}
     ${dpf}`;
-  const text = `Reporte ${nombreMesPeriodo(d.period)}: gasto ${bob(d.gastoMes)}, ingreso ${bob(d.ingresoMes)}, balance ${bob(balance)}.`;
-  return { subject: `MyMoney · 📈 Reporte de ${nombreMesPeriodo(d.period)}`, html: layout("Reporte mensual", contenido), text };
+
+  const contenido = `
+    <div style="text-align:center;padding-bottom:10px;">
+      <div style="font-size:15px;font-weight:bold;color:${AZUL};">📈 Cierre de ${nombreMesPeriodo(d.period)}</div>
+      <div style="font-size:12px;color:${GRIS};margin-top:2px;">Resumen del mes que terminó</div>
+    </div>
+    ${cuerpo}`;
+  const text = d.movimientos === 0
+    ? `Cierre de ${nombreMesPeriodo(d.period)}: sin movimientos registrados. Patrimonio al cierre ${bob(d.patrimonioFin)}.`
+    : `Cierre de ${nombreMesPeriodo(d.period)}: gasto ${bob(d.gastoMes)}, ingreso ${bob(d.ingresoMes)}, balance ${bob(balance)}.`;
+  return { subject: `MyMoney · 📈 Cierre de ${nombreMesPeriodo(d.period)}`, html: layout("Cierre mensual", contenido), text };
 }
 
 // ============================================================================
@@ -384,7 +401,7 @@ function monedaFmt(monto: number, moneda: string): string {
   return moneda === "BOB" ? bob(monto) : `${monto.toFixed(2)} ${moneda}`;
 }
 
-function fila(etiqueta: string, valor: string, monto: string, color = VERDE): string {
+function fila(etiqueta: string, valor: string, monto: string, color = AZUL): string {
   return `<tr>
     <td style="padding:10px 0;border-bottom:1px solid ${BORDE};">
       <div style="font-weight:bold;color:${TEXTO};">${etiqueta}</div>
@@ -423,7 +440,7 @@ export function htmlReciboVoz(d: ReciboVozData): { subject: string; html: string
         `Te debe: ${esc(x.quien || "—")}`,
         x.motivo ? esc(x.motivo) : "",
         `+ ${bob(x.monto)}`,
-        VERDE
+        AZUL
       )
     )
     .join("");
@@ -442,7 +459,7 @@ export function htmlReciboVoz(d: ReciboVozData): { subject: string; html: string
   const contenido = `
     <div style="text-align:center;padding:4px 0 10px;">
       <div style="font-size:40px;">✅</div>
-      <div style="font-size:20px;font-weight:bold;color:${VERDE};margin-top:4px;">Registro recibido</div>
+      <div style="font-size:20px;font-weight:bold;color:${AZUL};margin-top:4px;">Registro recibido</div>
       <div style="font-size:13px;color:${GRIS};margin-top:2px;">${resumen} · ${d.fechaHora}</div>
     </div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${filasGasto}${filasDeuda}</table>
