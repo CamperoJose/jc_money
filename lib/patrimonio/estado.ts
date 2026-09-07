@@ -73,6 +73,47 @@ export interface EstadoPatrimonio {
   nota: string;
 }
 
+/**
+ * ¿El error es "esa tabla o columna todavía no existe"?
+ *
+ * El módulo tolera a propósito que una migración no esté aplicada: la app no
+ * debe romperse por eso. Pero esa tolerancia NO puede extenderse a cualquier
+ * error: un timeout de red haría que la cuenta derivada se quedara con el valor
+ * de la base, y el job persistiría ese número equivocado como la verdad del día,
+ * en silencio. Cualquier otro error se propaga.
+ */
+function esMigracionPendiente(error: unknown): boolean {
+  if (!error) return false;
+  const e = error as { code?: string; message?: string };
+  const code = e.code ?? "";
+  // Postgres: 42P01 tabla inexistente, 42703 columna inexistente.
+  // PostgREST: PGRST20x cuando no encuentra la tabla/columna en su caché.
+  if (code === "42P01" || code === "42703" || code.startsWith("PGRST2")) return true;
+  const msg = (e.message ?? "").toLowerCase();
+  return msg.includes("does not exist") || msg.includes("could not find");
+}
+
+/**
+ * Extrae las filas de una lectura hecha con `allSettled`, distinguiendo la
+ * migración pendiente (devuelve `null`: la cuenta conserva el saldo de la base)
+ * de un fallo real (lanza).
+ */
+function filasDe<T>(
+  resultado: PromiseSettledResult<{ data: unknown; error: unknown }>,
+  contexto: string
+): T[] | null {
+  if (resultado.status === "rejected") {
+    if (esMigracionPendiente(resultado.reason)) return null;
+    throw resultado.reason;
+  }
+  const { data, error } = resultado.value;
+  if (error) {
+    if (esMigracionPendiente(error)) return null;
+    throw new Error(`Error al leer ${contexto}: ${(error as { message?: string }).message ?? error}`);
+  }
+  return (data ?? []) as T[];
+}
+
 /** Cuenta del usuario, tal como la necesita este módulo. */
 export interface CuentaMeta {
   id: string;
@@ -153,9 +194,10 @@ export async function getCuentasDerivadas(
   ]);
 
   // DPF: vigente a la fecha = ya había empezado y aún no se había cobrado.
-  if (cuentaDpf && rDpf.status === "fulfilled" && !rDpf.value.error) {
+  const filasDpf = cuentaDpf ? filasDe<Record<string, unknown>>(rDpf, "los DPF") : null;
+  if (cuentaDpf && filasDpf) {
     const value = redondear(
-      (rDpf.value.data ?? []).reduce((s, d) => {
+      filasDpf.reduce((s, d) => {
         const r = d as {
           principal: number;
           start_date: string | null;
@@ -176,9 +218,10 @@ export async function getCuentasDerivadas(
   }
 
   // Por cobrar: saldo pendiente a la fecha.
-  if (cuentaPorCobrar && rDeudas.status === "fulfilled" && !rDeudas.value.error) {
+  const filasDeudas = cuentaPorCobrar ? filasDe<Record<string, unknown>>(rDeudas, "las deudas") : null;
+  if (cuentaPorCobrar && filasDeudas) {
     const value = redondear(
-      (rDeudas.value.data ?? []).reduce((s, d) => {
+      filasDeudas.reduce((s, d) => {
         const r = d as {
           amount: number;
           paid_amount?: number;
@@ -199,9 +242,10 @@ export async function getCuentasDerivadas(
   }
 
   // Activos: los que ya se habían adquirido y aún no se habían vendido.
-  if (cuentaActivos && rActivos.status === "fulfilled" && !rActivos.value.error) {
+  const filasActivos = cuentaActivos ? filasDe<Record<string, unknown>>(rActivos, "los activos") : null;
+  if (cuentaActivos && filasActivos) {
     const value = redondear(
-      (rActivos.value.data ?? []).reduce((s, a) => {
+      filasActivos.reduce((s, a) => {
         const r = a as {
           acquisition_cost: number;
           current_value: number | null;
@@ -283,8 +327,8 @@ export async function getMovimientosPuntuales(
   ]);
 
   // Ventas de activos: ENTRA el precio de venta.
-  if (rVentas.status === "fulfilled" && !rVentas.value.error) {
-    for (const r of rVentas.value.data ?? []) {
+  for (const r of filasDe<Record<string, unknown>>(rVentas, "las ventas de activos") ?? []) {
+    {
       const a = r as { sold_price: number | null; currency: string; sold_account_id: string };
       const price = Number(a.sold_price);
       if (!a.sold_account_id || !Number.isFinite(price) || price <= 0) continue;
@@ -299,8 +343,8 @@ export async function getMovimientosPuntuales(
   }
 
   // Préstamos otorgados: SALE el monto prestado de la cuenta de origen.
-  if (rPrestamos.status === "fulfilled" && !rPrestamos.value.error) {
-    for (const r of rPrestamos.value.data ?? []) {
+  for (const r of filasDe<Record<string, unknown>>(rPrestamos, "los préstamos") ?? []) {
+    {
       const d = r as { amount: number | null; source_account_id: string };
       const monto = Number(d.amount);
       if (!d.source_account_id || !Number.isFinite(monto) || monto <= 0) continue;
@@ -315,8 +359,8 @@ export async function getMovimientosPuntuales(
   }
 
   // Cobros de deudas: ENTRA el monto cobrado.
-  if (rCobros.status === "fulfilled" && !rCobros.value.error) {
-    for (const r of rCobros.value.data ?? []) {
+  for (const r of filasDe<Record<string, unknown>>(rCobros, "los cobros") ?? []) {
+    {
       const d = r as { paid_amount: number | null; paid_account_id: string };
       const paid = Number(d.paid_amount);
       if (!d.paid_account_id || !Number.isFinite(paid) || paid <= 0) continue;
@@ -397,6 +441,18 @@ export async function calcularEstadoPatrimonio(
     account: b.accounts as { currency: "BOB" | "USD" | "USDT"; is_liability: boolean },
   }));
 
+  // Una foto sin saldos no es una base válida: al arrancar de cero, el resultado
+  // pierde TODAS las cuentas reales y solo quedan las derivadas, dando un
+  // patrimonio muy por debajo del real. Puede ocurrir con una fila huérfana (un
+  // alta que no llegó a guardar sus saldos). Mejor fallar con un mensaje claro
+  // que escribir esa cifra en el historial.
+  if (balancesBase.length === 0) {
+    throw new Error(
+      `La foto del ${base.snapshot_date} no tiene saldos: no sirve como base. ` +
+        "Bórrala desde Registros y vuelve a intentarlo."
+    );
+  }
+
   // El total de la base se recalcula SIEMPRE desde sus saldos: la foto nueva se
   // arma a partir de ellos, así que tomar un total almacenado que no cuadre haría
   // que la explicación contradijera al detalle.
@@ -404,7 +460,18 @@ export async function calcularEstadoPatrimonio(
 
   // Cuentas: moneda, tipo y si son pasivo. Se leen UNA vez y se reutilizan;
   // antes se volvían a consultar tres veces más, una por cuenta derivada.
+  // Sin las cuentas no se sabe la moneda de cada saldo y todo se valuaría como
+  // BOB: un fallo aquí daría un total miles de bolivianos por debajo del real,
+  // y el job lo guardaría como verdad. Es un error fatal, no algo que tolerar.
+  if (resCuentas.error) {
+    throw new Error(
+      `No se pudieron leer las cuentas: ${(resCuentas.error as { message?: string }).message ?? resCuentas.error}`
+    );
+  }
   const cuentas = (resCuentas.data ?? []) as CuentaMeta[];
+  if (cuentas.length === 0) {
+    throw new Error("No hay cuentas: no se puede valuar el patrimonio por moneda.");
+  }
   const metaCuenta = new Map(
     cuentas.map((r) => [
       r.id,

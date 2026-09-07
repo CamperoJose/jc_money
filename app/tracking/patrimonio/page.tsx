@@ -77,6 +77,9 @@ export default async function PatrimonioDashboard() {
   // última foto como siempre.
   const estado: EstadoPatrimonio | null =
     resEstado.status === "fulfilled" ? resEstado.value : null;
+  // Si el cálculo en vivo falla, se muestra la última foto — pero se dice, para
+  // que nadie tome por actual una cifra que puede tener horas.
+  const estadoFallo = resEstado.status === "rejected";
 
   return (
     <div className="space-y-8">
@@ -118,7 +121,7 @@ export default async function PatrimonioDashboard() {
             </CardContent>
           </Card>
         ) : (
-          <Contenido resumen={resumen} estado={estado} />
+          <Contenido resumen={resumen} estado={estado} estadoFallo={estadoFallo} />
         ))}
 
       {resumenDpf && resumenDpf.totalHistorico > 0 && <DpfResumenCard resumen={resumenDpf} />}
@@ -129,9 +132,11 @@ export default async function PatrimonioDashboard() {
 function Contenido({
   resumen,
   estado,
+  estadoFallo,
 }: {
   resumen: ResumenPatrimonio;
   estado: EstadoPatrimonio | null;
+  estadoFallo: boolean;
 }) {
   const {
     ultimo,
@@ -211,6 +216,12 @@ function Contenido({
                   última foto: {formatDate(ultimo?.snapshot_date)}
                 </span>
               </div>
+              {estadoFallo && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  No se pudo calcular el valor de ahora. Se muestra la última foto, que puede
+                  no incluir lo registrado hoy.
+                </p>
+              )}
               {estado && (
                 <EstadoEnVivo
                   baseTotalBob={estado.baseTotalBob}

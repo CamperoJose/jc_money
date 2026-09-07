@@ -13,6 +13,8 @@ dashboard y el cierre del job dan exactamente lo mismo.
 |---|---|
 | `e2e.mjs` | Batería principal contra Postgres real (17 comprobaciones). |
 | `perf.mjs` | Cuenta consultas y mide viajes encadenados, con latencia simulada. |
+| `fallos.mjs` | Comprueba que un fallo real se propaga y una migración pendiente se tolera. |
+| `vacio.mjs` | Comprueba que una foto sin saldos no se usa como base. |
 | `coherencia.test.mjs` | Comprueba sobre el código que lectura y cierre no vuelvan a duplicarse. |
 | `correo.mjs` | Renderiza el correo diario y verifica asunto y cuerpo. |
 | `supa-pg.mjs` | Adaptador mínimo de la API de supabase-js sobre Postgres. |
