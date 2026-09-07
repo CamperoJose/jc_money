@@ -2,7 +2,43 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-04 (sesión 20 — accesibilidad y pase completo de UX)
+## Última actualización: 2026-09-06 (sesión 21 — cuenta de origen en deudas + arreglos de UI)
+
+### Sesión 21 — lo hecho ✅
+
+**Bug reportado por el usuario y corregido (era mío).** Al escribir en la
+descripción de un gasto, cada tecla devolvía el foco al campo de fecha y se
+perdían caracteres. Causa: en `components/ui/dialog.tsx` el efecto de foco
+dependía de `[open, onOpenChange, onEnviar]`, y `onEnviar` se pasa como
+`enviando ? undefined : guardar` — identidad nueva en cada render. Cada tecla
+remontaba el efecto y su enfoque inicial volvía al primer campo. Afectaba a los
+seis formularios en diálogo. Arreglo: callbacks por referencia y el efecto
+depende solo de `open`. Mismo error en `useOrden` (`valores` como objeto
+literal). Verificado en un navegador contra la app compilada, comprobando además
+que la prueba detecta el fallo al reintroducirlo.
+
+**Deudas: cuenta de origen (migración `0015`).** Faltaba la mitad del ciclo: al
+cobrar ya se indicaba a qué cuenta llegaba el dinero, pero al prestar no se
+registraba de dónde salía, así que el monto aparecía en «Por Cobrar» sin
+descontarse de ninguna cuenta. Ahora el job descuenta el monto de
+`source_account_id` el día del préstamo; la contraparte es la cuenta derivada,
+así que **el patrimonio total no cambia, solo su composición**. Simétrico al
+cobro. De paso se corrigió que el diálogo de "recibir cobro" habría borrado la
+cuenta de origen, porque su PATCH reescribe la fila entera.
+
+**Ajustes de UI**, dos de ellos regresiones de la sesión 20 en móvil: el aviso
+tapaba el botón flotante de voz, y el contenido no reservaba sitio para ese
+botón (tapaba la paginación). Además: estados vacíos con su botón de acción y
+distinguiendo vacío real de vacío por filtros, densidad `p-4 sm:p-6` en las
+tarjetas KPI, restauración de scroll al navegar atrás, y se quitó el
+`overflow-x-hidden` que recortaba los resplandores.
+
+⚠️ **Pendiente del usuario: aplicar la migración `0015` en Supabase.** El job la
+tolera si no está (omite la columna), pero hasta entonces no descuenta nada.
+
+---
+
+## Update previo: 2026-09-04 (sesión 20 — accesibilidad y pase completo de UX)
 
 ### Sesión 20 — lo hecho ✅
 
