@@ -34,7 +34,10 @@ Módulos desplegados:
 - **Asistente IA**: registro por **voz** (Vertex AI, audio directo), asíncrono, con correo-recibo y
   pestaña de auditoría; e ingesta por token para el **Atajo / botón de acción de iOS**.
 - **Configuración → Parámetros**: ABM de categorías.
-- **Job diario de patrimonio** (`/api/jobs/patrimonio-diario` + GitHub Actions 00:30 Bolivia).
+- **Patrimonio en vivo**: el dashboard muestra `última foto + lo registrado después`, con el mismo
+  cálculo que el cierre (`lib/patrimonio/estado.ts`). Ver decisión F1.
+- **Job diario de patrimonio** (`/api/jobs/patrimonio-diario` + GitHub Actions 00:17 Bolivia): cierra
+  el día y envía el correo con el resumen de lo gastado.
 - Migraciones `0001`–`0014` aplicadas en Supabase.
 
 ⚠️ El despliegue a producción en Vercel es **manual** ("Promote to Production"): un push a `main`
@@ -96,6 +99,9 @@ luego Inversiones DPF, y al final Deudas. Ver `claude/roadmap.md`.
   `lib/charts.ts`, que necesita tonos distinguibles entre sí para series múltiples.
 - **`npm run lint` debe quedar limpio.** Hay ESLint configurado (`eslint.config.mjs`) y corre dentro
   de `npm run build`. `any` es error, no aviso.
+- **El cálculo del patrimonio vive en `lib/patrimonio/estado.ts` y NO se duplica.** Lectura y cierre
+  usan la misma función; la duplicación previa causó tres errores de cálculo. La invariante
+  `total = Σ(saldos)` no se rompe: el total sale de los saldos, nunca de sumar piezas.
 - **Este proyecto NO lleva tests automatizados** (decisión E6): no agregues Vitest/Jest/Playwright ni
   los propongas. La red de seguridad es `lint` + `tsc --noEmit` + `build` verde + revisar el diff.
 - **Texturas y vidrio**: `app/globals.css` define un sistema de superficies (`.superficie`,

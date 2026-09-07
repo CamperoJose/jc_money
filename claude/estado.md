@@ -2,7 +2,36 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-06 (sesión 21 — cuenta de origen en deudas + arreglos de UI)
+## Última actualización: 2026-09-07 (sesión 22 — patrimonio en vivo + resumen diario)
+
+### Sesión 22 — lo hecho ✅
+
+Se analizó la propuesta de crear una foto de patrimonio por cada registro y se
+descartó con razones (decisión F1). En su lugar:
+
+- **`lib/patrimonio/estado.ts`**: todo el cálculo sale del job a un módulo
+  compartido, como función pura que no escribe nada. El job baja de 432 a 150
+  líneas y queda con lo suyo: idempotencia, persistencia e informe.
+- **El dashboard muestra el patrimonio de AHORA** (última foto + lo registrado
+  después), con el mismo cálculo que hará el cierre: el número que se ve durante
+  el día es el que se guardará esa noche. Disponibilidad y distribución por
+  moneda también en vivo. Si el cálculo falla, se muestra la última foto.
+- **Dos bugs latentes corregidos al generalizar el rango**: si el cierre no corre
+  varios días ya no se pierden los días intermedios, y la regla del corte
+  inferior según el tipo de foto base queda escrita (decisión F2).
+- **El correo diario resume lo gastado**: total, movimientos, ingresos, neto y
+  las cinco categorías con más gasto; el asunto lleva el gasto del día. La
+  plantilla pasa del verde al azul actual.
+
+**Verificación**: arnés en `scripts/verificacion/` que ejecuta el código real
+contra un Postgres real (no una reimplementación), sembrando el caso del 3 de
+septiembre. 13/13, incluidas la invariante `total = Σ(saldos)` y que el job
+persiste exactamente lo que mostraba el dashboard. No es una suite de tests
+(decisión E6): es una herramienta manual, no corre en CI ni en el build.
+
+---
+
+## Update previo: 2026-09-06 (sesión 21 — cuenta de origen en deudas + arreglos de UI)
 
 ### Sesión 21 — lo hecho ✅
 

@@ -134,3 +134,49 @@ La red de seguridad que **sí** existe y hay que mantener limpia en cada cambio:
 Consecuencia asumida: las regresiones se detectan en producción. Por eso pesa más revisar el propio
 diff con cuidado antes de pushear, y por eso importan las invariantes del dominio escritas en el
 código (por ejemplo `total = Σ(saldos)` en el job) en vez de en una suite.
+
+---
+
+## F. Decisiones de la sesión 22
+
+### F1. Patrimonio en vivo por lectura, NO una foto por evento
+
+El usuario planteó que cada registro (gasto, ingreso, deuda, activo) creara al
+instante una nueva foto de patrimonio con la diferencia, dejando el job solo
+para el resumen del día. Se analizó y **se descartó la foto por evento**, por
+cuatro motivos concretos:
+
+1. **Editar y borrar rompen la cadena.** Una foto es "el estado en el momento T".
+   Corregir un gasto de hace una semana invalida todas las fotos posteriores: el
+   recálculo no desaparece, se vuelve más frecuente y en cascada. Evitarlo exige
+   event sourcing puro (eventos inmutables + asientos de compensación), que
+   cambia la UX y el modelo de datos.
+2. **Las cuentas derivadas cambian sin eventos del usuario.** Un DPF que vence
+   altera el capital activo por el paso del tiempo. Haría falta un cierre
+   periódico igual.
+3. **El tipo de cambio.** Si el T/C sube, el patrimonio en BOB cambia sin que
+   ocurra ningún evento; pesa, porque hay ~9.600 Bs en USDT y 1.850 en USD.
+4. **Las fotos manuales son el ancla de verdad.** El saldo real deriva
+   (intereses, comisiones, gastos no registrados); un modelo puramente derivado
+   acumula error sin límite.
+
+**Lo adoptado:** calcular el patrimonio EN LECTURA — `última foto + eventos
+posteriores` — con la misma función que usa el cierre (`lib/patrimonio/estado.ts`).
+Da el efecto inmediato que se buscaba, editar y borrar se reflejan solos porque
+se recalcula desde los datos vigentes, y no escribe ni una fila.
+
+El job conserva el cierre diario (una foto por día mantiene el historial legible
+y sirve de ancla) y suma el resumen de gastos por correo, que pasa a ser su
+principal valor.
+
+> Si algún día se quiere trazabilidad contable de cada movimiento, la forma
+> correcta es una **tabla de movimientos append-only** separada de las fotos, no
+> fotos por evento. Es un rediseño mayor y hoy no compensa.
+
+### F2. Regla del rango de transacciones, escrita
+
+Se explicita en `rangoTransacciones` lo que la decisión E4 implicaba: una foto
+AUTO ya lleva aplicados los gastos de su día (se cuenta desde el siguiente); una
+MANUAL son saldos en bruto y su propio día se cuenta igual. Los movimientos
+puntuales (ventas, cobros, préstamos) usan siempre corte exclusivo, porque una
+foto manual sí refleja el saldo real de las cuentas tras el movimiento.
