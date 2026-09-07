@@ -10,6 +10,7 @@ import {
   type DpfAlertaItem,
 } from "@/lib/emails/plantillas";
 import { getDpfs } from "@/lib/queries/dpf";
+import { TIPOS_LIQUIDOS } from "@/lib/patrimonio";
 import { resumenDpf, type ResumenDpf } from "@/lib/dpf";
 import { getResumenPresupuestos, periodoActual } from "@/lib/queries/presupuestos";
 
@@ -38,7 +39,6 @@ function periodoAnterior(period: string): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-const TIPOS_LIQUIDOS = new Set(["banco", "efectivo", "stablecoin"]);
 
 async function getUsuarioId(admin: SupabaseClient): Promise<string | null> {
   for (const t of ["net_worth_snapshots", "accounts", "app_settings", "transactions"]) {

@@ -14,6 +14,18 @@ const { ejecutarPatrimonioDiario } = await import("/tmp/compilado/jobs/patrimoni
 const USER = "11111111-1111-1111-1111-111111111111";
 const { pool, db } = await conectar();
 const r2 = (n) => Math.round(n * 100) / 100;
+
+// La batería se deja el escenario como lo encontró: si no, la segunda corrida
+// arranca con la foto auto y los datos que creó la primera, y falla sin que
+// haya ningún problema real en el código.
+async function reiniciarEscenario() {
+  await pool.query("delete from net_worth_snapshots where kind = 'auto'");
+  await pool.query("delete from transactions where txn_date <> '2026-09-03'");
+  await pool.query("delete from dpf_deposits where principal = 5000");
+  await pool.query(`update debts set paid_amount = 0, status = 'pendiente',
+    collected_date = null, paid_account_id = null where counterparty = 'Deuda nueva del día'`);
+}
+await reiniciarEscenario();
 const pruebas = [];
 const check = (n, ok) => pruebas.push([n, ok]);
 
@@ -67,9 +79,40 @@ check("la base pasa a ser la foto auto recién creada", vivo2.base.kind === "aut
 check("el gasto se refleja SIN esperar al cierre", r2(vivo.totalBob - vivo2.totalBob) === 50);
 check("no se recuentan los gastos del día 3 (base auto → día siguiente)", vivo2.netoBob === -50);
 
+// ---------- 5. Las derivadas se evalúan A LA FECHA, no a hoy ----------
+// Se cobra la deuda de 140 el día 6. Recalcular el día 3 no debe verse afectado
+// por algo ocurrido tres días después.
+await pool.query(`update debts set paid_amount=140, status='pagado', collected_date='2026-09-06',
+  paid_account_id='a0000000-0000-0000-0000-000000000002' where counterparty='Deuda nueva del día'`);
+const vivo3 = await calcularEstadoPatrimonio(db, USER, "2026-09-03");
+const porCobrar3 = vivo3.balances.find((b) => b.account.name === "Por Cobrar").amount;
+const vivo6 = await calcularEstadoPatrimonio(db, USER, "2026-09-06");
+const porCobrar6 = vivo6.balances.find((b) => b.account.name === "Por Cobrar").amount;
+console.log("\n— Cobro de la deuda el día 6 —");
+console.log("  Por Cobrar al día 3:", porCobrar3, "| al día 6:", porCobrar6);
+check("recalcular un día pasado NO se contamina con el estado de hoy", porCobrar3 === 1745);
+check("y el día del cobro sí lo refleja", porCobrar6 === 1605);
+await pool.query(`update debts set paid_amount=0, status='pendiente', collected_date=null,
+  paid_account_id=null where counterparty='Deuda nueva del día'`);
+
+// ---------- 6. Un DPF que aún no existía no cuenta ----------
+await pool.query(`alter table dpf_deposits add column if not exists start_date date`);
+await pool.query(`alter table dpf_deposits add column if not exists end_date date`);
+await pool.query(`alter table dpf_deposits add column if not exists paid_at date`);
+await pool.query(`insert into dpf_deposits (user_id,principal,status,start_date) values ($1,5000,'activo','2026-09-05')`, [USER]);
+const vivoDpf3 = await calcularEstadoPatrimonio(db, USER, "2026-09-03");
+const dpf3 = vivoDpf3.balances.find((b) => b.account.name === "DPF Congelado").amount;
+const vivoDpf6 = await calcularEstadoPatrimonio(db, USER, "2026-09-06");
+const dpf6 = vivoDpf6.balances.find((b) => b.account.name === "DPF Congelado").amount;
+console.log("\n— DPF abierto el día 5 —");
+console.log("  DPF al día 3:", dpf3, "| al día 6:", dpf6);
+check("un DPF que aún no existía no cuenta en una fecha anterior", dpf3 === 39000);
+check("y sí cuenta desde que empieza", dpf6 === 44000);
+
 console.log("");
 let f = 0;
 for (const [n, ok] of pruebas) { if (!ok) f++; console.log(`${ok ? "OK   " : "FALLA"} ${n}`); }
 console.log(f === 0 ? `\n${pruebas.length}/${pruebas.length} correctas` : `\n${f} FALLOS`);
+await reiniciarEscenario();
 await pool.end();
 process.exit(f ? 1 : 0);

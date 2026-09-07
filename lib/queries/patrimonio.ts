@@ -4,6 +4,7 @@ import {
   calcularTotalBob,
   calcularTotalUsd,
   distribucionPorMoneda,
+  TIPOS_LIQUIDOS,
 } from "@/lib/patrimonio";
 
 export interface BalanceUI {
@@ -74,7 +75,6 @@ export interface ResumenPatrimonio {
 }
 
 /** Tipos de cuenta considerados de disposición inmediata (líquidos). */
-const TIPOS_LIQUIDOS = new Set(["banco", "efectivo", "stablecoin"]);
 
 /** Lista de cuentas/billeteras del usuario (para el formulario de registro). */
 export async function getCuentas(supabase: SupabaseClient): Promise<Account[]> {

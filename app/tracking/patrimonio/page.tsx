@@ -168,6 +168,12 @@ function Contenido({
 
   const totalMoneda = monedas ? monedas.BOB + monedas.USD + monedas.USDT : 0;
 
+  // El máximo histórico sale de las fotos. Si el valor en vivo ya lo superó, la
+  // tarjeta mostraría un "máximo" MENOR que la cifra grande de arriba, que se
+  // lee como un error. Se incluye el valor de ahora en la comparación.
+  const maxConHoy = estado && maxBob != null ? Math.max(maxBob, estado.totalBob) : maxBob;
+  const recordHoy = estado != null && maxBob != null && estado.totalBob > maxBob;
+
   return (
     <>
       {/* Hero + KPIs */}
@@ -197,7 +203,10 @@ function Contenido({
             </div>
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <DeltaPill valor={variacionBob} pct={variacionPct} label="vs. foto anterior" />
+                {/* El delta compara contra la foto ANTERIOR a la base, no
+                    contra el valor en vivo: la etiqueta lo dice para que no se
+                    lea como la variación de la cifra grande. */}
+                <DeltaPill valor={variacionBob} pct={variacionPct} label="entre las dos últimas fotos" />
                 <span className="text-muted-foreground">
                   última foto: {formatDate(ultimo?.snapshot_date)}
                 </span>
@@ -228,10 +237,10 @@ function Contenido({
 
         <Kpi
           label="Máximo histórico"
-          valor={formatBobCompact(maxBob)}
-          valorFull={formatBob(maxBob)}
-          sub={`Mínimo ${formatBobCompact(minBob)}`}
-          color="neutral"
+          valor={formatBobCompact(maxConHoy)}
+          valorFull={formatBob(maxConHoy)}
+          sub={recordHoy ? "¡Récord! Es tu valor de ahora" : `Mínimo ${formatBobCompact(minBob)}`}
+          color={recordHoy ? "pos" : "neutral"}
           icon={Trophy}
         />
       </section>

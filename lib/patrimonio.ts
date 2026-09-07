@@ -23,6 +23,13 @@ function aBob(amount: number, currency: Currency, exchangeRate: number): number 
   return currency === "BOB" ? amount : amount * exchangeRate;
 }
 
+/**
+ * Tipos de cuenta que cuentan como dinero disponible ya (la "disponibilidad
+ * rápida"): excluye DPF, por cobrar y activos, que no se pueden gastar hoy.
+ * Estaba repetido en tres archivos; vive aquí, que es el módulo de dominio.
+ */
+export const TIPOS_LIQUIDOS = new Set(["banco", "efectivo", "stablecoin"]);
+
 export function calcularTotalBob(
   balances: BalanceConCuenta[],
   exchangeRate: number

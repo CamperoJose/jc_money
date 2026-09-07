@@ -7,6 +7,16 @@ dashboard y el cierre del job dan exactamente lo mismo.
 > verificación puntual, que se ejecuta a mano cuando se toca
 > `lib/patrimonio/estado.ts` o el job. No corre en CI ni en el build.
 
+## Qué hay aquí
+
+| Archivo | Para qué |
+|---|---|
+| `e2e.mjs` | Batería principal contra Postgres real (17 comprobaciones). |
+| `perf.mjs` | Cuenta consultas y mide viajes encadenados, con latencia simulada. |
+| `coherencia.test.mjs` | Comprueba sobre el código que lectura y cierre no vuelvan a duplicarse. |
+| `correo.mjs` | Renderiza el correo diario y verifica asunto y cuerpo. |
+| `supa-pg.mjs` | Adaptador mínimo de la API de supabase-js sobre Postgres. |
+
 ## Qué comprueba
 
 Siembra el caso real del 3 de septiembre de 2026 (foto manual de las 09:06, tres
@@ -19,6 +29,12 @@ gastos en efectivo, deuda nueva del día) y verifica 13 propiedades, entre ellas
 - Un gasto nuevo se refleja **sin esperar al cierre**.
 - Con base auto no se recuentan los gastos del día ya cerrado.
 - El job es idempotente.
+- **Las cuentas derivadas se evalúan a la fecha pedida, no a hoy**: cobrar una
+  deuda el día 6 no puede cambiar el «Por Cobrar» del día 3, y un DPF abierto el
+  día 5 no cuenta el día 3.
+
+La batería **se deja el escenario como lo encontró**: puede correrse las veces
+que haga falta sin limpiar la base a mano.
 
 ## Cómo se ejecuta
 

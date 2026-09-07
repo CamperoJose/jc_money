@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { BOLIVIA_OFFSET } from "@/lib/datetime";
-import { calcularTotalBob, redondear } from "@/lib/patrimonio";
+import { calcularTotalBob, redondear, TIPOS_LIQUIDOS } from "@/lib/patrimonio";
 
 /**
  * Cálculo del estado del patrimonio a una fecha dada, a partir de la última foto
@@ -73,93 +73,154 @@ export interface EstadoPatrimonio {
   nota: string;
 }
 
-/** Busca el id de una cuenta por tipo o por nombre. */
-async function cuentaIdPor(
-  db: SupabaseClient,
-  userId: string,
+/** Cuenta del usuario, tal como la necesita este módulo. */
+export interface CuentaMeta {
+  id: string;
+  name: string;
+  type: string;
+  currency: "BOB" | "USD" | "USDT";
+  is_liability: boolean;
+}
+
+/** Primera cuenta que coincide por tipo o por nombre, sobre la lista ya leída. */
+function buscarCuenta(
+  cuentas: CuentaMeta[],
   match: { type?: string; name?: string }
-): Promise<string | null> {
-  let q = db.from("accounts").select("id").eq("user_id", userId);
-  if (match.type) q = q.eq("type", match.type);
-  if (match.name) q = q.eq("name", match.name);
-  const { data } = await q.order("created_at", { ascending: true }).limit(1);
-  return (data?.[0] as { id: string } | undefined)?.id ?? null;
+): CuentaMeta | undefined {
+  return cuentas.find(
+    (c) => (match.type ? c.type === match.type : true) && (match.name ? c.name === match.name : true)
+  );
+}
+
+/**
+ * `true` si la fecha existe y ya había ocurrido en el corte.
+ * No se llama `hasta` a propósito: ese nombre ya lo usa el parámetro de fecha de
+ * `calcularEstadoPatrimonio`, y tener las dos cosas con el mismo nombre es una
+ * trampa para quien venga después.
+ */
+function yaOcurrio(fecha: string | null | undefined, corte: string): boolean {
+  return !!fecha && fecha <= corte;
 }
 
 /**
  * Cuentas cuyo saldo se AUTOCALCULA (no se copia de la base):
- *  - DPF (Σ principal de DPF activos)
- *  - Por Cobrar (Σ saldo de deudas no pagadas)
- *  - Activos (Σ valor de activos que cuentan en patrimonio, en BOB)
+ *  - DPF (Σ principal de los depósitos vigentes)
+ *  - Por Cobrar (Σ saldo de las deudas aún no cobradas)
+ *  - Activos (Σ valor de los activos que cuentan en patrimonio, en BOB)
+ *
+ * TODO se evalúa **a la fecha `corte`**, no a hoy. Antes se filtraba por el
+ * `status` actual, así que regenerar la foto de un día pasado la contaminaba con
+ * el estado presente: si cobrabas una deuda el día 6 y volvías a calcular el
+ * día 3, «Por Cobrar» del día 3 perdía ese monto, que en esa fecha sí existía.
+ * Como el usuario regenera días pasados, esto corrompía el historial.
+ *
  * Cada fuente es resiliente: si su tabla/columna aún no existe (migración sin
  * aplicar), se omite y se conserva el saldo de la base para esa cuenta.
  */
 export async function getCuentasDerivadas(
   db: SupabaseClient,
   userId: string,
-  rate: number
+  rate: number,
+  corte: string,
+  cuentas: CuentaMeta[]
 ): Promise<CuentaDerivada[]> {
   const out: CuentaDerivada[] = [];
 
-  try {
-    const accountId = await cuentaIdPor(db, userId, { type: "dpf" });
-    if (accountId) {
-      const { data, error } = await db
-        .from("dpf_deposits")
-        .select("principal")
-        .eq("user_id", userId)
-        .eq("status", "activo");
-      if (error) throw error;
-      const value = redondear(
-        (data ?? []).reduce((s, d) => s + Number((d as { principal: number }).principal), 0)
-      );
-      out.push({ accountId, label: "DPF", value });
-    }
-  } catch { /* tabla no lista: se omite */ }
+  const cuentaDpf = buscarCuenta(cuentas, { type: "dpf" });
+  const cuentaPorCobrar = buscarCuenta(cuentas, { type: "por_cobrar" });
+  const cuentaActivos = buscarCuenta(cuentas, { name: "Activos" });
 
-  try {
-    const accountId = await cuentaIdPor(db, userId, { type: "por_cobrar" });
-    if (accountId) {
-      const { data, error } = await db
-        .from("debts")
-        .select("amount, paid_amount, status")
-        .eq("user_id", userId)
-        .neq("status", "pagado");
-      if (error) throw error;
-      const value = redondear(
-        (data ?? []).reduce((s, d) => {
-          const r = d as { amount: number; paid_amount?: number };
-          return s + Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0));
-        }, 0)
-      );
-      out.push({ accountId, label: "Por Cobrar", value });
-    }
-  } catch { /* tabla/columna no lista: se omite */ }
+  // Las tres lecturas son independientes: en paralelo.
+  const [rDpf, rDeudas, rActivos] = await Promise.allSettled([
+    cuentaDpf
+      ? db
+          .from("dpf_deposits")
+          .select("principal, start_date, end_date, status, paid_at")
+          .eq("user_id", userId)
+      : Promise.resolve({ data: [], error: null }),
+    cuentaPorCobrar
+      ? db
+          .from("debts")
+          .select("amount, paid_amount, status, debt_date, collected_date")
+          .eq("user_id", userId)
+      : Promise.resolve({ data: [], error: null }),
+    cuentaActivos
+      ? db
+          .from("assets")
+          .select("acquisition_cost, current_value, currency, acquired_date, sold_date, status, counts_in_patrimonio")
+          .eq("user_id", userId)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
-  try {
-    const accountId = await cuentaIdPor(db, userId, { name: "Activos" });
-    if (accountId) {
-      const { data, error } = await db
-        .from("assets")
-        .select("acquisition_cost, current_value, currency")
-        .eq("user_id", userId)
-        .eq("status", "activo")
-        .eq("counts_in_patrimonio", true);
-      if (error) throw error;
-      const value = redondear(
-        (data ?? []).reduce((s, a) => {
-          const r = a as {
-            acquisition_cost: number;
-            current_value: number | null;
-            currency: string;
-          };
-          const val = r.current_value != null ? Number(r.current_value) : Number(r.acquisition_cost);
-          return s + (r.currency === "BOB" ? val : val * rate);
-        }, 0)
-      );
-      out.push({ accountId, label: "Activos", value });
-    }
-  } catch { /* tabla no lista: se omite */ }
+  // DPF: vigente a la fecha = ya había empezado y aún no se había cobrado.
+  if (cuentaDpf && rDpf.status === "fulfilled" && !rDpf.value.error) {
+    const value = redondear(
+      (rDpf.value.data ?? []).reduce((s, d) => {
+        const r = d as {
+          principal: number;
+          start_date: string | null;
+          end_date: string | null;
+          status: string;
+          paid_at?: string | null;
+        };
+        // Aún no existía en esa fecha.
+        if (r.start_date && r.start_date > corte) return s;
+        // Ya se había cobrado. Si no hay fecha de cobro se usa el vencimiento,
+        // que es cuando el dinero deja de estar inmovilizado.
+        const liberado = r.paid_at ?? r.end_date;
+        if (r.status === "pagado" && yaOcurrio(liberado, corte)) return s;
+        return s + Number(r.principal);
+      }, 0)
+    );
+    out.push({ accountId: cuentaDpf.id, label: "DPF", value });
+  }
+
+  // Por cobrar: saldo pendiente a la fecha.
+  if (cuentaPorCobrar && rDeudas.status === "fulfilled" && !rDeudas.value.error) {
+    const value = redondear(
+      (rDeudas.value.data ?? []).reduce((s, d) => {
+        const r = d as {
+          amount: number;
+          paid_amount?: number;
+          status: string;
+          debt_date: string | null;
+          collected_date?: string | null;
+        };
+        // El préstamo todavía no se había hecho.
+        if (r.debt_date && r.debt_date > corte) return s;
+        // Lo cobrado solo descuenta si el cobro ya había ocurrido. Sin fecha de
+        // cobro se toma el estado actual, que es lo único que se sabe.
+        const yaCobrado = r.collected_date ? r.collected_date <= corte : r.status === "pagado";
+        const cobrado = yaCobrado ? Number(r.paid_amount ?? 0) : 0;
+        return s + Math.max(0, Number(r.amount) - cobrado);
+      }, 0)
+    );
+    out.push({ accountId: cuentaPorCobrar.id, label: "Por Cobrar", value });
+  }
+
+  // Activos: los que ya se habían adquirido y aún no se habían vendido.
+  if (cuentaActivos && rActivos.status === "fulfilled" && !rActivos.value.error) {
+    const value = redondear(
+      (rActivos.value.data ?? []).reduce((s, a) => {
+        const r = a as {
+          acquisition_cost: number;
+          current_value: number | null;
+          currency: string;
+          acquired_date: string | null;
+          sold_date: string | null;
+          status: string;
+          counts_in_patrimonio: boolean;
+        };
+        if (!r.counts_in_patrimonio) return s;
+        if (r.acquired_date && r.acquired_date > corte) return s;
+        const yaVendido = r.sold_date ? r.sold_date <= corte : r.status === "vendido";
+        if (yaVendido) return s;
+        const val = r.current_value != null ? Number(r.current_value) : Number(r.acquisition_cost);
+        return s + (r.currency === "BOB" ? val : val * rate);
+      }, 0)
+    );
+    out.push({ accountId: cuentaActivos.id, label: "Activos", value });
+  }
 
   return out;
 }
@@ -183,7 +244,7 @@ export async function getMovimientosPuntuales(
   db: SupabaseClient,
   userId: string,
   baseDate: string,
-  hasta: string,
+  corte: string,
   rate: number,
   monedaCuenta: Map<string, "BOB" | "USD" | "USDT">
 ): Promise<MovimientoPuntual[]> {
@@ -193,18 +254,37 @@ export async function getMovimientosPuntuales(
     return cur === "BOB" ? bob : rate ? bob / rate : 0;
   };
 
-  // Ventas de activos.
-  try {
-    const { data, error } = await db
+  // Las tres lecturas son independientes: en paralelo. `allSettled` mantiene la
+  // tolerancia a que una columna aún no exista (migración sin aplicar) sin que
+  // eso tumbe a las otras dos.
+  const [rVentas, rPrestamos, rCobros] = await Promise.allSettled([
+    db
       .from("assets")
       .select("sold_price, currency, sold_date, sold_account_id")
       .eq("user_id", userId)
       .eq("status", "vendido")
       .gt("sold_date", baseDate)
-      .lte("sold_date", hasta)
-      .not("sold_account_id", "is", null);
-    if (error) throw error;
-    for (const r of data ?? []) {
+      .lte("sold_date", corte)
+      .not("sold_account_id", "is", null),
+    db
+      .from("debts")
+      .select("amount, debt_date, source_account_id")
+      .eq("user_id", userId)
+      .gt("debt_date", baseDate)
+      .lte("debt_date", corte)
+      .not("source_account_id", "is", null),
+    db
+      .from("debts")
+      .select("paid_amount, collected_date, paid_account_id")
+      .eq("user_id", userId)
+      .gt("collected_date", baseDate)
+      .lte("collected_date", corte)
+      .not("paid_account_id", "is", null),
+  ]);
+
+  // Ventas de activos: ENTRA el precio de venta.
+  if (rVentas.status === "fulfilled" && !rVentas.value.error) {
+    for (const r of rVentas.value.data ?? []) {
       const a = r as { sold_price: number | null; currency: string; sold_account_id: string };
       const price = Number(a.sold_price);
       if (!a.sold_account_id || !Number.isFinite(price) || price <= 0) continue;
@@ -216,19 +296,11 @@ export async function getMovimientosPuntuales(
         destIncrement: redondear(aNativo(bob, a.sold_account_id)),
       });
     }
-  } catch { /* columna no lista: se omite */ }
+  }
 
-  // Préstamos otorgados: el dinero SALE de la cuenta de origen.
-  try {
-    const { data, error } = await db
-      .from("debts")
-      .select("amount, debt_date, source_account_id")
-      .eq("user_id", userId)
-      .gt("debt_date", baseDate)
-      .lte("debt_date", hasta)
-      .not("source_account_id", "is", null);
-    if (error) throw error;
-    for (const r of data ?? []) {
+  // Préstamos otorgados: SALE el monto prestado de la cuenta de origen.
+  if (rPrestamos.status === "fulfilled" && !rPrestamos.value.error) {
+    for (const r of rPrestamos.value.data ?? []) {
       const d = r as { amount: number | null; source_account_id: string };
       const monto = Number(d.amount);
       if (!d.source_account_id || !Number.isFinite(monto) || monto <= 0) continue;
@@ -240,19 +312,11 @@ export async function getMovimientosPuntuales(
         destIncrement: -redondear(aNativo(bob, d.source_account_id)),
       });
     }
-  } catch { /* columna no lista: se omite */ }
+  }
 
-  // Cobros de deudas.
-  try {
-    const { data, error } = await db
-      .from("debts")
-      .select("paid_amount, collected_date, paid_account_id")
-      .eq("user_id", userId)
-      .gt("collected_date", baseDate)
-      .lte("collected_date", hasta)
-      .not("paid_account_id", "is", null);
-    if (error) throw error;
-    for (const r of data ?? []) {
+  // Cobros de deudas: ENTRA el monto cobrado.
+  if (rCobros.status === "fulfilled" && !rCobros.value.error) {
+    for (const r of rCobros.value.data ?? []) {
       const d = r as { paid_amount: number | null; paid_account_id: string };
       const paid = Number(d.paid_amount);
       if (!d.paid_account_id || !Number.isFinite(paid) || paid <= 0) continue;
@@ -264,7 +328,7 @@ export async function getMovimientosPuntuales(
         destIncrement: redondear(aNativo(bob, d.paid_account_id)),
       });
     }
-  } catch { /* columna no lista: se omite */ }
+  }
 
   return out;
 }
@@ -301,17 +365,21 @@ export async function calcularEstadoPatrimonio(
   const hastaISO = new Date(`${hasta}T23:59:59${BOLIVIA_OFFSET}`).toISOString();
 
   // Base = el último registro (manual o auto) en o antes del corte.
-  const { data: bases, error: eBase } = await db
-    .from("net_worth_snapshots")
-    .select(
-      "id, snapshot_date, snapshot_at, kind, exchange_rate, total_bob, net_worth_balances(account_id, amount, accounts(currency, is_liability))"
-    )
-    .eq("user_id", userId)
-    .lte("snapshot_at", hastaISO)
-    .order("snapshot_at", { ascending: false })
-    .limit(1);
-  if (eBase) throw eBase;
-  const fila = bases?.[0] as Record<string, unknown> | undefined;
+  // La foto base y las cuentas no dependen entre sí: en paralelo.
+  const [resBase, resCuentas] = await Promise.all([
+    db
+      .from("net_worth_snapshots")
+      .select(
+        "id, snapshot_date, snapshot_at, kind, exchange_rate, total_bob, net_worth_balances(account_id, amount, accounts(currency, is_liability))"
+      )
+      .eq("user_id", userId)
+      .lte("snapshot_at", hastaISO)
+      .order("snapshot_at", { ascending: false })
+      .limit(1),
+    db.from("accounts").select("id, name, type, currency, is_liability").eq("user_id", userId),
+  ]);
+  if (resBase.error) throw resBase.error;
+  const fila = resBase.data?.[0] as Record<string, unknown> | undefined;
   if (!fila) return null;
 
   const base: BaseFoto = {
@@ -334,36 +402,32 @@ export async function calcularEstadoPatrimonio(
   // que la explicación contradijera al detalle.
   const baseTotalBob = calcularTotalBob(balancesBase, rate);
 
-  // Cuentas: moneda y si son pasivo.
-  const { data: cuentasData } = await db
-    .from("accounts")
-    .select("id, name, type, currency, is_liability")
-    .eq("user_id", userId);
+  // Cuentas: moneda, tipo y si son pasivo. Se leen UNA vez y se reutilizan;
+  // antes se volvían a consultar tres veces más, una por cuenta derivada.
+  const cuentas = (resCuentas.data ?? []) as CuentaMeta[];
   const metaCuenta = new Map(
-    (cuentasData ?? []).map((c) => {
-      const r = c as {
-        id: string;
-        name: string;
-        type: string;
-        currency: "BOB" | "USD" | "USDT";
-        is_liability: boolean;
-      };
-      return [
-        r.id,
-        { name: r.name, type: r.type, currency: r.currency, is_liability: !!r.is_liability },
-      ];
-    })
+    cuentas.map((r) => [
+      r.id,
+      { name: r.name, type: r.type, currency: r.currency, is_liability: !!r.is_liability },
+    ])
   );
-  const monedaCuenta = new Map([...metaCuenta].map(([id, m]) => [id, m.currency] as const));
-
   // Gastos e ingresos posteriores a la base, repartidos CUENTA POR CUENTA.
   const rango = rangoTransacciones(base, hasta);
-  const { data: txns, error: eTx } = await db
-    .from("transactions")
-    .select("type, amount, currency, exchange_rate, account_id")
-    .eq("user_id", userId)
-    .gte("txn_date", rango.desde)
-    .lte("txn_date", rango.hasta);
+  const monedaCuenta = new Map([...metaCuenta].map(([id, m]) => [id, m.currency] as const));
+
+  // Las tres lecturas restantes no dependen entre sí: en paralelo. En secuencia
+  // eran tres viajes encadenados en cada carga del dashboard.
+  const [resTxns, derivadas, movimientos] = await Promise.all([
+    db
+      .from("transactions")
+      .select("type, amount, currency, exchange_rate, account_id")
+      .eq("user_id", userId)
+      .gte("txn_date", rango.desde)
+      .lte("txn_date", rango.hasta),
+    getCuentasDerivadas(db, userId, rate, hasta, cuentas),
+    getMovimientosPuntuales(db, userId, base.snapshot_date, hasta, rate, monedaCuenta),
+  ]);
+  const { data: txns, error: eTx } = resTxns;
   if (eTx) throw eTx;
 
   const deltaPorCuenta = new Map<string, number>();
@@ -401,8 +465,6 @@ export async function calcularEstadoPatrimonio(
   netoBob = redondear(netoBob);
   netoSinCuentaBob = redondear(netoSinCuentaBob);
 
-  // Cuentas derivadas y movimientos puntuales.
-  const derivadas = await getCuentasDerivadas(db, userId, rate);
   let ajusteDerivadas = 0;
   for (const d of derivadas) {
     const enBase = balancesBase.find((b) => b.account_id === d.accountId)?.amount ?? 0;
@@ -410,14 +472,6 @@ export async function calcularEstadoPatrimonio(
   }
   ajusteDerivadas = redondear(ajusteDerivadas);
 
-  const movimientos = await getMovimientosPuntuales(
-    db,
-    userId,
-    base.snapshot_date,
-    hasta,
-    rate,
-    monedaCuenta
-  );
   const incrementos = new Map<string, number>();
   let ajusteMovimientos = 0;
   for (const m of movimientos) {
@@ -488,7 +542,6 @@ export async function calcularEstadoPatrimonio(
   };
 }
 
-const TIPOS_LIQUIDOS = new Set(["banco", "efectivo", "stablecoin"]);
 
 /** Dinero disponible ya (efectivo, banco, stablecoins), en BOB. */
 export function disponibilidadDe(estado: EstadoPatrimonio): number {
