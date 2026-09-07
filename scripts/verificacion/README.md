@@ -15,6 +15,7 @@ dashboard y el cierre del job dan exactamente lo mismo.
 | `perf.mjs` | Cuenta consultas y mide viajes encadenados, con latencia simulada. |
 | `fallos.mjs` | Comprueba que un fallo real se propaga y una migración pendiente se tolera. |
 | `vacio.mjs` | Comprueba que una foto sin saldos no se usa como base. |
+| `sin-0015.mjs` | Comprueba que la app da el mismo resultado con la migración 0015 sin aplicar. |
 | `coherencia.test.mjs` | Comprueba sobre el código que lectura y cierre no vuelvan a duplicarse. |
 | `correo.mjs` | Renderiza el correo diario y verifica asunto y cuerpo. |
 | `supa-pg.mjs` | Adaptador mínimo de la API de supabase-js sobre Postgres. |

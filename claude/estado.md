@@ -6,6 +6,22 @@
 
 ### Sesión 22 — lo hecho ✅
 
+> **Revisión posterior (mismo día).** Tras el refactor se hizo una pasada
+> buscando rutas de corrupción silenciosa y se encontraron tres, todas
+> corregidas y con prueba propia:
+> 1. **Las derivadas se calculaban a HOY, no a la fecha pedida** → regenerar un
+>    día pasado lo contaminaba con el estado presente.
+> 2. **Un fallo transitorio se trataba como "migración pendiente"** → un timeout
+>    en `accounts` daba un total 9.011 Bs menor (el USDT valuado como BOB) y el
+>    job lo persistía.
+> 3. **Una foto sin saldos servía de base** → 40.745 en vez de 63.235.
+>
+> Además: 7 → 4 viajes encadenados a la base por carga (273 → 149 ms con 40 ms
+> de latencia simulada), `TIPOS_LIQUIDOS` unificado (estaba en tres archivos), el
+> helper `hasta()` renombrado por colisión con el parámetro homónimo, y en el
+> dashboard el "máximo histórico" ya considera el valor en vivo (si no, al batir
+> tu récord mostraba un máximo menor que la cifra de arriba).
+
 Se analizó la propuesta de crear una foto de patrimonio por cada registro y se
 descartó con razones (decisión F1). En su lugar:
 
