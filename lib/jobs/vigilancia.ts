@@ -62,12 +62,31 @@ export async function ejecutarVigilancia(
   const fechas = new Set((data ?? []).map((r) => r.snapshot_date as string));
   const ultima = (data ?? [])[0]?.snapshot_date as string | undefined;
 
+  // Antes de la PRIMERA foto automática de la historia no faltaba nada: el
+  // cierre sencillamente todavía no existía. Sin esto, la primera vez que
+  // corre la vigilancia denuncia diez días que nunca debieron cerrarse.
+  const { data: primeraFila, error: ePrimera } = await admin
+    .from("net_worth_snapshots")
+    .select("snapshot_date")
+    .eq("user_id", userId)
+    .eq("kind", "auto")
+    .order("snapshot_date", { ascending: true })
+    .limit(1);
+  if (ePrimera) throw ePrimera;
+  const primeraAuto = (primeraFila ?? [])[0]?.snapshot_date as string | undefined;
+  if (!primeraAuto) {
+    // El cierre nunca corrió. Eso no es un hueco que listar día por día; es que
+    // la automatización todavía no está en marcha, y no es una alerta diaria.
+    return { ok: true, ultima_foto_auto: null, dias_faltantes: [], aviso_enviado: false };
+  }
+
   // Se espera una foto por cada día hasta "ayer" (el cierre de hoy corre
   // mañana). Los días de gracia evitan avisar por un retraso normal del cron.
   const faltantes: string[] = [];
   for (let i = DIAS_GRACIA; i <= MAX_DIAS_LISTADOS; i++) {
     const dia = restarDias(hoy, i);
     if (dia < desde) break;
+    if (dia < primeraAuto) break; // antes de que el cierre existiera
     if (!fechas.has(dia)) faltantes.push(dia);
   }
   faltantes.reverse(); // del más viejo al más nuevo, como se leen

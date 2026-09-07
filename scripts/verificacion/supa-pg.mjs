@@ -32,6 +32,12 @@ export function clienteDesdePg(pool) {
         return api;
       },
       delete() { st.borrar = true; return api; },
+      // `upsert` con onConflict, tal como lo usa guardarAviso().
+      upsert(filas, opciones) {
+        st.insertar = Array.isArray(filas) ? filas : [filas];
+        st.conflicto = opciones?.onConflict ?? null;
+        return api;
+      },
       single() { st.single = true; return api; },
       then(res, rej) { return api.ejecutar().then(res, rej); },
       async ejecutar() {
@@ -40,7 +46,13 @@ export function clienteDesdePg(pool) {
           const filas = st.insertar.map((f, i) =>
             `(${cols.map((_, j) => `$${i * cols.length + j + 1}`).join(",")})`);
           const vals = st.insertar.flatMap((f) => cols.map((c) => f[c]));
-          const sql = `insert into ${st.tabla} (${cols.join(",")}) values ${filas.join(",")} returning *`;
+          const choque = st.conflicto
+            ? ` on conflict (${st.conflicto}) do update set ${cols
+                .filter((c) => !st.conflicto.split(",").map((x) => x.trim()).includes(c))
+                .map((c) => `${c} = excluded.${c}`)
+                .join(", ")}`
+            : "";
+          const sql = `insert into ${st.tabla} (${cols.join(",")}) values ${filas.join(",")}${choque} returning *`;
           try {
             const r = await pool.query(sql, vals);
             return { data: st.single ? r.rows[0] : r.rows, error: null };

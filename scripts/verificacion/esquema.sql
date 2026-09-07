@@ -49,3 +49,13 @@ create table assets (
   currency currency not null default 'BOB', status text not null default 'activo',
   counts_in_patrimonio boolean not null default true, sold_price numeric(16,2),
   sold_date date, sold_account_id uuid references accounts(id));
+
+-- Memoria de «ya avisé esto» (migración 0008). La usan los correos de alerta
+-- y el job de vigilancia para no repetir el mismo aviso a diario.
+create table if not exists app_settings (
+  id      uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  key     text not null,
+  value   text,
+  unique (user_id, key)
+);

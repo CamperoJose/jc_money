@@ -17,7 +17,11 @@ dashboard y el cierre del job dan exactamente lo mismo.
 | `vacio.mjs` | Comprueba que una foto sin saldos no se usa como base. |
 | `sin-0015.mjs` | Comprueba que la app da el mismo resultado con la migración 0015 sin aplicar. |
 | `coherencia.test.mjs` | Comprueba sobre el código que lectura y cierre no vuelvan a duplicarse. |
-| `correo.mjs` | Renderiza el correo diario y verifica asunto y cuerpo. |
+| `correo.mjs` | Renderiza los correos y verifica asunto y cuerpo. |
+| `avisos.mjs` | Cuándo se manda y cuándo NO cada alerta (la parte que falla en silencio). |
+| `vigilancia.mjs` | El job que avisa si el cierre diario no corrió, contra Postgres real. |
+| `tendencias.mjs` | Banda de predicción, drawdown, aceleración, racha y meses. |
+| `analisis.mjs` | Patrones de gasto, incluidos los falsos positivos que NO debe detectar. |
 | `supa-pg.mjs` | Adaptador mínimo de la API de supabase-js sobre Postgres. |
 
 ## Qué comprueba

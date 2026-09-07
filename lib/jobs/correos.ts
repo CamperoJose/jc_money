@@ -18,7 +18,13 @@ import { TIPOS_LIQUIDOS } from "@/lib/patrimonio";
 import { resumenDpf, type ResumenDpf } from "@/lib/dpf";
 import { getResumenPresupuestos } from "@/lib/queries/presupuestos";
 import { getResumenDeudas } from "@/lib/queries/deudas";
-import { leerAviso, guardarAviso } from "@/lib/jobs/avisos";
+import {
+  leerAviso,
+  guardarAviso,
+  nivelDeEstado,
+  decidirAvisoPresupuesto,
+  decidirAvisoDeudas,
+} from "@/lib/jobs/avisos";
 
 export interface ResultadoCorreos {
   ok: boolean;
@@ -239,23 +245,23 @@ export async function ejecutarCorreos(
     const rp = await getResumenPresupuestos(admin, period);
     const claveP = `aviso_presupuesto:${period}`;
     const avisados = (await leerAviso<Record<string, number>>(admin, userId, claveP)) ?? {};
-    const nuevos: AlertaPresupuestoItem[] = [];
-    const marcas: Record<string, number> = { ...avisados };
 
-    for (const f of rp.filas) {
-      if (f.planned <= 0) continue;
-      const nivelActual = f.estado === "excedido" ? 100 : f.estado === "alerta" ? 85 : 0;
-      if (nivelActual === 0) continue;
-      if ((avisados[f.category_id] ?? 0) >= nivelActual) continue; // ya se avisó este nivel
-      marcas[f.category_id] = nivelActual;
-      nuevos.push({
-        categoria: f.category_name,
-        planeado: f.planned,
-        gastado: f.spent,
-        pct: f.pct,
-        nivel: nivelActual === 100 ? "excedido" : "alerta",
-      });
-    }
+    const { nuevas: nuevos, marcas } = decidirAvisoPresupuesto<AlertaPresupuestoItem>(
+      rp.filas
+        .filter((f) => f.planned > 0)
+        .map((f) => ({
+          categoryId: f.category_id,
+          nivel: nivelDeEstado(f.estado),
+          dato: {
+            categoria: f.category_name,
+            planeado: f.planned,
+            gastado: f.spent,
+            pct: f.pct,
+            nivel: f.estado === "excedido" ? ("excedido" as const) : ("alerta" as const),
+          },
+        })),
+      avisados
+    );
 
     if (nuevos.length > 0) {
       const al = htmlAlertaPresupuesto(nuevos, period);
@@ -278,10 +284,8 @@ export async function ejecutarCorreos(
       const claveD = "aviso_deudas_vencidas";
       const previo = await leerAviso<{ fecha: string; ids: string[] }>(admin, userId, claveD);
       const ids = vencidas.map((d) => d.id).sort();
-      const hayNuevas = !previo || ids.some((id) => !previo.ids.includes(id));
-      const pasoUnaSemana = !previo || diasEntreISO(previo.fecha, hoy) >= 7;
 
-      if (hayNuevas || pasoUnaSemana) {
+      if (decidirAvisoDeudas(ids, previo, hoy)) {
         const items: DeudaVencidaItem[] = vencidas.map((d) => ({
           quien: d.counterparty || "Sin nombre",
           monto: d.outstanding,
