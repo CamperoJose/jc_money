@@ -77,5 +77,13 @@ export async function POST(request: Request) {
     }).eq("id", requestId).eq("user_id", uid);
   });
 
-  return NextResponse.json({ ok: true, requestId, status: "procesando", message: "Registro recibido. Te enviaremos un correo con el detalle." }, { status: 202 });
+  return NextResponse.json(
+    {
+      ok: true,
+      requestId,
+      status: "procesando",
+      message: "Audio recibido. Se validará que haya voz y datos financieros; si no hay contenido válido, no se registrará nada.",
+    },
+    { status: 202 }
+  );
 }
