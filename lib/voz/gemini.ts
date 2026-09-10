@@ -6,7 +6,10 @@ import type { DeudaVoz, GastoVoz, IngresoVoz, ResultadoVoz } from "@/lib/voz/tip
 export interface CuentaCatalogo { id: string; name: string; type: string; currency: string; }
 export interface CategoriaCatalogo { id: string; name: string; }
 
-const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
+// 3.1 Flash-Lite ofrece mejor capacidad que 2.5 Flash-Lite y actualmente
+// tiene menor coste de entrada de audio. Mantenemos una salida JSON pequeña
+// para que el coste total siga siendo bajo.
+const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
 const LOCATION = process.env.GCP_LOCATION?.trim() || "global";
 const REINTENTOS = 2;
 const ESPERAS_MS = [1500];
@@ -19,39 +22,56 @@ function construirPrompt(cuentas: CuentaCatalogo[], categoriasGasto: CategoriaCa
   const listaCuentas = cuentas.map((c) => `- id="${c.id}" | nombre="${c.name}" | tipo=${c.type} | moneda=${c.currency}`).join("\n");
   const listaCategoriasGasto = categoriasGasto.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
   const listaCategoriasIngreso = categoriasIngreso.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
-  return `Eres un parser financiero estricto para comandos de voz en español boliviano.
+  return `Eres un parser financiero para comandos de voz en español boliviano.
 
 PRIMERA REGLA — SEGURIDAD DEL AUDIO:
 Primero inspecciona el AUDIO adjunto y decide si contiene habla humana inteligible.
 - Si el audio está vacío, contiene solo silencio, ruido, está incompleto, es inaudible o NO puedes identificar con claridad habla humana, responde con audio_con_habla=false, transcripcion="" y TODOS los arrays vacíos.
 - NUNCA inventes, completes ni supongas palabras, números, nombres o movimientos financieros.
 - Un audio con silencio no es una orden financiera.
-- Si tienes cualquier duda razonable sobre lo que se dijo, no crees un movimiento.
 - Solo considera información realmente pronunciada en el audio.
 
 Fecha de hoy: ${hoy}.
 
 La persona puede dictar uno o varios GASTOS, INGRESOS y/o DEUDAS (dinero que OTROS le deben).
-Solo registra información explícita o inequívocamente pronunciada en el audio.
+Si una frase financiera es suficientemente comprensible, intenta interpretarla aunque la redacción sea informal, incompleta o tenga errores gramaticales.
+Si no dice explícitamente que es ingreso o deuda, un movimiento monetario debe considerarse GASTO como primera opción. Solo clasifícalo como INGRESO o DEUDA cuando exista evidencia explícita de ello.
 
 Distingue:
 - GASTO: la persona pagó/compró/gastó algo. Ej: "gasté", "pagué", "compré", "me costó".
 - INGRESO: la persona recibió dinero. Ej: "recibí", "me pagaron", "cobré", "me depositaron", "recibí mi sueldo".
 - DEUDA (que me deben): la persona prestó dinero o alguien le debe. Ej: "presté", "le fié", "me debe", "quedó debiendo", "por cobrar".
 
+CATEGORIZACIÓN — REGLA OBLIGATORIA:
+Las categorías disponibles que aparecen más abajo son el catálogo REAL y cerrado del usuario.
+Para cada GASTO, compara semánticamente la descripción, el comercio, producto o servicio mencionado contra TODAS las categorías de gasto disponibles y selecciona la que mejor represente el movimiento.
+Para cada INGRESO, compara semánticamente el origen o concepto del dinero contra TODAS las categorías de ingreso disponibles y selecciona la que mejor represente el movimiento.
+
+IMPORTANTE SOBRE CATEGORÍAS:
+- Si existe al menos una categoría disponible del tipo correspondiente, intenta seleccionar SIEMPRE la mejor categoría existente.
+- NO necesitas encontrar coincidencia literal entre las palabras del audio y el nombre de la categoría.
+- Usa significado y contexto. Por ejemplo, "hamburguesa", "almuerzo", "café" o "pan" pueden corresponder a una categoría llamada "Alimentación".
+- "Netflix" o "Spotify" pueden corresponder a una categoría llamada "Suscripciones".
+- "sueldo" o "salario" pueden corresponder a una categoría llamada "Salario".
+- No inventes categorías ni IDs.
+- Si ninguna categoría es perfecta pero hay categorías disponibles, elige la más cercana semánticamente.
+- categoria_id puede ser null ÚNICAMENTE cuando la lista correspondiente de categorías esté vacía o cuando sea imposible determinar el tipo del movimiento.
+- Si el movimiento es un gasto y hay categorías de gasto disponibles, NO devuelvas null solo porque no exista coincidencia literal.
+- Si el movimiento es un ingreso y hay categorías de ingreso disponibles, NO devuelvas null solo porque no exista coincidencia literal.
+
 Para cada GASTO extrae:
 - descripcion: qué se compró/pagó, usando únicamente palabras presentes en el audio.
 - monto: número explícitamente pronunciado. Si NO se entiende o no se menciona, usa null.
 - moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
 - cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
-- categoria_id: SOLO un id de CATEGORÍAS DE GASTO razonable. Si no hay coincidencia, null.
+- categoria_id: ID de la mejor CATEGORÍA DE GASTO disponible según similitud semántica. Puede ser null solo en las excepciones indicadas arriba.
 
 Para cada INGRESO extrae:
 - descripcion: origen del dinero, usando únicamente palabras presentes en el audio.
 - monto: número explícitamente pronunciado. Si NO se entiende o no se menciona, usa null.
 - moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
 - cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
-- categoria_id: SOLO un id de CATEGORÍAS DE INGRESO razonable. Si no hay coincidencia, null.
+- categoria_id: ID de la mejor CATEGORÍA DE INGRESO disponible según similitud semántica. Puede ser null solo en las excepciones indicadas arriba.
 
 Para cada DEUDA extrae:
 - quien: nombre de quien debe, solo si se entiende claramente; si no, null.
@@ -69,6 +89,13 @@ ${listaCategoriasGasto || "(ninguna)"}
 
 CATEGORÍAS DE INGRESO disponibles del usuario actual:
 ${listaCategoriasIngreso || "(ninguna)"}
+
+Antes de responder, revisa cada movimiento y verifica:
+1. que el tipo sea correcto;
+2. que el monto esté realmente presente en el audio;
+3. que cuenta_id pertenezca a las cuentas disponibles;
+4. que categoria_id pertenezca al catálogo correcto;
+5. que, si existen categorías disponibles, hayas elegido la categoría semánticamente más cercana en lugar de dejarla en null sin motivo.
 
 Devuelve ÚNICAMENTE JSON válido, sin markdown, con esta forma exacta:
 {"audio_con_habla":true,"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"ingresos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
@@ -122,10 +149,6 @@ function parsear(textoModelo: string, cuentas: CuentaCatalogo[], categoriasGasto
   const raw = obj as { audio_con_habla?: unknown; transcripcion?: unknown; gastos?: unknown; ingresos?: unknown; deudas?: unknown };
   const transcripcion = textoONull(raw.transcripcion);
 
-  // audio_con_habla es un indicador auxiliar del modelo, no un bloqueo del flujo.
-  // Gemini puede marcarlo false aunque entregue una transcripción financiera válida.
-  // La transcripción no habilita por sí sola un registro: cada movimiento se valida
-  // de forma determinística contra tipo, monto, moneda y catálogo.
   if (!transcripcion) return { gastos: [], ingresos: [], deudas: [], transcripcion: null };
 
   const idsCuenta = new Set(cuentas.map((c) => c.id));
