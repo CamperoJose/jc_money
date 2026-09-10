@@ -38,6 +38,7 @@ export function VozFab() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const framesVozRef = useRef(0);
+  const analisisDisponibleRef = useRef(false);
 
   const detenerAnalisis = useCallback(() => {
     if (rafRef.current !== null) {
@@ -50,6 +51,7 @@ export function VozFab() {
       void audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
+    analisisDisponibleRef.current = false;
   }, []);
 
   const iniciarAnalisis = useCallback((stream: MediaStream) => {
@@ -62,6 +64,7 @@ export function VozFab() {
       source.connect(analyser);
       audioContextRef.current = contexto;
       analyserRef.current = analyser;
+      analisisDisponibleRef.current = true;
       framesVozRef.current = 0;
 
       const datos = new Float32Array(analyser.fftSize);
@@ -77,8 +80,8 @@ export function VozFab() {
       rafRef.current = requestAnimationFrame(analizar);
       void contexto.resume().catch(() => {});
     } catch {
-      // El análisis es una defensa adicional. Si el navegador no soporta Web Audio,
-      // Gemini mantiene la validación estricta del audio como segunda barrera.
+      // Es una defensa adicional. Gemini sigue siendo la validación principal.
+      analisisDisponibleRef.current = false;
     }
   }, []);
 
@@ -130,7 +133,7 @@ export function VozFab() {
       rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       rec.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeRef.current });
-        const huboVoz = framesVozRef.current >= FRAMES_VOZ_REQUERIDOS;
+        const huboVoz = !analisisDisponibleRef.current || framesVozRef.current >= FRAMES_VOZ_REQUERIDOS;
         detenerAnalisis();
         pararTimer();
         if (idleRef.current) clearTimeout(idleRef.current);
