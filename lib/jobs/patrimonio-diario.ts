@@ -4,23 +4,21 @@ import { calcularEstadoPatrimonio } from "@/lib/patrimonio/estado";
 
 export interface ResultadoJob { ok: boolean; skipped?: boolean; reason?: string; snapshot_id?: string; target_date?: string; base_date?: string; base_total_bob?: number; neto_dia_bob?: number; neto_sin_cuenta_bob?: number; ajuste_derivadas_bob?: number; derivadas?: Record<string, number>; ajuste_movimientos_bob?: number; movimientos?: string[]; total_bob?: number; }
 function ayerBolivia(): string { const d = new Date(`${fechaBoliviaHoy()}T12:00:00${BOLIVIA_OFFSET}`); d.setUTCDate(d.getUTCDate() - 1); return isoAFechaBolivia(d.toISOString()); }
-async function getUsuarioId(admin: SupabaseClient): Promise<string | null> {
-  const override = process.env.JOB_USER_ID; if (override) return override;
-  for (const tabla of ["net_worth_snapshots", "accounts", "transactions"]) { const { data, error } = await admin.from(tabla).select("user_id").limit(1); if (error) throw error; if (data?.length) return (data[0] as { user_id: string }).user_id; }
-  return null;
-}
 
-export async function ejecutarPatrimonioDiario(admin: SupabaseClient, opts?: { targetDate?: string }): Promise<ResultadoJob> {
-  const targetDate = opts?.targetDate ?? ayerBolivia(); const targetAtISO = new Date(`${targetDate}T23:59:00${BOLIVIA_OFFSET}`).toISOString();
-  const userId = await getUsuarioId(admin); if (!userId) return { ok: false, reason: "No hay usuarios en la app." };
+export async function ejecutarPatrimonioDiario(admin: SupabaseClient, opts?: { targetDate?: string; userId?: string }): Promise<ResultadoJob> {
+  const targetDate = opts?.targetDate ?? ayerBolivia();
+  const targetAtISO = new Date(`${targetDate}T23:59:00${BOLIVIA_OFFSET}`).toISOString();
+  const userId = opts?.userId ?? process.env.JOB_USER_ID;
+  if (!userId) return { ok: false, reason: "No hay usuario objetivo." };
   const { data: yaAuto, error: eDup } = await admin.from("net_worth_snapshots").select("id").eq("user_id", userId).eq("kind", "auto").eq("snapshot_date", targetDate).limit(1);
   if (eDup) throw eDup;
   if (yaAuto?.length) return { ok: true, skipped: true, reason: `Ya existe una foto auto para ${targetDate}.`, target_date: targetDate };
   const estado = await calcularEstadoPatrimonio(admin, userId, targetDate);
   if (!estado) return { ok: true, skipped: true, reason: "No hay foto base previa para calcular.", target_date: targetDate };
   const { data: snap, error: eIns } = await admin.from("net_worth_snapshots").insert({ user_id: userId, snapshot_date: targetDate, snapshot_at: targetAtISO, kind: "auto", exchange_rate: estado.rate, total_bob: estado.totalBob, total_usd: estado.totalUsd, note: estado.nota }).select("id").single();
-  if (eIns) throw eIns; const snapId = snap.id as string;
+  if (eIns) throw eIns;
+  const snapId = snap.id as string;
   const filas = estado.balances.map(b => ({ user_id: userId, snapshot_id: snapId, account_id: b.account_id, amount: b.amount }));
-  if (filas.length) { const { error: eBal } = await admin.from("net_worth_balances").insert(filas); if (eBal) { await admin.from("net_worth_snapshots").delete().eq("id", snapId); throw eBal; } }
+  if (filas.length) { const { error: eBal } = await admin.from("net_worth_balances").insert(filas); if (eBal) { await admin.from("net_worth_snapshots").delete().eq("id", snapId).eq("user_id", userId); throw eBal; } }
   return { ok: true, snapshot_id: snapId, target_date: targetDate, base_date: estado.base.snapshot_date, base_total_bob: estado.baseTotalBob, neto_dia_bob: estado.netoBob, neto_sin_cuenta_bob: estado.netoSinCuentaBob || undefined, ajuste_derivadas_bob: estado.derivadas.length ? estado.ajusteDerivadas : undefined, derivadas: estado.derivadas.length ? Object.fromEntries(estado.derivadas.map(d => [d.label, d.value])) : undefined, ajuste_movimientos_bob: estado.movimientos.length ? estado.ajusteMovimientos : undefined, movimientos: estado.movimientos.length ? estado.movimientos.map(m => `${m.label}=${m.proceedsBob}`) : undefined, total_bob: estado.totalBob };
 }
