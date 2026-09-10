@@ -1,13 +1,6 @@
 name: Patrimonio diario (autocálculo)
 
 # Programado ~00:17 de Bolivia (GMT-4) = 04:17 UTC, todos los días.
-# NOTA: los cron de GitHub Actions se encolan y pueden retrasarse bastante
-# (a veces horas), sobre todo en minutos "redondos" como :00 y :30. Por eso se
-# usa un minuto poco congestionado (:17). El retraso NO afecta la exactitud: el
-# job cierra SIEMPRE "ayer" (23:59 Bolivia) y es idempotente, así que corra a la
-# 00:17 o a las 04:57 el resultado es el mismo. Si se necesitara puntualidad,
-# se usaría un scheduler externo (cron-job.org), ya contemplado en CLAUDE.md.
-# También se puede disparar a mano desde la pestaña Actions.
 on:
   schedule:
     - cron: "17 4 * * *"
@@ -23,20 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Tipo de cambio del día (BCB)
-        continue-on-error: true  # el BCB puede fallar; no debe tumbar el cierre de patrimonio
+        continue-on-error: true
         env:
           APP_URL: ${{ secrets.APP_URL }}
           API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
         run: |
-          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then
-            echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN." >&2
-            exit 1
-          fi
+          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN." >&2; exit 1; fi
           URL="$APP_URL/api/jobs/tipo-cambio"
-          echo "POST $URL (T/C del día en curso)"
-          codigo=$(curl -sS -o tc.json -w "%{http_code}" \
-            -X POST "$URL" \
-            -H "Authorization: Bearer $API_BEARER_TOKEN")
+          codigo=$(curl -sS -o tc.json -w "%{http_code}" -X POST "$URL" -H "Authorization: Bearer $API_BEARER_TOKEN")
           echo "HTTP $codigo"; cat tc.json; echo
           if [ "$codigo" -ge 300 ]; then exit 1; fi
 
@@ -46,39 +33,21 @@ jobs:
           API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
           DATE_INPUT: ${{ github.event.inputs.date }}
         run: |
-          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then
-            echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN en el repositorio." >&2
-            exit 1
-          fi
+          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN en el repositorio." >&2; exit 1; fi
           URL="$APP_URL/api/jobs/patrimonio-diario"
-          if [ -n "$DATE_INPUT" ]; then
-            URL="$URL?date=$DATE_INPUT"
-          fi
-          echo "POST $URL"
-          codigo=$(curl -sS -o respuesta.json -w "%{http_code}" \
-            -X POST "$URL" \
-            -H "Authorization: Bearer $API_BEARER_TOKEN")
-          echo "HTTP $codigo"
-          cat respuesta.json
-          echo
-          if [ "$codigo" -ge 300 ]; then
-            exit 1
-          fi
+          if [ -n "$DATE_INPUT" ]; then URL="$URL?date=$DATE_INPUT"; fi
+          codigo=$(curl -sS -o respuesta.json -w "%{http_code}" -X POST "$URL" -H "Authorization: Bearer $API_BEARER_TOKEN")
+          echo "HTTP $codigo"; cat respuesta.json; echo
+          if [ "$codigo" -ge 300 ]; then exit 1; fi
 
-      - name: Correos (patrimonio + alerta DPF)
-        continue-on-error: true  # un fallo de correo no debe tumbar el cierre
+      - name: Correos (patrimonio + alertas, todos los usuarios)
+        continue-on-error: true
         env:
           APP_URL: ${{ secrets.APP_URL }}
           API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
         run: |
-          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then
-            echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN." >&2
-            exit 1
-          fi
-          URL="$APP_URL/api/jobs/correos"
-          echo "POST $URL"
-          codigo=$(curl -sS -o correos.json -w "%{http_code}" \
-            -X POST "$URL" \
-            -H "Authorization: Bearer $API_BEARER_TOKEN")
+          if [ -z "$APP_URL" ] || [ -z "$API_BEARER_TOKEN" ]; then echo "Faltan los secrets APP_URL y/o API_BEARER_TOKEN." >&2; exit 1; fi
+          URL="$APP_URL/api/jobs/correos-multi"
+          codigo=$(curl -sS -o correos.json -w "%{http_code}" -X POST "$URL" -H "Authorization: Bearer $API_BEARER_TOKEN")
           echo "HTTP $codigo"; cat correos.json; echo
           if [ "$codigo" -ge 300 ]; then exit 1; fi
