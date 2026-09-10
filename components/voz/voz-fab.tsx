@@ -7,6 +7,9 @@ import { Microphone, Stop, X, Warning, CircleNotch, CheckCircle } from "@phospho
 
 type Estado = "idle" | "grabando" | "enviando" | "ok" | "error";
 
+const UMBRAL_VOZ = 0.008;
+const FRAMES_VOZ_REQUERIDOS = 8;
+
 function elegirMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
   const candidatos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
@@ -31,17 +34,67 @@ export function VozFab() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const okTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const framesVozRef = useRef(0);
+
+  const detenerAnalisis = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    analyserRef.current?.disconnect();
+    analyserRef.current = null;
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+  }, []);
+
+  const iniciarAnalisis = useCallback((stream: MediaStream) => {
+    try {
+      const contexto = new AudioContext();
+      const analyser = contexto.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.2;
+      const source = contexto.createMediaStreamSource(stream);
+      source.connect(analyser);
+      audioContextRef.current = contexto;
+      analyserRef.current = analyser;
+      framesVozRef.current = 0;
+
+      const datos = new Float32Array(analyser.fftSize);
+      const analizar = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getFloatTimeDomainData(datos);
+        let suma = 0;
+        for (const muestra of datos) suma += muestra * muestra;
+        const rms = Math.sqrt(suma / datos.length);
+        if (rms >= UMBRAL_VOZ) framesVozRef.current += 1;
+        rafRef.current = requestAnimationFrame(analizar);
+      };
+      rafRef.current = requestAnimationFrame(analizar);
+      void contexto.resume().catch(() => {});
+    } catch {
+      // El análisis es una defensa adicional. Si el navegador no soporta Web Audio,
+      // Gemini mantiene la validación estricta del audio como segunda barrera.
+    }
+  }, []);
 
   const soltarMic = useCallback(() => {
+    detenerAnalisis();
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-  }, []);
+  }, [detenerAnalisis]);
+
   const pararTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
   }, []);
+
   const obtenerStream = useCallback(async (): Promise<MediaStream> => {
     const actual = streamRef.current;
     if (actual && actual.getAudioTracks().some((t) => t.readyState === "live")) return actual;
@@ -71,12 +124,23 @@ export function VozFab() {
       mimeRef.current = (mime || "audio/webm").split(";")[0];
       const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       chunksRef.current = [];
+      framesVozRef.current = 0;
+      iniciarAnalisis(stream);
+
       rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       rec.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeRef.current });
+        const huboVoz = framesVozRef.current >= FRAMES_VOZ_REQUERIDOS;
+        detenerAnalisis();
         pararTimer();
         if (idleRef.current) clearTimeout(idleRef.current);
         idleRef.current = setTimeout(soltarMic, 120_000);
+
+        if (!huboVoz) {
+          setEstado("error");
+          setMensaje("No se detectó voz clara. No se envió ni registró ningún movimiento.");
+          return;
+        }
         void enviar(blob);
       };
       recorderRef.current = rec;
@@ -108,6 +172,7 @@ export function VozFab() {
       recorderRef.current.onstop = null;
       recorderRef.current.stop();
     }
+    detenerAnalisis();
     pararTimer();
     if (idleRef.current) clearTimeout(idleRef.current);
     idleRef.current = setTimeout(soltarMic, 120_000);
@@ -116,7 +181,17 @@ export function VozFab() {
 
   async function enviar(blob: Blob) {
     try {
+      if (blob.size <= 0) {
+        setEstado("error");
+        setMensaje("La grabación está vacía. No se envió ni registró ningún movimiento.");
+        return;
+      }
       const audioBase64 = await blobABase64(blob);
+      if (!audioBase64.trim()) {
+        setEstado("error");
+        setMensaje("No se pudo obtener contenido del audio. No se registró ningún movimiento.");
+        return;
+      }
       const res = await fetch("/api/voz/ingesta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
