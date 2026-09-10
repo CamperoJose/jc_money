@@ -225,7 +225,7 @@ function textoONull(v: unknown): string | null {
 }
 
 const EVIDENCIA: Record<"gasto" | "ingreso" | "deuda", RegExp> = {
-  gasto: /\b(gast|pag|compr|cost|consum|adquir)\w*/i,
+  gasto: /\b(gast|pagu|compr|cost|consum|adquir)\w*/i,
   ingreso: /\b(recib|pagaron|cobr|deposit|sueldo|salario|gan|ingres)\w*/i,
   deuda: /\b(prest|fi[eé]|debe|deben|deuda|debiendo|cobrar|prestado)\w*/i,
 };
@@ -235,7 +235,7 @@ function tieneEvidenciaDeTipo(transcripcion: string, tipo: "gasto" | "ingreso" |
 }
 
 function transcripcionPareceFinanciera(transcripcion: string): boolean {
-  return /\d|boliv|d[oó]lar|usd|usdt|tether|gast|pag|compr|recib|cobr|deposit|sueldo|salario|prest|debe|deuda|fi[eé]/i.test(
+  return /\d|boliv|d[oó]lar|usd|usdt|tether|gast|pagu|compr|recib|cobr|deposit|sueldo|salario|prest|debe|deuda|fi[eé]/i.test(
     transcripcion
   );
 }
