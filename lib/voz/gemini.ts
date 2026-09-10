@@ -1,7 +1,7 @@
 import { obtenerAccessToken } from "@/lib/gcp/token";
 import { cargarServiceAccount } from "@/lib/gcp/credenciales";
 import type { Currency } from "@/lib/types";
-import type { DeudaVoz, GastoVoz, ResultadoVoz } from "@/lib/voz/tipos";
+import type { DeudaVoz, GastoVoz, IngresoVoz, ResultadoVoz } from "@/lib/voz/tipos";
 
 export interface CuentaCatalogo {
   id: string;
@@ -18,28 +18,35 @@ const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
 const LOCATION = process.env.GCP_LOCATION?.trim() || "global";
 
 const REINTENTOS = 2;
-const ESPERAS_MS = [1500]; // entre intentos
-const TIMEOUT_MS = 25_000; // por intento (acota el tiempo total)
+const ESPERAS_MS = [1500];
+const TIMEOUT_MS = 25_000;
 
-/** Host de Vertex AI según la ubicación ("global" usa el host sin prefijo). */
 function hostVertex(location: string): string {
   return location === "global"
     ? "https://aiplatform.googleapis.com"
     : `https://${location}-aiplatform.googleapis.com`;
 }
 
-function construirPrompt(cuentas: CuentaCatalogo[], categorias: CategoriaCatalogo[], hoy: string): string {
+function construirPrompt(
+  cuentas: CuentaCatalogo[],
+  categoriasGasto: CategoriaCatalogo[],
+  categoriasIngreso: CategoriaCatalogo[],
+  hoy: string
+): string {
   const listaCuentas = cuentas
     .map((c) => `- id="${c.id}" | nombre="${c.name}" | tipo=${c.type} | moneda=${c.currency}`)
     .join("\n");
-  const listaCategorias = categorias.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
+  const listaCategoriasGasto = categoriasGasto.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
+  const listaCategoriasIngreso = categoriasIngreso.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
 
   return `Eres un asistente que interpreta comandos de voz en español boliviano para registrar
-finanzas personales. La persona dicta uno o varios GASTOS y/o una o varias DEUDAS (dinero que
+finanzas personales. La persona dicta uno o varios GASTOS, INGRESOS y/o DEUDAS (dinero que
 OTROS le deben a la persona) en un solo mensaje, sin orden fijo. Fecha de hoy: ${hoy}.
 
 Distingue:
 - GASTO: la persona pagó/compró/gastó algo. Ej: "gasté", "pagué", "compré", "me costó".
+- INGRESO: la persona recibió dinero. Ej: "recibí", "me pagaron", "cobré", "me depositaron",
+  "recibí mi sueldo".
 - DEUDA (que me deben): la persona prestó dinero o alguien le debe. Ej: "presté", "le fié",
   "me debe", "quedó debiendo", "por cobrar".
 
@@ -47,11 +54,24 @@ Para cada GASTO extrae:
 - descripcion: qué se compró/pagó (texto corto).
 - monto: número (sin moneda). Si NO se menciona un monto, usa null.
 - moneda: "BOB" (por defecto en Bolivia), "USD" si dice dólares, "USDT" si dice USDT/tether.
-- cuenta_id: el id de la cuenta con la que se pagó, eligiendo de la lista de CUENTAS por el
-  nombre mencionado (ej. "efectivo", "BNB", "banco"). Si no se menciona o no hay coincidencia
-  clara, usa null.
-- categoria_id: el id de la CATEGORÍA de gasto que mejor corresponda a la descripción. Si no hay
-  una coincidencia razonable, usa null.
+- cuenta_id: el id de la cuenta con la que se pagó, eligiendo SOLO de CUENTAS por el nombre
+  mencionado. Si no se menciona o no hay coincidencia clara, usa null.
+- categoria_id: el id de una CATEGORÍA DE GASTO que mejor corresponda. Si no hay coincidencia
+  razonable, usa null.
+
+Para cada INGRESO extrae:
+- descripcion: origen del dinero (texto corto), por ejemplo "sueldo".
+- monto: número (sin moneda). Si NO se menciona un monto, usa null.
+- moneda: "BOB" (por defecto en Bolivia), "USD" si dice dólares, "USDT" si dice USDT/tether.
+- cuenta_id: el id de la cuenta DONDE SE RECIBIÓ el dinero, eligiendo SOLO de CUENTAS por el
+  nombre mencionado (ej. "BNB", "efectivo", "Banco SOL"). Si no se menciona o no hay coincidencia
+  clara, usa null. NO inventes una cuenta ni reutilices una cuenta de otro usuario.
+- categoria_id: el id de una CATEGORÍA DE INGRESO que mejor corresponda. Si no hay coincidencia
+  razonable, usa null.
+
+REGLA IMPORTANTE DE CUENTAS: las CUENTAS pertenecen exclusivamente al usuario actual. Solo puedes
+usar IDs de la lista proporcionada. Un nombre parecido no es suficiente si puede referirse a otra
+cuenta. Si hay varias coincidencias posibles, usa null.
 
 Para cada DEUDA extrae:
 - quien: nombre de quien debe, o null.
@@ -59,17 +79,21 @@ Para cada DEUDA extrae:
 - moneda: "BOB" por defecto.
 - motivo: motivo del préstamo, o null.
 
-CUENTAS disponibles:
+CUENTAS disponibles del usuario actual:
 ${listaCuentas || "(ninguna)"}
 
-CATEGORÍAS de gasto disponibles:
-${listaCategorias || "(ninguna)"}
+CATEGORÍAS DE GASTO disponibles del usuario actual:
+${listaCategoriasGasto || "(ninguna)"}
+
+CATEGORÍAS DE INGRESO disponibles del usuario actual:
+${listaCategoriasIngreso || "(ninguna)"}
 
 Incluye también "transcripcion": lo que entendiste del audio, en texto natural.
 
 Responde ÚNICAMENTE con un JSON válido, sin texto adicional ni markdown, con esta forma exacta:
-{"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
-Si no hay gastos, "gastos" es []. Si no hay deudas, "deudas" es []. No inventes montos ni cuentas.`;
+{"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"ingresos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
+Si no hay gastos, "gastos" es []. Si no hay ingresos, "ingresos" es []. Si no hay deudas, "deudas" es [].
+No inventes montos, cuentas ni categorías.`;
 }
 
 interface VertexResponse {
@@ -83,12 +107,7 @@ async function llamarVertex(prompt: string, audioBase64: string, mimeType: strin
     `/publishers/google/models/${MODEL}:generateContent`;
 
   const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: prompt }, { inlineData: { mimeType, data: audioBase64 } }],
-      },
-    ],
+    contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType, data: audioBase64 } }] }],
     generationConfig: { temperature: 0, responseMimeType: "application/json" },
   };
 
@@ -96,7 +115,7 @@ async function llamarVertex(prompt: string, audioBase64: string, mimeType: strin
   for (let intento = 1; intento <= REINTENTOS; intento++) {
     let res: Response;
     const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), TIMEOUT_MS); // no colgar indefinidamente
+    const timeout = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
       const token = await obtenerAccessToken();
       res = await fetch(url, {
@@ -145,8 +164,12 @@ function esperar(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Limpia posibles fences ```json y parsea el JSON del modelo. */
-function parsear(texto: string, cuentas: CuentaCatalogo[], categorias: CategoriaCatalogo[]): ResultadoVoz {
+function parsear(
+  texto: string,
+  cuentas: CuentaCatalogo[],
+  categoriasGasto: CategoriaCatalogo[],
+  categoriasIngreso: CategoriaCatalogo[]
+): ResultadoVoz {
   let limpio = texto.trim();
   if (limpio.startsWith("```")) limpio = limpio.replace(/```[a-z]*\n?/gi, "").trim();
 
@@ -156,18 +179,22 @@ function parsear(texto: string, cuentas: CuentaCatalogo[], categorias: Categoria
   } catch {
     throw new Error("No se pudo interpretar la respuesta del modelo.");
   }
-  const raw = obj as { gastos?: unknown; deudas?: unknown; transcripcion?: unknown };
+  const raw = obj as { gastos?: unknown; ingresos?: unknown; deudas?: unknown; transcripcion?: unknown };
   const idsCuenta = new Set(cuentas.map((c) => c.id));
-  const idsCat = new Set(categorias.map((c) => c.id));
+  const idsCatGasto = new Set(categoriasGasto.map((c) => c.id));
+  const idsCatIngreso = new Set(categoriasIngreso.map((c) => c.id));
 
   const gastos: GastoVoz[] = Array.isArray(raw.gastos)
-    ? raw.gastos.map((g) => normalizarGasto(g, idsCuenta, idsCat)).filter((g): g is GastoVoz => g !== null)
+    ? raw.gastos.map((g) => normalizarMovimiento(g, idsCuenta, idsCatGasto)).filter((g): g is GastoVoz => g !== null)
+    : [];
+  const ingresos: IngresoVoz[] = Array.isArray(raw.ingresos)
+    ? raw.ingresos.map((i) => normalizarMovimiento(i, idsCuenta, idsCatIngreso)).filter((i): i is IngresoVoz => i !== null)
     : [];
   const deudas: DeudaVoz[] = Array.isArray(raw.deudas)
     ? raw.deudas.map(normalizarDeuda).filter((d): d is DeudaVoz => d !== null)
     : [];
 
-  return { gastos, deudas, transcripcion: textoONull(raw.transcripcion) };
+  return { gastos, ingresos, deudas, transcripcion: textoONull(raw.transcripcion) };
 }
 
 function moneda(v: unknown): Currency {
@@ -182,13 +209,16 @@ function textoONull(v: unknown): string | null {
   return t.length ? t : null;
 }
 
-function normalizarGasto(g: unknown, idsCuenta: Set<string>, idsCat: Set<string>): GastoVoz | null {
-  if (!g || typeof g !== "object") return null;
-  const r = g as Record<string, unknown>;
+function normalizarMovimiento(
+  value: unknown,
+  idsCuenta: Set<string>,
+  idsCategoria: Set<string>
+): GastoVoz | IngresoVoz | null {
+  if (!value || typeof value !== "object") return null;
+  const r = value as Record<string, unknown>;
   const descripcion = textoONull(r.descripcion) ?? "";
   const cuenta = typeof r.cuenta_id === "string" && idsCuenta.has(r.cuenta_id) ? r.cuenta_id : null;
-  const categoria = typeof r.categoria_id === "string" && idsCat.has(r.categoria_id) ? r.categoria_id : null;
-  // Descarta entradas totalmente vacías.
+  const categoria = typeof r.categoria_id === "string" && idsCategoria.has(r.categoria_id) ? r.categoria_id : null;
   if (!descripcion && numeroONull(r.monto) == null) return null;
   return {
     descripcion,
@@ -209,15 +239,16 @@ function normalizarDeuda(d: unknown): DeudaVoz | null {
   return { quien, monto, moneda: moneda(r.moneda), motivo };
 }
 
-/** Interpreta un audio (base64) y devuelve gastos y deudas estructurados. */
+/** Interpreta un audio (base64) y devuelve gastos, ingresos y deudas estructurados. */
 export async function interpretarAudio(opts: {
   audioBase64: string;
   mimeType: string;
   cuentas: CuentaCatalogo[];
-  categorias: CategoriaCatalogo[];
+  categoriasGasto: CategoriaCatalogo[];
+  categoriasIngreso: CategoriaCatalogo[];
   hoy: string;
 }): Promise<ResultadoVoz> {
-  const prompt = construirPrompt(opts.cuentas, opts.categorias, opts.hoy);
+  const prompt = construirPrompt(opts.cuentas, opts.categoriasGasto, opts.categoriasIngreso, opts.hoy);
   const texto = await llamarVertex(prompt, opts.audioBase64, opts.mimeType);
-  return parsear(texto, opts.cuentas, opts.categorias);
+  return parsear(texto, opts.cuentas, opts.categoriasGasto, opts.categoriasIngreso);
 }
