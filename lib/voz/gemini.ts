@@ -3,39 +3,26 @@ import { cargarServiceAccount } from "@/lib/gcp/credenciales";
 import type { Currency } from "@/lib/types";
 import type { DeudaVoz, GastoVoz, IngresoVoz, ResultadoVoz } from "@/lib/voz/tipos";
 
-export interface CuentaCatalogo {
-  id: string;
-  name: string;
-  type: string;
-  currency: string;
-}
-
-export interface CategoriaCatalogo {
-  id: string;
-  name: string;
-}
+export interface CuentaCatalogo { id: string; name: string; type: string; currency: string; }
+export interface CategoriaCatalogo { id: string; name: string; }
 
 const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
 const LOCATION = process.env.GCP_LOCATION?.trim() || "global";
-
 const REINTENTOS = 2;
 const ESPERAS_MS = [1500];
 const TIMEOUT_MS = 25_000;
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
-function hostVertex(location: string): string {
-  return location === "global" ? "https://aiplatform.googleapis.com" : `https://${location}-aiplatform.googleapis.com`;
-}
+function hostVertex(location: string): string { return location === "global" ? "https://aiplatform.googleapis.com" : `https://${location}-aiplatform.googleapis.com`; }
 
 function construirPrompt(cuentas: CuentaCatalogo[], categoriasGasto: CategoriaCatalogo[], categoriasIngreso: CategoriaCatalogo[], hoy: string): string {
   const listaCuentas = cuentas.map((c) => `- id="${c.id}" | nombre="${c.name}" | tipo=${c.type} | moneda=${c.currency}`).join("\n");
   const listaCategoriasGasto = categoriasGasto.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
   const listaCategoriasIngreso = categoriasIngreso.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
-
   return `Eres un parser financiero estricto para comandos de voz en español boliviano.
 
 PRIMERA REGLA — SEGURIDAD DEL AUDIO:
-Primero debes inspeccionar el AUDIO adjunto y decidir si contiene habla humana inteligible.
+Primero inspecciona el AUDIO adjunto y decide si contiene habla humana inteligible.
 - Si el audio está vacío, contiene solo silencio, ruido, está incompleto, es inaudible o NO puedes identificar con claridad habla humana, responde con audio_con_habla=false, transcripcion="" y TODOS los arrays vacíos.
 - NUNCA inventes, completes ni supongas palabras, números, nombres o movimientos financieros.
 - Un audio con silencio no es una orden financiera.
@@ -133,12 +120,12 @@ function parsear(textoModelo: string, cuentas: CuentaCatalogo[], categoriasGasto
   let obj: unknown;
   try { obj = JSON.parse(limpio); } catch { throw new Error("No se pudo interpretar la respuesta del modelo."); }
   const raw = obj as { audio_con_habla?: unknown; transcripcion?: unknown; gastos?: unknown; ingresos?: unknown; deudas?: unknown };
-  const audioConHabla = raw.audio_con_habla === true;
   const transcripcion = textoONull(raw.transcripcion);
 
-  // Gemini puede marcar audio_con_habla=false aun cuando entrega una transcripción financiera válida.
-  // La transcripción no habilita por sí sola un registro: los movimientos se validan debajo contra
-  // evidencia de tipo, monto, moneda y catálogo. Esto evita perder comandos válidos por el flag.
+  // audio_con_habla es un indicador auxiliar del modelo, no un bloqueo del flujo.
+  // Gemini puede marcarlo false aunque entregue una transcripción financiera válida.
+  // La transcripción no habilita por sí sola un registro: cada movimiento se valida
+  // de forma determinística contra tipo, monto, moneda y catálogo.
   if (!transcripcion) return { gastos: [], ingresos: [], deudas: [], transcripcion: null };
 
   const idsCuenta = new Set(cuentas.map((c) => c.id));
@@ -153,32 +140,19 @@ function parsear(textoModelo: string, cuentas: CuentaCatalogo[], categoriasGasto
 function moneda(v: unknown): Currency { return v === "USD" || v === "USDT" ? v : "BOB"; }
 function numeroONull(v: unknown): number | null { const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN; return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; }
 function textoONull(v: unknown): string | null { const t = typeof v === "string" ? v.trim() : ""; return t.length ? t : null; }
-
-const EVIDENCIA: Record<"gasto" | "ingreso" | "deuda", RegExp> = {
-  gasto: /\b(gast|pagu|compr|cost|consum|adquir)\w*/i,
-  ingreso: /\b(recib|pagaron|cobr|deposit|sueldo|salario|gan|ingres)\w*/i,
-  deuda: /\b(prest|fi[eé]|debe|deben|deuda|debiendo|cobrar|prestado)\w*/i,
-};
+const EVIDENCIA: Record<"gasto" | "ingreso" | "deuda", RegExp> = { gasto: /\b(gast|pagu|compr|cost|consum|adquir)\w*/i, ingreso: /\b(recib|pagaron|cobr|deposit|sueldo|salario|gan|ingres)\w*/i, deuda: /\b(prest|fi[eé]|debe|deben|deuda|debiendo|cobrar|prestado)\w*/i };
 function tieneEvidenciaDeTipo(transcripcion: string, tipo: "gasto" | "ingreso" | "deuda"): boolean { return EVIDENCIA[tipo].test(transcripcion); }
 function quitarAcentos(texto: string): string { return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
 function escapeRegExp(value: string): string { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-
 function montoApareceEnTranscripcion(monto: number | null, transcripcion: string): boolean {
   if (monto == null) return false;
   const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/[,]/g, ".");
   const entero = Number.isInteger(monto) ? String(monto) : monto.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
   if (new RegExp(`(?:^|\\D)${escapeRegExp(entero)}(?:\\D|$)`).test(texto)) return true;
-  if (Number.isInteger(monto)) {
-    const palabras = numeroEnPalabras(monto);
-    if (palabras && texto.includes(quitarAcentos(palabras))) return true;
-  }
+  if (Number.isInteger(monto)) { const palabras = numeroEnPalabras(monto); if (palabras && texto.includes(quitarAcentos(palabras))) return true; }
   return false;
 }
-function monedaApareceEnTranscripcion(moneda: Currency, transcripcion: string): boolean {
-  if (moneda === "BOB") return true;
-  if (moneda === "USD") return /d[oó]lar|usd|d[oó]lares/i.test(transcripcion);
-  return /usdt|tether/i.test(transcripcion);
-}
+function monedaApareceEnTranscripcion(moneda: Currency, transcripcion: string): boolean { if (moneda === "BOB") return true; if (moneda === "USD") return /d[oó]lar|usd|d[oó]lares/i.test(transcripcion); return /usdt|tether/i.test(transcripcion); }
 function numeroEnPalabras(n: number): string | null {
   if (!Number.isInteger(n) || n < 0 || n > 999999) return null;
   if (n === 0) return "cero";
@@ -191,7 +165,6 @@ function numeroEnPalabras(n: number): string | null {
   const miles = Math.floor(n / 1000), resto = n % 1000;
   return `${miles === 1 ? "mil" : `${hasta999(miles)} mil`}${resto ? ` ${hasta999(resto)}` : ""}`;
 }
-
 function normalizarMovimiento(value: unknown, idsCuenta: Set<string>, idsCategoria: Set<string>, cuentas: CuentaCatalogo[], transcripcion: string, tipo: "gasto" | "ingreso"): GastoVoz | IngresoVoz | null {
   if (!value || typeof value !== "object") return null;
   const r = value as Record<string, unknown>;
@@ -203,18 +176,11 @@ function normalizarMovimiento(value: unknown, idsCuenta: Set<string>, idsCategor
   if (monto != null && !montoApareceEnTranscripcion(monto, transcripcion)) return null;
   const monedaMovimiento = moneda(r.moneda);
   if (!monedaApareceEnTranscripcion(monedaMovimiento, transcripcion)) return null;
-  if (cuenta) {
-    const cuentaCatalogo = cuentas.find((c) => c.id === cuenta);
-    if (!cuentaCatalogo || !textoContieneFrase(transcripcion, cuentaCatalogo.name)) return null;
-  }
+  if (cuenta) { const cuentaCatalogo = cuentas.find((c) => c.id === cuenta); if (!cuentaCatalogo || !textoContieneFrase(transcripcion, cuentaCatalogo.name)) return null; }
   if (!descripcion && monto == null) return null;
   return { descripcion, monto, moneda: monedaMovimiento, cuenta_id: cuenta, categoria_id: categoria };
 }
-function textoContieneFrase(texto: string, frase: string): boolean {
-  const a = quitarAcentos(texto.toLowerCase()).replace(/\s+/g, " ").trim();
-  const b = quitarAcentos(frase.toLowerCase()).replace(/\s+/g, " ").trim();
-  return Boolean(b) && a.includes(b);
-}
+function textoContieneFrase(texto: string, frase: string): boolean { const a = quitarAcentos(texto.toLowerCase()).replace(/\s+/g, " ").trim(); const b = quitarAcentos(frase.toLowerCase()).replace(/\s+/g, " ").trim(); return Boolean(b) && a.includes(b); }
 function normalizarDeuda(d: unknown, transcripcion: string): DeudaVoz | null {
   if (!d || typeof d !== "object") return null;
   const r = d as Record<string, unknown>;
