@@ -7,7 +7,6 @@ import { Microphone, Stop, X, Warning, CircleNotch, CheckCircle } from "@phospho
 
 type Estado = "idle" | "grabando" | "enviando" | "ok" | "error";
 
-/** Elige un mimeType de grabación soportado por el navegador. */
 function elegirMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
   const candidatos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
@@ -19,18 +18,12 @@ function elegirMime(): string {
   return "";
 }
 
-/**
- * Botón flotante de registro por voz. Graba audio y lo envía a /api/voz/ingesta,
- * que responde de inmediato ("registro recibido") y procesa en segundo plano;
- * el usuario recibe el detalle por correo. Sin menú de revisión.
- */
 export function VozFab() {
   const router = useRouter();
   const avisos = useAvisos();
   const [estado, setEstado] = useState<Estado>("idle");
   const [segundos, setSegundos] = useState(0);
   const [mensaje, setMensaje] = useState<string | null>(null);
-
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -39,22 +32,16 @@ export function VozFab() {
   const okTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Libera el micrófono por completo (apaga el indicador). Solo al desmontar o
-  // tras un rato de inactividad, no entre grabaciones (así no se re-pide permiso).
   const soltarMic = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }, []);
-
   const pararTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
   }, []);
-
-  // Devuelve un stream de micrófono reutilizable: si ya se otorgó el permiso y
-  // el track sigue vivo, se reutiliza (iOS/Safari no vuelve a preguntar).
   const obtenerStream = useCallback(async (): Promise<MediaStream> => {
     const actual = streamRef.current;
     if (actual && actual.getAudioTracks().some((t) => t.readyState === "live")) return actual;
@@ -63,15 +50,12 @@ export function VozFab() {
     return stream;
   }, []);
 
-  useEffect(
-    () => () => {
-      pararTimer();
-      soltarMic();
-      if (okTimerRef.current) clearTimeout(okTimerRef.current);
-      if (idleRef.current) clearTimeout(idleRef.current);
-    },
-    [pararTimer, soltarMic]
-  );
+  useEffect(() => () => {
+    pararTimer();
+    soltarMic();
+    if (okTimerRef.current) clearTimeout(okTimerRef.current);
+    if (idleRef.current) clearTimeout(idleRef.current);
+  }, [pararTimer, soltarMic]);
 
   async function iniciar() {
     setMensaje(null);
@@ -80,20 +64,17 @@ export function VozFab() {
       setMensaje("Tu navegador no permite grabar audio.");
       return;
     }
-    if (idleRef.current) clearTimeout(idleRef.current); // no sueltes el mic mientras se usa
+    if (idleRef.current) clearTimeout(idleRef.current);
     try {
       const stream = await obtenerStream();
       const mime = elegirMime();
       mimeRef.current = (mime || "audio/webm").split(";")[0];
       const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       chunksRef.current = [];
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       rec.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeRef.current });
         pararTimer();
-        // Conserva el permiso reutilizando el stream; suéltalo si queda inactivo.
         if (idleRef.current) clearTimeout(idleRef.current);
         idleRef.current = setTimeout(soltarMic, 120_000);
         void enviar(blob);
@@ -104,7 +85,7 @@ export function VozFab() {
       setEstado("grabando");
       timerRef.current = setInterval(() => {
         setSegundos((s) => {
-          if (s >= 59) detener(); // corte de seguridad a 60s
+          if (s >= 59) detener();
           return s + 1;
         });
       }, 1000);
@@ -128,7 +109,6 @@ export function VozFab() {
       recorderRef.current.stop();
     }
     pararTimer();
-    // Mantén el permiso: suelta el mic solo tras inactividad.
     if (idleRef.current) clearTimeout(idleRef.current);
     idleRef.current = setTimeout(soltarMic, 120_000);
     setEstado("idle");
@@ -144,7 +124,6 @@ export function VozFab() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error ?? j.message ?? `Error ${res.status}`);
-      // j.ok === false → se procesó pero no se registró (faltó un dato).
       if (j.ok === false) {
         setEstado("error");
         setMensaje(j.message ?? "No se registró: faltó un dato.");
@@ -156,10 +135,7 @@ export function VozFab() {
         setEstado("idle");
         setMensaje(null);
       }, 6000);
-      avisos.exito(
-        "Registro recibido",
-        "Se está procesando; te llega un correo con el detalle."
-      );
+      avisos.exito("Registro recibido", "Se está procesando; te llega un correo con el detalle.");
       router.refresh();
     } catch (e) {
       setEstado("error");
@@ -177,32 +153,16 @@ export function VozFab() {
         onClick={grabando ? detener : estado === "idle" || estado === "ok" || estado === "error" ? iniciar : undefined}
         disabled={enviando}
         aria-label={grabando ? "Detener grabación" : "Registrar por voz"}
-        title="Registrar gasto o deuda por voz"
+        title="Registrar gasto, ingreso o deuda por voz"
         className={[
           "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40",
-          // Botón flotante: sobre él pasa todo el contenido al desplazar, así
-          // que aquí el vidrio sí aporta. El degradado y el filo interior le dan
-          // relieve para que no se pierda sobre fondos claros.
           "flex h-14 items-center gap-2 rounded-full px-4 text-primary-foreground shadow-lg ring-1 ring-inset ring-white/20 backdrop-blur-xl backdrop-saturate-150 transition-all active:scale-95",
           "bg-gradient-to-b from-white/25 to-transparent",
-          grabando
-            ? "animate-pulse bg-destructive/85 hover:bg-destructive"
-            : "bg-primary/85 hover:bg-primary",
+          grabando ? "animate-pulse bg-destructive/85 hover:bg-destructive" : "bg-primary/85 hover:bg-primary",
           enviando ? "opacity-80" : "",
         ].join(" ")}
       >
-        {enviando ? (
-          <CircleNotch weight="bold" className="size-6 animate-spin" />
-        ) : estado === "ok" ? (
-          <CheckCircle weight="fill" className="size-6" />
-        ) : grabando ? (
-          <>
-            <Stop weight="fill" className="size-6" />
-            <span className="font-semibold tabular-nums">{fmt(segundos)}</span>
-          </>
-        ) : (
-          <Microphone weight="fill" className="size-6" />
-        )}
+        {enviando ? <CircleNotch weight="bold" className="size-6 animate-spin" /> : estado === "ok" ? <CheckCircle weight="fill" className="size-6" /> : grabando ? <><Stop weight="fill" className="size-6" /><span className="font-semibold tabular-nums">{fmt(segundos)}</span></> : <Microphone weight="fill" className="size-6" />}
       </button>
 
       {grabando && (
@@ -213,21 +173,10 @@ export function VozFab() {
       )}
 
       {mensaje && (estado === "ok" || estado === "error") && (
-        <div
-          className={[
-            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 flex max-w-xs items-start gap-1.5 rounded-lg px-3 py-2 text-xs shadow-md",
-            estado === "ok" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive",
-          ].join(" ")}
-        >
-          {estado === "ok" ? (
-            <CheckCircle weight="fill" className="mt-0.5 size-3.5 shrink-0" />
-          ) : (
-            <Warning weight="fill" className="mt-0.5 size-3.5 shrink-0" />
-          )}
+        <div className={["fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-40 flex max-w-xs items-start gap-1.5 rounded-lg px-3 py-2 text-xs shadow-md", estado === "ok" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"].join(" ")}>
+          {estado === "ok" ? <CheckCircle weight="fill" className="mt-0.5 size-3.5 shrink-0" /> : <Warning weight="fill" className="mt-0.5 size-3.5 shrink-0" />}
           <span>{mensaje}</span>
-          <button onClick={() => { setEstado("idle"); setMensaje(null); }} aria-label="Cerrar">
-            <X className="size-3.5" />
-          </button>
+          <button onClick={() => { setEstado("idle"); setMensaje(null); }} aria-label="Cerrar"><X className="size-3.5" /></button>
         </div>
       )}
     </>
