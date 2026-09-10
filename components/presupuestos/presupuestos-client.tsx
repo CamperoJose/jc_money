@@ -16,7 +16,7 @@ import type { BudgetUI } from "@/lib/types";
 
 function nombreMes(period: string): string {
   const [y, m] = period.split("-").map(Number);
-  return new Intl.DateTimeFormat("es-BO", { month: "long", year: "numeric" }).format(new Date(Date.UTC(y, m - 1, 1)));
+  return new Intl.DateTimeFormat("es-BO", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 function mesAnterior(period: string): string {
   const [y, m] = period.split("-").map(Number);
@@ -99,7 +99,6 @@ export function PresupuestosClient({ resumen }: { resumen: ResumenPresupuestos }
         </div>
       )}
 
-      {/* Hero: avance global + KPIs */}
       <div className="grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardContent className="flex items-center gap-4 p-5">
@@ -216,4 +215,3 @@ function Fila({ f, onGuardar }: { f: BudgetUI; onGuardar: (id: string, v: string
     </div>
   );
 }
-
