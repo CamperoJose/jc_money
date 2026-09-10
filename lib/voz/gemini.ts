@@ -195,12 +195,12 @@ function parsear(
 
   const gastos: GastoVoz[] = Array.isArray(raw.gastos)
     ? raw.gastos
-        .map((g) => normalizarMovimiento(g, idsCuenta, idsCatGasto, transcripcion, "gasto"))
+        .map((g) => normalizarMovimiento(g, idsCuenta, idsCatGasto, cuentas, transcripcion, "gasto"))
         .filter((g): g is GastoVoz => g !== null)
     : [];
   const ingresos: IngresoVoz[] = Array.isArray(raw.ingresos)
     ? raw.ingresos
-        .map((i) => normalizarMovimiento(i, idsCuenta, idsCatIngreso, transcripcion, "ingreso"))
+        .map((i) => normalizarMovimiento(i, idsCuenta, idsCatIngreso, cuentas, transcripcion, "ingreso"))
         .filter((i): i is IngresoVoz => i !== null)
     : [];
   const deudas: DeudaVoz[] = Array.isArray(raw.deudas)
@@ -234,17 +234,32 @@ function tieneEvidenciaDeTipo(transcripcion: string, tipo: "gasto" | "ingreso" |
   return EVIDENCIA[tipo].test(transcripcion);
 }
 
+function transcripcionPareceFinanciera(transcripcion: string): boolean {
+  return /\d|boliv|d[oó]lar|usd|usdt|tether|gast|pag|compr|recib|cobr|deposit|sueldo|salario|prest|debe|deuda|fi[eé]/i.test(
+    transcripcion
+  );
+}
+
+function quitarAcentos(texto: string): string {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function montoApareceEnTranscripcion(monto: number | null, transcripcion: string): boolean {
   if (monto == null) return false;
-  const texto = transcripcion.toLowerCase();
-  const normalizado = texto.replace(/[,]/g, ".");
+  const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/[,]/g, ".");
   const entero = Number.isInteger(monto) ? String(monto) : monto.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
-  if (new RegExp(`(?:^|\\D)${escapeRegExp(entero)}(?:\\D|$)`).test(normalizado)) return true;
+  if (new RegExp(`(?:^|\\D)${escapeRegExp(entero)}(?:\\D|$)`).test(texto)) return true;
   if (Number.isInteger(monto)) {
     const palabras = numeroEnPalabras(monto);
-    if (palabras && normalizado.includes(palabras)) return true;
+    if (palabras && texto.includes(quitarAcentos(palabras))) return true;
   }
   return false;
+}
+
+function monedaApareceEnTranscripcion(moneda: Currency, transcripcion: string): boolean {
+  if (moneda === "BOB") return true;
+  if (moneda === "USD") return /d[oó]lar|usd|d[oó]lares/i.test(transcripcion);
+  return /usdt|tether/i.test(transcripcion);
 }
 
 function escapeRegExp(value: string): string {
@@ -280,6 +295,7 @@ function normalizarMovimiento(
   value: unknown,
   idsCuenta: Set<string>,
   idsCategoria: Set<string>,
+  cuentas: CuentaCatalogo[],
   transcripcion: string,
   tipo: "gasto" | "ingreso"
 ): GastoVoz | IngresoVoz | null {
@@ -290,14 +306,28 @@ function normalizarMovimiento(
   const cuenta = typeof r.cuenta_id === "string" && idsCuenta.has(r.cuenta_id) ? r.cuenta_id : null;
   const categoria = typeof r.categoria_id === "string" && idsCategoria.has(r.categoria_id) ? r.categoria_id : null;
 
-  // Defensa contra alucinaciones: un movimiento solo puede pasar si la transcripción
-  // contiene evidencia del tipo y el monto propuesto. Sin monto explícito, queda como
-  // incompleto y nunca se inserta en transactions.
+  // Defensa contra alucinaciones: el movimiento debe tener evidencia del tipo y
+  // el monto en la transcripción. Sin monto explícito, queda incompleto y proceso.ts
+  // lo descarta antes de insertar.
   if (!tieneEvidenciaDeTipo(transcripcion, tipo)) return null;
   if (monto != null && !montoApareceEnTranscripcion(monto, transcripcion)) return null;
-  if (!descripcion && monto == null) return null;
+  const monedaMovimiento = moneda(r.moneda);
+  if (!monedaApareceEnTranscripcion(monedaMovimiento, transcripcion)) return null;
 
-  return { descripcion, monto, moneda: moneda(r.moneda), cuenta_id: cuenta, categoria_id: categoria };
+  // Una cuenta solo puede asignarse si su nombre fue realmente mencionado.
+  if (cuenta) {
+    const cuentaCatalogo = cuentas.find((c) => c.id === cuenta);
+    if (!cuentaCatalogo || !textoContieneFrase(transcripcion, cuentaCatalogo.name)) return null;
+  }
+
+  if (!descripcion && monto == null) return null;
+  return { descripcion, monto, moneda: monedaMovimiento, cuenta_id: cuenta, categoria_id: categoria };
+}
+
+function textoContieneFrase(texto: string, frase: string): boolean {
+  const a = quitarAcentos(texto.toLowerCase()).replace(/\s+/g, " ").trim();
+  const b = quitarAcentos(frase.toLowerCase()).replace(/\s+/g, " ").trim();
+  return Boolean(b) && a.includes(b);
 }
 
 function normalizarDeuda(d: unknown, transcripcion: string): DeudaVoz | null {
@@ -308,8 +338,10 @@ function normalizarDeuda(d: unknown, transcripcion: string): DeudaVoz | null {
   const monto = numeroONull(r.monto);
   if (!tieneEvidenciaDeTipo(transcripcion, "deuda")) return null;
   if (monto != null && !montoApareceEnTranscripcion(monto, transcripcion)) return null;
+  const monedaDeuda = moneda(r.moneda);
+  if (!monedaApareceEnTranscripcion(monedaDeuda, transcripcion)) return null;
   if (!quien && !motivo && monto == null) return null;
-  return { quien, monto, moneda: moneda(r.moneda), motivo };
+  return { quien, monto, moneda: monedaDeuda, motivo };
 }
 
 /**
@@ -328,6 +360,10 @@ export async function interpretarAudio(opts: {
   const reconocimiento = await transcribirAudio({ audioBase64: opts.audioBase64 });
   if (!reconocimiento) {
     return { gastos: [], ingresos: [], deudas: [], transcripcion: null };
+  }
+
+  if (!transcripcionPareceFinanciera(reconocimiento.texto)) {
+    return { gastos: [], ingresos: [], deudas: [], transcripcion: reconocimiento.texto };
   }
 
   const prompt = construirPrompt(
