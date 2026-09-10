@@ -33,9 +33,23 @@ Primero inspecciona el AUDIO adjunto y decide si contiene habla humana inteligib
 
 Fecha de hoy: ${hoy}.
 
-La persona puede dictar uno o varios GASTOS, INGRESOS y/o DEUDAS (dinero que OTROS le deben).
+La persona puede dictar UNO O VARIOS movimientos financieros en el MISMO audio.
+Debes detectar y registrar CADA movimiento independiente que haya sido pronunciado. NUNCA resumas, agrupes ni conviertas varios movimientos en uno solo.
 Si una frase financiera es suficientemente comprensible, intenta interpretarla aunque la redacción sea informal, incompleta o tenga errores gramaticales.
 Si no dice explícitamente que es ingreso o deuda, un movimiento monetario debe considerarse GASTO como primera opción. Solo clasifícalo como INGRESO o DEUDA cuando exista evidencia explícita de ello.
+
+REGLA CRÍTICA — MÚLTIPLES MOVIMIENTOS:
+- Un audio puede contener 2, 3 o más gastos.
+- Cada compra, pago o gasto independiente debe convertirse en un objeto separado dentro de gastos[].
+- Si aparecen varios importes asociados a diferentes compras, crea un gasto por cada importe.
+- Ejemplo: "gasté 20 en pan y 35 en almuerzo" => DOS gastos: pan=20 y almuerzo=35.
+- Ejemplo: "compré pan 10, leche 8 y huevos 15" => TRES gastos: pan=10, leche=8 y huevos=15.
+- Ejemplo: "pagué 50 de Netflix y 30 de internet" => DOS gastos independientes.
+- NO sumes importes. NO agrupes productos. NO conviertas una lista de compras en un único gasto.
+- Conserva cada descripción y su importe correspondiente.
+- Mantén los movimientos en el orden en que fueron mencionados cuando sea posible.
+- También puedes devolver varios ingresos y/o deudas si aparecen varios movimientos de esos tipos.
+- Un solo audio puede mezclar gastos, ingresos y deudas; clasifica cada movimiento por separado.
 
 Distingue:
 - GASTO: la persona pagó/compró/gastó algo. Ej: "gasté", "pagué", "compré", "me costó".
@@ -90,12 +104,17 @@ ${listaCategoriasGasto || "(ninguna)"}
 CATEGORÍAS DE INGRESO disponibles del usuario actual:
 ${listaCategoriasIngreso || "(ninguna)"}
 
-Antes de responder, revisa cada movimiento y verifica:
-1. que el tipo sea correcto;
-2. que el monto esté realmente presente en el audio;
-3. que cuenta_id pertenezca a las cuentas disponibles;
-4. que categoria_id pertenezca al catálogo correcto;
-5. que, si existen categorías disponibles, hayas elegido la categoría semánticamente más cercana en lugar de dejarla en null sin motivo.
+Antes de responder, haz una segunda revisión del audio y verifica:
+1. cuántos movimientos financieros independientes fueron pronunciados;
+2. que exista un objeto separado para CADA movimiento;
+3. que cada importe esté asociado al movimiento correcto;
+4. que no hayas combinado dos o más importes en un solo movimiento;
+5. que no hayas creado movimientos que no fueron pronunciados;
+6. que el tipo sea correcto para cada movimiento;
+7. que el monto de cada movimiento esté realmente presente en el audio;
+8. que cuenta_id pertenezca a las cuentas disponibles;
+9. que categoria_id pertenezca al catálogo correcto;
+10. que, si existen categorías disponibles, hayas elegido la categoría semánticamente más cercana en lugar de dejarla en null sin motivo.
 
 Devuelve ÚNICAMENTE JSON válido, sin markdown, con esta forma exacta:
 {"audio_con_habla":true,"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"ingresos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
