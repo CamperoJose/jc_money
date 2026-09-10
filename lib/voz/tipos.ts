@@ -9,6 +9,15 @@ export interface GastoVoz {
   categoria_id: string | null;
 }
 
+/** Un ingreso detectado en el audio (la cuenta es donde se recibió el dinero). */
+export interface IngresoVoz {
+  descripcion: string;
+  monto: number | null;
+  moneda: Currency;
+  cuenta_id: string | null;
+  categoria_id: string | null;
+}
+
 /** Una deuda (que me deben) detectada en el audio. */
 export interface DeudaVoz {
   quien: string | null;
@@ -20,6 +29,7 @@ export interface DeudaVoz {
 /** Resultado estructurado de interpretar un comando por voz. */
 export interface ResultadoVoz {
   gastos: GastoVoz[];
+  ingresos: IngresoVoz[];
   deudas: DeudaVoz[];
   transcripcion: string | null;
 }
