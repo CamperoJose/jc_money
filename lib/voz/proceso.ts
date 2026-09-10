@@ -137,9 +137,22 @@ function recuperarDesdeTranscripcion(parsed: Awaited<ReturnType<typeof interpret
   const monto = extraerMontoExplicito(t);
   if (monto == null) return parsed;
   const resultado = { ...parsed, gastos: [...parsed.gastos], ingresos: [...parsed.ingresos], deudas: [...parsed.deudas] };
-  if (contieneTipo(t, "gasto") && resultado.gastos.length === 0) resultado.gastos.push({ descripcion: descripcionGasto(t), monto, moneda: "BOB", cuenta_id: encontrarCuenta(t, cat.cuentas), categoria_id: null });
-  if (contieneTipo(t, "ingreso") && resultado.ingresos.length === 0) resultado.ingresos.push({ descripcion: t.trim(), monto, moneda: "BOB", cuenta_id: encontrarCuenta(t, cat.cuentas), categoria_id: null });
-  if (contieneTipo(t, "deuda") && resultado.deudas.length === 0) resultado.deudas.push({ quien: null, monto, moneda: "BOB", motivo: t.trim() });
+
+  // Prioridad semántica: ingreso y deuda solo cuando son explícitos.
+  // Si no hay una señal explícita de ninguno de ellos, una frase financiera
+  // con monto se interpreta como gasto. Esto tolera frases naturales como
+  // "treinta del Fortaleza por unas papas" aunque falte la palabra "gasto".
+  const esIngreso = contieneTipo(t, "ingreso");
+  const esDeuda = contieneTipo(t, "deuda");
+  const esGasto = contieneTipo(t, "gasto");
+
+  if (esDeuda && resultado.deudas.length === 0) {
+    resultado.deudas.push({ quien: null, monto, moneda: "BOB", motivo: t.trim() });
+  } else if (esIngreso && resultado.ingresos.length === 0) {
+    resultado.ingresos.push({ descripcion: t.trim(), monto, moneda: "BOB", cuenta_id: encontrarCuenta(t, cat.cuentas), categoria_id: null });
+  } else if ((esGasto || (!esIngreso && !esDeuda)) && resultado.gastos.length === 0) {
+    resultado.gastos.push({ descripcion: descripcionGasto(t), monto, moneda: "BOB", cuenta_id: encontrarCuenta(t, cat.cuentas), categoria_id: null });
+  }
   return resultado;
 }
 
