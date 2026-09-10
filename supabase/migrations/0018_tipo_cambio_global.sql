@@ -37,19 +37,10 @@ drop policy if exists exchange_rates_insert on exchange_rates;
 drop policy if exists exchange_rates_update on exchange_rates;
 drop policy if exists exchange_rates_delete on exchange_rates;
 
+-- Lectura compartida para cualquier usuario autenticado.
 create policy exchange_rates_select
   on exchange_rates for select
   using (auth.uid() is not null);
 
-create policy exchange_rates_insert
-  on exchange_rates for insert
-  with check (auth.uid() is not null);
-
-create policy exchange_rates_update
-  on exchange_rates for update
-  using (auth.uid() is not null)
-  with check (auth.uid() is not null);
-
-create policy exchange_rates_delete
-  on exchange_rates for delete
-  using (auth.uid() is not null);
+-- No se permiten escrituras desde el navegador. El job BCB usa service_role,
+-- que omite RLS, y es el único flujo que actualiza la cotización compartida.
