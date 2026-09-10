@@ -17,10 +17,14 @@ function aRate(r: Record<string, unknown>): ExchangeRate {
   };
 }
 
-export async function getTcConfig(supabase: SupabaseClient, userId?: string): Promise<TcConfig> {
-  let q = supabase.from("app_settings").select("key, value").in("key", ["tc_cod_indicador", "tc_cod_moneda"]);
-  if (userId) q = q.eq("user_id", userId);
-  const { data, error } = await q;
+/** El tipo de cambio es información global de la aplicación: todos los usuarios
+ * consultan exactamente la misma tabla de cotizaciones y configuración. */
+export async function getTcConfig(supabase: SupabaseClient, _userId?: string): Promise<TcConfig> {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("key, value")
+    .in("key", ["tc_cod_indicador", "tc_cod_moneda"])
+    .order("created_at", { ascending: true });
   if (error) throw error;
   const map = new Map((data ?? []).map((r) => [r.key as string, r.value as string]));
   return {
@@ -29,10 +33,9 @@ export async function getTcConfig(supabase: SupabaseClient, userId?: string): Pr
   };
 }
 
-export async function getExchangeRates(supabase: SupabaseClient, codMoneda?: number, userId?: string): Promise<ExchangeRate[]> {
+export async function getExchangeRates(supabase: SupabaseClient, codMoneda?: number, _userId?: string): Promise<ExchangeRate[]> {
   let q = supabase.from("exchange_rates").select(CAMPOS).order("rate_date", { ascending: false });
   if (codMoneda != null) q = q.eq("cod_moneda", codMoneda);
-  if (userId) q = q.eq("user_id", userId);
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []).map((r) => aRate(r as Record<string, unknown>));
@@ -42,17 +45,15 @@ export async function getUltimoTc(
   supabase: SupabaseClient,
   date: string,
   codMoneda: number,
-  userId?: string
+  _userId?: string
 ): Promise<ExchangeRate | null> {
-  let q = supabase
+  const { data, error } = await supabase
     .from("exchange_rates")
     .select(CAMPOS)
     .eq("cod_moneda", codMoneda)
     .lte("rate_date", date)
     .order("rate_date", { ascending: false })
     .limit(1);
-  if (userId) q = q.eq("user_id", userId);
-  const { data, error } = await q;
   if (error) throw error;
   const row = data?.[0];
   return row ? aRate(row as Record<string, unknown>) : null;
