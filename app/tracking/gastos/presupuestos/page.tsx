@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getResumenPresupuestos } from "@/lib/queries/presupuestos";
 import type { ResumenPresupuestos } from "@/lib/presupuestos";
@@ -5,8 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PresupuestosClient } from "@/components/presupuestos/presupuestos-client";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function PresupuestosPage() {
+  noStore();
   const supabase = await createClient();
 
   let resumen: ResumenPresupuestos | null = null;
