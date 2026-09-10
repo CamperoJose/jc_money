@@ -37,7 +37,7 @@ Orden sugerido: **1 → 2 → 3 → 4** desbloquean el arranque (Fase 0/1). El r
 ## 4. GitHub — GRATIS
 - [ ] El repo ya existe: https://github.com/CamperoJose/jc_money. Confirma que puedo pushear a la
       rama `claude/jc-money-setup-dzuiql` (ya tengo permiso concedido por ti).
-- [ ] (Más adelante) Secrets para el scheduler (ver punto 8).
+- [ ] (Más adelante) Secrets para el scheduler (punto 8).
 
 ## 5. Vercel (hosting) — GRATIS (plan Hobby)
 - [ ] Crear cuenta en https://vercel.com e **importar** el repo `CamperoJose/jc_money`.
@@ -107,6 +107,28 @@ node --experimental-strip-types scripts/backfill/tc-bcb.mjs --desde 2005-01-01
       serie que sí se mueva, usá `--moneda 76` (UFV).
 
 Detalle completo en `scripts/backfill/README.md`.
+
+## 8.e Barrera de seguridad para registro por voz — PRIORITARIO
+La ingesta por voz ahora usa **dos etapas**: primero Cloud Speech-to-Text verifica que exista habla
+real y obtiene una transcripción; recién después Gemini estructura esa transcripción. Si Speech-to-Text
+no detecta habla, **no se llama a Gemini y no se crea ninguna transacción**.
+
+Para producción hay que habilitar la API **Cloud Speech-to-Text** en el mismo proyecto de Google que
+usa Vertex AI y asegurarse de que el service account tenga permiso para usarla. No es necesario agregar
+otra credencial: se reutiliza `GCP_SA_JSON` / `credenciales/vertex-ai.json` y el mismo OAuth de
+`cloud-platform`.
+
+Variables opcionales:
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `STT_LOCATION` | `GCP_LOCATION` o `global` | Región de Speech-to-Text |
+| `STT_MODEL` | `latest_short` | Modelo para comandos cortos |
+
+- [ ] Habilitar **Cloud Speech-to-Text API** en Google Cloud.
+- [ ] Verificar que el service account pueda usar Speech-to-Text.
+- [ ] Desplegar y probar un audio **sin hablar**: debe terminar como `incompleto`, con 0 gastos/ingresos/deudas.
+- [ ] Probar una frase real: por ejemplo `gasté 50 bolivianos en comida` y confirmar que se registra una sola vez.
 
 ## 9. Google Drive (respaldos) — GRATIS · Fase 2
 - [ ] En Google Cloud crea un **service account** y habilita la **Google Drive API**.
