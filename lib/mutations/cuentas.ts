@@ -1,0 +1,35 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AccountType, Currency } from "@/lib/types";
+
+const ACCOUNT_TYPES: AccountType[] = ["banco", "efectivo", "stablecoin", "tarjeta_credito", "dpf", "por_cobrar", "otro"];
+const CURRENCIES: Currency[] = ["BOB", "USD", "USDT"];
+
+function validar(name: string, type: AccountType, currency: Currency) {
+  if (!name.trim()) throw new Error("El nombre es obligatorio.");
+  if (!ACCOUNT_TYPES.includes(type)) throw new Error("Tipo de cuenta inválido.");
+  if (!CURRENCIES.includes(currency)) throw new Error("Moneda inválida.");
+}
+
+export async function crearCuenta(supabase: SupabaseClient, campos: { name: string; type: AccountType; currency: Currency; is_liability: boolean }): Promise<string> {
+  validar(campos.name, campos.type, campos.currency);
+  const { data, error } = await supabase.from("accounts").insert({ name: campos.name.trim(), type: campos.type, currency: campos.currency, is_liability: campos.is_liability, active: true }).select("id").single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function actualizarCuenta(supabase: SupabaseClient, id: string, campos: { name?: string; type?: AccountType; currency?: Currency; is_liability?: boolean; active?: boolean }): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (campos.name !== undefined) { if (!campos.name.trim()) throw new Error("El nombre es obligatorio."); patch.name = campos.name.trim(); }
+  if (campos.type !== undefined) { if (!ACCOUNT_TYPES.includes(campos.type)) throw new Error("Tipo de cuenta inválido."); patch.type = campos.type; }
+  if (campos.currency !== undefined) { if (!CURRENCIES.includes(campos.currency)) throw new Error("Moneda inválida."); patch.currency = campos.currency; }
+  if (campos.is_liability !== undefined) patch.is_liability = campos.is_liability;
+  if (campos.active !== undefined) patch.active = campos.active;
+  if (!Object.keys(patch).length) return;
+  const { error } = await supabase.from("accounts").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function borrarCuenta(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("accounts").delete().eq("id", id);
+  if (error) throw error;
+}
