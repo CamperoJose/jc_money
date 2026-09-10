@@ -23,6 +23,6 @@ export async function ejecutarTipoCambioBCB(admin: SupabaseClient, opts?: { targ
   if (!userId) return { ok: false, reason: "No hay usuarios en la app." }; const cfg = await leerConfig(admin, userId);
   const r = await obtenerTipoCambioBCB(fetchImpl, { codIndicador: cfg.codIndicador, codMoneda: cfg.codMoneda, fechaISO: targetDate, namespace: cfg.namespace, paramNames: cfg.paramNames, soapAction: cfg.soapAction });
   const valor = r.valor as number;
-  const { error } = await admin.from("exchange_rates").upsert({ user_id: userId, rate_date: targetDate, cod_indicador: cfg.codIndicador, cod_moneda: cfg.codMoneda, moneda_desc: descripcionMoneda(cfg.codMoneda), valor: Math.round(valor * 100000) / 100000, source: "bcb", fetched_at: new Date().toISOString() }, { onConflict: "user_id,rate_date,cod_indicador,cod_moneda" });
+  const { error } = await admin.from("exchange_rates").upsert({ rate_date: targetDate, cod_indicador: cfg.codIndicador, cod_moneda: cfg.codMoneda, moneda_desc: descripcionMoneda(cfg.codMoneda), valor: Math.round(valor * 100000) / 100000, source: "bcb", fetched_at: new Date().toISOString() }, { onConflict: "rate_date,cod_indicador,cod_moneda" });
   if (error) throw error; return { ok: true, rate_date: targetDate, cod_indicador: cfg.codIndicador, cod_moneda: cfg.codMoneda, valor };
 }
