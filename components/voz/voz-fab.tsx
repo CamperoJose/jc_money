@@ -21,6 +21,10 @@ function elegirMime(): string {
   return "";
 }
 
+function normalizarMime(mime: string): string {
+  return mime.trim().toLowerCase().split(";")[0];
+}
+
 export function VozFab() {
   const router = useRouter();
   const avisos = useAvisos();
@@ -30,7 +34,7 @@ export function VozFab() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const mimeRef = useRef<string>("audio/webm");
+  const mimeRef = useRef<string>("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const okTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,16 +127,28 @@ export function VozFab() {
     if (idleRef.current) clearTimeout(idleRef.current);
     try {
       const stream = await obtenerStream();
-      const mime = elegirMime();
-      mimeRef.current = (mime || "audio/webm").split(";")[0];
-      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      const mimeSolicitado = elegirMime();
+      const rec = mimeSolicitado
+        ? new MediaRecorder(stream, { mimeType: mimeSolicitado })
+        : new MediaRecorder(stream);
+
+      // IMPORTANTE: el navegador puede elegir un formato distinto al solicitado.
+      // En iOS/Safari esto evita enviar audio/webm cuando realmente se grabó audio/mp4.
+      const mimeReal = normalizarMime(rec.mimeType || mimeSolicitado);
+      if (!mimeReal) {
+        throw new Error("El navegador no informó el formato real de la grabación.");
+      }
+
+      mimeRef.current = mimeReal;
       chunksRef.current = [];
       framesVozRef.current = 0;
       iniciarAnalisis(stream);
 
       rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeRef.current });
+        const mimeChunk = normalizarMime(chunksRef.current.find((c) => c.type)?.type ?? "");
+        const mimeFinal = mimeChunk || normalizarMime(rec.mimeType) || mimeRef.current;
+        const blob = new Blob(chunksRef.current, { type: mimeFinal });
         const huboVoz = !analisisDisponibleRef.current || framesVozRef.current >= FRAMES_VOZ_REQUERIDOS;
         detenerAnalisis();
         pararTimer();
@@ -144,6 +160,17 @@ export function VozFab() {
           setMensaje("No se detectó voz clara. No se envió ni registró ningún movimiento.");
           return;
         }
+        if (!blob.size) {
+          setEstado("error");
+          setMensaje("La grabación está vacía. No se envió ni registró ningún movimiento.");
+          return;
+        }
+        if (!mimeFinal) {
+          setEstado("error");
+          setMensaje("No se pudo identificar el formato del audio. No se registró ningún movimiento.");
+          return;
+        }
+        mimeRef.current = mimeFinal;
         void enviar(blob);
       };
       recorderRef.current = rec;
@@ -156,11 +183,11 @@ export function VozFab() {
           return s + 1;
         });
       }, 1000);
-    } catch {
+    } catch (e) {
       pararTimer();
       soltarMic();
       setEstado("error");
-      setMensaje("No se pudo acceder al micrófono. Revisa los permisos.");
+      setMensaje(e instanceof Error ? e.message : "No se pudo iniciar la grabación.");
     }
   }
 
