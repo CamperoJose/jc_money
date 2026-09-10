@@ -2,7 +2,6 @@ import { obtenerAccessToken } from "@/lib/gcp/token";
 import { cargarServiceAccount } from "@/lib/gcp/credenciales";
 import type { Currency } from "@/lib/types";
 import type { DeudaVoz, GastoVoz, IngresoVoz, ResultadoVoz } from "@/lib/voz/tipos";
-import { transcribirAudio } from "@/lib/voz/speech";
 
 export interface CuentaCatalogo {
   id: string;
@@ -10,6 +9,7 @@ export interface CuentaCatalogo {
   type: string;
   currency: string;
 }
+
 export interface CategoriaCatalogo {
   id: string;
   name: string;
@@ -21,6 +21,7 @@ const LOCATION = process.env.GCP_LOCATION?.trim() || "global";
 const REINTENTOS = 2;
 const ESPERAS_MS = [1500];
 const TIMEOUT_MS = 25_000;
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 function hostVertex(location: string): string {
   return location === "global"
@@ -32,29 +33,34 @@ function construirPrompt(
   cuentas: CuentaCatalogo[],
   categoriasGasto: CategoriaCatalogo[],
   categoriasIngreso: CategoriaCatalogo[],
-  hoy: string,
-  transcripcion: string
+  hoy: string
 ): string {
   const listaCuentas = cuentas
     .map((c) => `- id="${c.id}" | nombre="${c.name}" | tipo=${c.type} | moneda=${c.currency}`)
     .join("\n");
-  const listaCategoriasGasto = categoriasGasto.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
-  const listaCategoriasIngreso = categoriasIngreso.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
+  const listaCategoriasGasto = categoriasGasto
+    .map((c) => `- id="${c.id}" | nombre="${c.name}"`)
+    .join("\n");
+  const listaCategoriasIngreso = categoriasIngreso
+    .map((c) => `- id="${c.id}" | nombre="${c.name}"`)
+    .join("\n");
 
-  return `Eres un parser financiero estricto. La transcripción de abajo fue obtenida por un
-servicio independiente de reconocimiento de voz. NO tienes acceso al audio y NO debes imaginar
-lo que pudo haberse dicho.
+  return `Eres un parser financiero estricto para comandos de voz en español boliviano.
+
+PRIMERA REGLA — SEGURIDAD DEL AUDIO:
+Primero debes inspeccionar el AUDIO adjunto y decidir si contiene habla humana inteligible.
+- Si el audio está vacío, contiene solo silencio, ruido, está incompleto, es inaudible o NO puedes
+  identificar con claridad habla humana, responde con audio_con_habla=false, transcripcion="" y
+  TODOS los arrays vacíos.
+- NUNCA inventes, completes ni supongas palabras, números, nombres o movimientos financieros.
+- Un audio con silencio no es una orden financiera.
+- Si tienes cualquier duda razonable sobre lo que se dijo, no crees un movimiento.
+- Solo considera información realmente pronunciada en el audio.
 
 Fecha de hoy: ${hoy}.
 
-TRANSCRIPCIÓN VERIFICADA:
-"""
-${transcripcion}
-"""
-
 La persona puede dictar uno o varios GASTOS, INGRESOS y/o DEUDAS (dinero que OTROS le deben).
-Solo registra información que esté explícita o inequívocamente contenida en la transcripción.
-Si la transcripción no contiene una instrucción financiera, devuelve todos los arrays vacíos.
+Solo registra información explícita o inequívocamente pronunciada en el audio.
 
 Distingue:
 - GASTO: la persona pagó/compró/gastó algo. Ej: "gasté", "pagué", "compré", "me costó".
@@ -64,30 +70,27 @@ Distingue:
   "me debe", "quedó debiendo", "por cobrar".
 
 Para cada GASTO extrae:
-- descripcion: qué se compró/pagó (texto corto tomado de la transcripción).
-- monto: número explícitamente mencionado. Si NO se menciona un monto, usa null.
+- descripcion: qué se compró/pagó, usando únicamente palabras presentes en el audio.
+- monto: número explícitamente pronunciado. Si NO se entiende o no se menciona, usa null.
 - moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
-- cuenta_id: el id de la cuenta con la que se pagó, SOLO de CUENTAS por el nombre mencionado.
-  Si no se menciona o no hay coincidencia clara, usa null.
-- categoria_id: el id de una CATEGORÍA DE GASTO razonable. Si no hay coincidencia, usa null.
+- cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
+- categoria_id: SOLO un id de CATEGORÍAS DE GASTO razonable. Si no hay coincidencia, null.
 
 Para cada INGRESO extrae:
-- descripcion: origen del dinero (texto corto tomado de la transcripción).
-- monto: número explícitamente mencionado. Si NO se menciona un monto, usa null.
+- descripcion: origen del dinero, usando únicamente palabras presentes en el audio.
+- monto: número explícitamente pronunciado. Si NO se entiende o no se menciona, usa null.
 - moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
-- cuenta_id: el id de la cuenta DONDE SE RECIBIÓ el dinero, SOLO de CUENTAS por el nombre
-  mencionado. Si no se menciona o no hay coincidencia clara, usa null.
-- categoria_id: el id de una CATEGORÍA DE INGRESO razonable. Si no hay coincidencia, usa null.
-
-REGLA IMPORTANTE DE CUENTAS: las CUENTAS pertenecen exclusivamente al usuario actual. Solo puedes
-usar IDs de la lista proporcionada. Un nombre parecido no es suficiente si puede referirse a otra
-cuenta. Si hay varias coincidencias posibles, usa null.
+- cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
+- categoria_id: SOLO un id de CATEGORÍAS DE INGRESO razonable. Si no hay coincidencia, null.
 
 Para cada DEUDA extrae:
-- quien: nombre de quien debe, o null.
-- monto: número explícitamente mencionado, o null si no se dijo.
-- moneda: "BOB" por defecto.
-- motivo: motivo del préstamo, o null.
+- quien: nombre de quien debe, solo si se entiende claramente; si no, null.
+- monto: número explícitamente pronunciado; si no se dijo o no se entiende, null.
+- moneda: "BOB" por defecto, "USD" si dice dólares, "USDT" si dice USDT/tether.
+- motivo: motivo del préstamo solo si fue pronunciado claramente; si no, null.
+
+REGLA DE CUENTAS: las cuentas pertenecen exclusivamente al usuario actual. Solo puedes usar IDs
+presentes en la lista. No inventes IDs ni elijas una cuenta solo porque parece probable.
 
 CUENTAS disponibles del usuario actual:
 ${listaCuentas || "(ninguna)"}
@@ -98,24 +101,34 @@ ${listaCategoriasGasto || "(ninguna)"}
 CATEGORÍAS DE INGRESO disponibles del usuario actual:
 ${listaCategoriasIngreso || "(ninguna)"}
 
-Responde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:
-{"gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"ingresos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
-Si no hay gastos, ingresos o deudas, usa [] en el array correspondiente.
-No inventes montos, cuentas, categorías, personas ni movimientos.`;
+Devuelve ÚNICAMENTE JSON válido, sin markdown, con esta forma exacta:
+{"audio_con_habla":true,"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"ingresos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
+
+Si el audio no contiene habla humana clara, devuelve exactamente audio_con_habla=false,
+transcripcion="" y gastos=[], ingresos=[], deudas=[].
+No inventes montos, cuentas, categorías, personas, transcripciones ni movimientos.`;
 }
 
 interface VertexResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 }
 
-async function llamarVertex(prompt: string): Promise<string> {
+async function llamarVertex(prompt: string, audioBase64: string, mimeType: string): Promise<string> {
   const sa = cargarServiceAccount();
   const url =
     `${hostVertex(LOCATION)}/v1/projects/${sa.project_id}/locations/${LOCATION}` +
     `/publishers/google/models/${MODEL}:generateContent`;
 
   const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType, data: audioBase64 } },
+        ],
+      },
+    ],
     generationConfig: { temperature: 0, responseMimeType: "application/json" },
   };
 
@@ -174,7 +187,6 @@ function esperar(ms: number): Promise<void> {
 
 function parsear(
   textoModelo: string,
-  transcripcion: string,
   cuentas: CuentaCatalogo[],
   categoriasGasto: CategoriaCatalogo[],
   categoriasIngreso: CategoriaCatalogo[]
@@ -188,7 +200,22 @@ function parsear(
   } catch {
     throw new Error("No se pudo interpretar la respuesta del modelo.");
   }
-  const raw = obj as { gastos?: unknown; ingresos?: unknown; deudas?: unknown };
+
+  const raw = obj as {
+    audio_con_habla?: unknown;
+    transcripcion?: unknown;
+    gastos?: unknown;
+    ingresos?: unknown;
+    deudas?: unknown;
+  };
+  const audioConHabla = raw.audio_con_habla === true;
+  const transcripcion = textoONull(raw.transcripcion);
+
+  // Fallo cerrado: si Gemini no confirma habla humana y transcripción útil, no hay movimientos.
+  if (!audioConHabla || !transcripcion) {
+    return { gastos: [], ingresos: [], deudas: [], transcripcion: null };
+  }
+
   const idsCuenta = new Set(cuentas.map((c) => c.id));
   const idsCatGasto = new Set(categoriasGasto.map((c) => c.id));
   const idsCatIngreso = new Set(categoriasIngreso.map((c) => c.id));
@@ -215,10 +242,12 @@ function parsear(
 function moneda(v: unknown): Currency {
   return v === "USD" || v === "USDT" ? v : "BOB";
 }
+
 function numeroONull(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
+
 function textoONull(v: unknown): string | null {
   const t = typeof v === "string" ? v.trim() : "";
   return t.length ? t : null;
@@ -234,12 +263,6 @@ function tieneEvidenciaDeTipo(transcripcion: string, tipo: "gasto" | "ingreso" |
   return EVIDENCIA[tipo].test(transcripcion);
 }
 
-function transcripcionPareceFinanciera(transcripcion: string): boolean {
-  return /\d|boliv|d[oó]lar|usd|usdt|tether|gast|pagu|compr|recib|cobr|deposit|sueldo|salario|prest|debe|deuda|fi[eé]/i.test(
-    transcripcion
-  );
-}
-
 function quitarAcentos(texto: string): string {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -247,7 +270,9 @@ function quitarAcentos(texto: string): string {
 function montoApareceEnTranscripcion(monto: number | null, transcripcion: string): boolean {
   if (monto == null) return false;
   const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/[,]/g, ".");
-  const entero = Number.isInteger(monto) ? String(monto) : monto.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  const entero = Number.isInteger(monto)
+    ? String(monto)
+    : monto.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
   if (new RegExp(`(?:^|\\D)${escapeRegExp(entero)}(?:\\D|$)`).test(texto)) return true;
   if (Number.isInteger(monto)) {
     const palabras = numeroEnPalabras(monto);
@@ -306,22 +331,25 @@ function normalizarMovimiento(
   const cuenta = typeof r.cuenta_id === "string" && idsCuenta.has(r.cuenta_id) ? r.cuenta_id : null;
   const categoria = typeof r.categoria_id === "string" && idsCategoria.has(r.categoria_id) ? r.categoria_id : null;
 
-  // Defensa contra alucinaciones: el movimiento debe tener evidencia del tipo y
-  // el monto en la transcripción. Sin monto explícito, queda incompleto y proceso.ts
-  // lo descarta antes de insertar.
   if (!tieneEvidenciaDeTipo(transcripcion, tipo)) return null;
   if (monto != null && !montoApareceEnTranscripcion(monto, transcripcion)) return null;
+
   const monedaMovimiento = moneda(r.moneda);
   if (!monedaApareceEnTranscripcion(monedaMovimiento, transcripcion)) return null;
 
-  // Una cuenta solo puede asignarse si su nombre fue realmente mencionado.
   if (cuenta) {
     const cuentaCatalogo = cuentas.find((c) => c.id === cuenta);
     if (!cuentaCatalogo || !textoContieneFrase(transcripcion, cuentaCatalogo.name)) return null;
   }
 
   if (!descripcion && monto == null) return null;
-  return { descripcion, monto, moneda: monedaMovimiento, cuenta_id: cuenta, categoria_id: categoria };
+  return {
+    descripcion,
+    monto,
+    moneda: monedaMovimiento,
+    cuenta_id: cuenta,
+    categoria_id: categoria,
+  };
 }
 
 function textoContieneFrase(texto: string, frase: string): boolean {
@@ -336,18 +364,18 @@ function normalizarDeuda(d: unknown, transcripcion: string): DeudaVoz | null {
   const quien = textoONull(r.quien);
   const motivo = textoONull(r.motivo);
   const monto = numeroONull(r.monto);
+
   if (!tieneEvidenciaDeTipo(transcripcion, "deuda")) return null;
   if (monto != null && !montoApareceEnTranscripcion(monto, transcripcion)) return null;
+
   const monedaDeuda = moneda(r.moneda);
   if (!monedaApareceEnTranscripcion(monedaDeuda, transcripcion)) return null;
   if (!quien && !motivo && monto == null) return null;
+
   return { quien, monto, moneda: monedaDeuda, motivo };
 }
 
-/**
- * Transcribe primero con Speech-to-Text y solo después usa Gemini para estructurar
- * la transcripción. El audio nunca se entrega a Gemini directamente.
- */
+/** Interpreta el audio directamente con Gemini/Vertex AI. */
 export async function interpretarAudio(opts: {
   audioBase64: string;
   mimeType: string;
@@ -356,23 +384,27 @@ export async function interpretarAudio(opts: {
   categoriasIngreso: CategoriaCatalogo[];
   hoy: string;
 }): Promise<ResultadoVoz> {
-  void opts.mimeType;
-  const reconocimiento = await transcribirAudio({ audioBase64: opts.audioBase64 });
-  if (!reconocimiento) {
+  const audioBase64 = opts.audioBase64.replace(/^data:[^,]*,/, "").trim();
+  if (!audioBase64) {
     return { gastos: [], ingresos: [], deudas: [], transcripcion: null };
   }
 
-  if (!transcripcionPareceFinanciera(reconocimiento.texto)) {
-    return { gastos: [], ingresos: [], deudas: [], transcripcion: reconocimiento.texto };
+  if (!Number.isInteger(Math.floor((audioBase64.length * 3) / 4)) || Math.floor((audioBase64.length * 3) / 4) <= 0) {
+    return { gastos: [], ingresos: [], deudas: [], transcripcion: null };
   }
 
-  const prompt = construirPrompt(
-    opts.cuentas,
-    opts.categoriasGasto,
-    opts.categoriasIngreso,
-    opts.hoy,
-    reconocimiento.texto
-  );
-  const textoModelo = await llamarVertex(prompt);
-  return parsear(textoModelo, reconocimiento.texto, opts.cuentas, opts.categoriasGasto, opts.categoriasIngreso);
+  const audioBytes = Math.floor((audioBase64.length * 3) / 4);
+  if (audioBytes > MAX_AUDIO_BYTES) {
+    throw new Error("El audio supera el límite de 10 MB.");
+  }
+
+  const mimeType = opts.mimeType.trim().toLowerCase().split(";")[0];
+  const mimePermitidos = new Set(["audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg", "audio/wav"]);
+  if (!mimePermitidos.has(mimeType)) {
+    throw new Error("Formato de audio no soportado.");
+  }
+
+  const prompt = construirPrompt(opts.cuentas, opts.categoriasGasto, opts.categoriasIngreso, opts.hoy);
+  const textoModelo = await llamarVertex(prompt, audioBase64, mimeType);
+  return parsear(textoModelo, opts.cuentas, opts.categoriasGasto, opts.categoriasIngreso);
 }
