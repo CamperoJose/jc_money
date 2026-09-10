@@ -1,28 +1,31 @@
 -- =============================================================================
 -- MyMoney Web — Multiusuario: cuentas administrables por cada usuario
---
--- Las cuentas ya pertenecen a user_id. Esta migración agrega una clave interna
--- opcional para cuentas derivadas que no deben depender de su nombre visible.
 -- NO borra ni recrea cuentas, balances, transacciones ni histórico existente.
+-- Los usuarios nuevos registran sus propias cuentas desde Parámetros.
 -- =============================================================================
 
-alter table accounts
-  add column if not exists system_key text;
+alter table accounts add column if not exists system_key text;
 
 create unique index if not exists ux_accounts_user_system_key
   on accounts(user_id, system_key)
   where system_key is not null;
 
--- Conserva la cuenta histórica "Activos" como cuenta derivada especial.
--- Solo se marca la cuenta existente; no se crea una cuenta nueva.
+-- Conserva el mismo id de la cuenta histórica Activos y evita que el cálculo
+-- patrimonial dependa únicamente de su nombre visible.
 update accounts
 set system_key = 'assets'
-where system_key is null
-  and name = 'Activos';
-
--- Las cuentas DPF y Por Cobrar siguen identificándose por su type actual.
--- No se les asigna system_key para evitar conflictos si algún usuario ya tiene
--- más de una cuenta de esos tipos.
+where system_key is null and name = 'Activos';
 
 comment on column accounts.system_key is
   'Clave interna opcional para cuentas derivadas. No depende del nombre visible.';
+
+-- Los usuarios existentes conservan toda su información y reciben su correo
+-- autenticado como destinatario inicial. No se pisa una configuración existente.
+insert into app_settings(user_id, key, value)
+select u.id, 'email_destino', u.email
+from auth.users u
+where u.email is not null
+  and not exists (
+    select 1 from app_settings s
+    where s.user_id = u.id and s.key = 'email_destino'
+  );
