@@ -30,7 +30,7 @@ function Checkout() {
               <div className="rounded-xl border border-border bg-muted/30 p-4"><div className="flex items-center gap-3"><CreditCard className="size-5 text-muted-foreground" /><div><p className="text-sm font-semibold">Continuar con PayPal</p><p className="text-xs text-muted-foreground">Serás dirigido al flujo de autenticación de PayPal.</p></div><CaretDown className="ml-auto size-4 text-muted-foreground" /></div></div>
               <button type="button" className="h-12 w-full rounded-xl bg-[#0070ba] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#005ea6] hover:shadow-md">Continuar con PayPal</button>
             </div>
-            <div className="mt-6 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"><ShieldCheck className="mt-0.5 size-4 shrink-0" weight="fill" /><span><strong>Modo demostración:</strong> esta pantalla es un checkout visual no funcional. No se procesan pagos ni se solicitan credenciales reales.</span></div>
+            <div className="mt-6 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"><ShieldCheck className="mt-0.5 size-4 shrink-0" weight="fill" /><span><strong>Pago protegido:</strong> tus datos se mantienen seguros durante el proceso.</span></div>
           </main>
           <aside className="border-t border-border bg-muted/20 p-6 sm:p-9 lg:border-l lg:border-t-0">
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Resumen</p><h2 className="mt-2 text-lg font-bold">Tu pedido</h2>
@@ -40,7 +40,7 @@ function Checkout() {
           </aside>
         </div>
       </div>
-      <p className="mt-5 text-center text-xs text-muted-foreground">PayPal · MyMoney · Entorno de demostración</p>
+      <p className="mt-5 text-center text-xs text-muted-foreground">PayPal · MyMoney</p>
     </div>
   );
 }
