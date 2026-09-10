@@ -19,6 +19,13 @@ export default async function TrackingLayout({ children }: { children: React.Rea
     mostrarOferta = setting?.value !== "true";
   }
 
+  const metadata = user?.user_metadata as Record<string, unknown> | undefined;
+  const nombreUsuario = typeof metadata?.full_name === "string"
+    ? metadata.full_name.trim()
+    : typeof metadata?.name === "string"
+      ? metadata.name.trim()
+      : user?.email?.split("@")[0] || "Princesa";
+
   return (
     <ProveedorAvisos>
       <div className="relative min-h-dvh bg-background lg:flex">
@@ -28,7 +35,7 @@ export default async function TrackingLayout({ children }: { children: React.Rea
           <main id="contenido" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:py-10 lg:pb-[calc(2rem+env(safe-area-inset-bottom))]">{children}</main>
         </div>
         <VozFab />
-        {mostrarOferta && <ProWelcome />}
+        {mostrarOferta && <ProWelcome nombre={nombreUsuario} />}
       </div>
     </ProveedorAvisos>
   );
