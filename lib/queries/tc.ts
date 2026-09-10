@@ -5,26 +5,54 @@ const CAMPOS = "id, rate_date, cod_indicador, cod_moneda, moneda_desc, valor, so
 const DEFAULT_CONFIG: TcConfig = { cod_indicador: 1, cod_moneda: 12 };
 
 function aRate(r: Record<string, unknown>): ExchangeRate {
-  return { id: r.id as string, rate_date: r.rate_date as string, cod_indicador: Number(r.cod_indicador), cod_moneda: Number(r.cod_moneda), moneda_desc: (r.moneda_desc as string) ?? null, valor: Number(r.valor), source: (r.source as string) ?? "bcb", fetched_at: r.fetched_at as string };
+  return {
+    id: r.id as string,
+    rate_date: r.rate_date as string,
+    cod_indicador: Number(r.cod_indicador),
+    cod_moneda: Number(r.cod_moneda),
+    moneda_desc: (r.moneda_desc as string) ?? null,
+    valor: Number(r.valor),
+    source: (r.source as string) ?? "bcb",
+    fetched_at: r.fetched_at as string,
+  };
 }
 
-export async function getTcConfig(supabase: SupabaseClient): Promise<TcConfig> {
-  const { data, error } = await supabase.from("app_settings").select("key, value").in("key", ["tc_cod_indicador", "tc_cod_moneda"]);
+export async function getTcConfig(supabase: SupabaseClient, userId?: string): Promise<TcConfig> {
+  let q = supabase.from("app_settings").select("key, value").in("key", ["tc_cod_indicador", "tc_cod_moneda"]);
+  if (userId) q = q.eq("user_id", userId);
+  const { data, error } = await q;
   if (error) throw error;
   const map = new Map((data ?? []).map((r) => [r.key as string, r.value as string]));
-  return { cod_indicador: Number(map.get("tc_cod_indicador") ?? DEFAULT_CONFIG.cod_indicador), cod_moneda: Number(map.get("tc_cod_moneda") ?? DEFAULT_CONFIG.cod_moneda) };
+  return {
+    cod_indicador: Number(map.get("tc_cod_indicador") ?? DEFAULT_CONFIG.cod_indicador),
+    cod_moneda: Number(map.get("tc_cod_moneda") ?? DEFAULT_CONFIG.cod_moneda),
+  };
 }
 
-export async function getExchangeRates(supabase: SupabaseClient, codMoneda?: number): Promise<ExchangeRate[]> {
+export async function getExchangeRates(supabase: SupabaseClient, codMoneda?: number, userId?: string): Promise<ExchangeRate[]> {
   let q = supabase.from("exchange_rates").select(CAMPOS).order("rate_date", { ascending: false });
   if (codMoneda != null) q = q.eq("cod_moneda", codMoneda);
+  if (userId) q = q.eq("user_id", userId);
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []).map((r) => aRate(r as Record<string, unknown>));
 }
 
-export async function getUltimoTc(supabase: SupabaseClient, date: string, codMoneda: number): Promise<ExchangeRate | null> {
-  const { data, error } = await supabase.from("exchange_rates").select(CAMPOS).eq("cod_moneda", codMoneda).lte("rate_date", date).order("rate_date", { ascending: false }).limit(1);
+export async function getUltimoTc(
+  supabase: SupabaseClient,
+  date: string,
+  codMoneda: number,
+  userId?: string
+): Promise<ExchangeRate | null> {
+  let q = supabase
+    .from("exchange_rates")
+    .select(CAMPOS)
+    .eq("cod_moneda", codMoneda)
+    .lte("rate_date", date)
+    .order("rate_date", { ascending: false })
+    .limit(1);
+  if (userId) q = q.eq("user_id", userId);
+  const { data, error } = await q;
   if (error) throw error;
   const row = data?.[0];
   return row ? aRate(row as Record<string, unknown>) : null;
