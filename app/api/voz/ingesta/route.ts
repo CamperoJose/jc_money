@@ -10,6 +10,15 @@ export const maxDuration = 60;
 
 const MAX_BASE64 = 12_000_000;
 
+function normalizarMime(mimeType: string): string {
+  const mime = mimeType.trim().toLowerCase().split(";")[0];
+  const aliases: Record<string, string> = {
+    "audio/x-m4a": "audio/mp4",
+    "audio/m4a": "audio/mp4",
+  };
+  return aliases[mime] ?? mime;
+}
+
 export async function POST(request: Request) {
   let payload: { audioBase64?: string; mimeType?: string; origen?: string; token?: string };
   try {
@@ -19,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   const audioBase64 = (payload.audioBase64 ?? "").replace(/^data:[^,]*,/, "").replace(/\s+/g, "");
-  const mimeType = payload.mimeType || "audio/webm";
+  const mimeType = normalizarMime(payload.mimeType || "audio/webm");
   if (!audioBase64) return NextResponse.json({ error: "Falta el audio." }, { status: 400 });
   if (audioBase64.length > MAX_BASE64) return NextResponse.json({ error: "El audio es demasiado largo." }, { status: 413 });
 
