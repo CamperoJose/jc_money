@@ -68,15 +68,111 @@ interface Resultado {
   correoOk: boolean;
 }
 
+const PALABRAS_NUMERO: Record<string, number> = {
+  cero: 0, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9,
+  diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, dieciséis: 16,
+  diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20, veintiuno: 21, veintidos: 22, veintidós: 22,
+  veintitres: 23, veintitrés: 23, veinticuatro: 24, veinticinco: 25, veintiseis: 26, veintiséis: 26,
+  veintisiete: 27, veintiocho: 28, veintinueve: 29, treinta: 30, cuarenta: 40, cincuenta: 50,
+  sesenta: 60, setenta: 70, ochenta: 80, noventa: 90, cien: 100, ciento: 100, doscientos: 200,
+  trescientos: 300, cuatrocientos: 400, quinientos: 500, seiscientos: 600, setecientos: 700,
+  ochocientos: 800, novecientos: 900,
+};
+
+function normalizarTexto(texto: string): string {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function extraerMontoExplicito(texto: string): number | null {
+  const normal = normalizarTexto(texto);
+  const digitos = normal.match(/(?:^|\s)(\d+(?:[.,]\d{1,2})?)(?:\s|$)/);
+  if (digitos) {
+    const monto = Number(digitos[1].replace(",", "."));
+    if (Number.isFinite(monto) && monto > 0) return Math.round(monto * 100) / 100;
+  }
+
+  const palabras = Object.keys(PALABRAS_NUMERO).sort((a, b) => b.length - a.length);
+  for (const palabra of palabras) {
+    const re = new RegExp(`(?:^|\\s)${palabra}(?:\\s|$)`);
+    if (re.test(normal)) {
+      const base = PALABRAS_NUMERO[palabra];
+      const matchCompuesto = normal.match(new RegExp(`(?:^|\\s)${palabra}\\s+y\\s+(uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)(?:\\s|$)`));
+      if (matchCompuesto) return base + PALABRAS_NUMERO[matchCompuesto[1]];
+      return base;
+    }
+  }
+  return null;
+}
+
+function contieneTipo(texto: string, tipo: "gasto" | "ingreso" | "deuda"): boolean {
+  const normal = normalizarTexto(texto);
+  if (tipo === "gasto") return /\b(gasto|gaste|gastar|pague|pagar|compre|comprar|costo|coste|consumi|adquiri)\b/.test(normal);
+  if (tipo === "ingreso") return /\b(ingreso|ingrese|recibi|recibir|pagaron|cobre|cobrar|depositaron|deposito|sueldo|salario)\b/.test(normal);
+  return /\b(preste|prestar|fie|fio|debe|deben|deuda|debiendo|cobrar|prestado)\b/.test(normal);
+}
+
+function encontrarCuenta(transcripcion: string, cuentas: Catalogos["cuentas"]): string | null {
+  const normal = normalizarTexto(transcripcion);
+  const cuenta = cuentas.find((c) => normal.includes(normalizarTexto(c.name)));
+  return cuenta?.id ?? null;
+}
+
+function extraerDescripcionGasto(transcripcion: string, cuentas: Catalogos["cuentas"]): string {
+  const normal = transcripcion.replace(/\s+/g, " ").trim();
+  const por = normal.match(/\bpor\s+(.+)$/i);
+  if (por?.[1]) return por[1].trim();
+  const bolivianos = normal.match(/\b(?:bolivianos?|bs\.?|bols?)\b\s+(.+)$/i);
+  if (bolivianos?.[1]) {
+    let descripcion = bolivianos[1].trim();
+    for (const cuenta of cuentas) {
+      const re = new RegExp(`\\b(?:del|de la|de)\\s+${escapeRegExp(cuenta.name)}\\b`, "i");
+      descripcion = descripcion.replace(re, " ");
+    }
+    return descripcion.replace(/\s+/g, " ").trim();
+  }
+  return normal;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Recuperación conservadora: Gemini puede transcribir correctamente el audio pero,
+ * ocasionalmente, devolver los arrays financieros vacíos. En ese caso solo recuperamos
+ * un gasto si la propia transcripción contiene una orden de gasto y un monto explícito.
+ * Nunca inventamos un monto ni una cuenta.
+ */
+function recuperarGastoDesdeTranscripcion(
+  parsed: Awaited<ReturnType<typeof interpretarAudio>>,
+  cat: Catalogos
+): Awaited<ReturnType<typeof interpretarAudio>> {
+  if (parsed.gastos.length || parsed.ingresos.length || parsed.deudas.length || !parsed.transcripcion) return parsed;
+  const transcripcion = parsed.transcripcion;
+  if (!contieneTipo(transcripcion, "gasto")) return parsed;
+
+  const monto = extraerMontoExplicito(transcripcion);
+  if (monto == null) return parsed;
+
+  const cuenta_id = encontrarCuenta(transcripcion, cat.cuentas);
+  const descripcion = extraerDescripcionGasto(transcripcion, cat.cuentas);
+  if (!descripcion) return parsed;
+
+  return {
+    ...parsed,
+    gastos: [{ descripcion, monto, moneda: "BOB", cuenta_id, categoria_id: null }],
+  };
+}
+
 export async function procesarSolicitudVoz(admin: SupabaseClient, opts: { userId: string; audioBase64: string; mimeType: string }): Promise<Resultado> {
   const { userId } = opts;
   const fechaHora = ahoraBolivia();
   const correoDestino = await obtenerCorreoDestino(admin, userId).catch(() => null);
 
   try {
-    // SELECT justo antes del prompt: Gemini solo recibe los catálogos activos del usuario.
     const cat = await cargarCatalogos(admin, userId);
-    const parsed = await interpretarAudio({ audioBase64: opts.audioBase64, mimeType: opts.mimeType, hoy: fechaBoliviaHoy(), cuentas: cat.cuentas, categoriasGasto: cat.categoriasGasto, categoriasIngreso: cat.categoriasIngreso });
+    let parsed = await interpretarAudio({ audioBase64: opts.audioBase64, mimeType: opts.mimeType, hoy: fechaBoliviaHoy(), cuentas: cat.cuentas, categoriasGasto: cat.categoriasGasto, categoriasIngreso: cat.categoriasIngreso });
+    parsed = recuperarGastoDesdeTranscripcion(parsed, cat);
 
     let rateExt: number | null = null;
     if ([...parsed.gastos, ...parsed.ingresos].some((m) => m.moneda !== "BOB")) {
