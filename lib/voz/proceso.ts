@@ -9,10 +9,12 @@ import { htmlReciboVozCompleto, type IngresoRecibo } from "@/lib/emails/recibo-v
 import { interpretarAudio } from "@/lib/voz/gemini";
 
 async function enviarConLimite(opts: { subject: string; html: string; text?: string; to?: string | null }): Promise<boolean> {
-  if (!opts.to) return false;
+  const to = opts.to?.trim();
+  if (!to) return false;
+  const correo = { subject: opts.subject, html: opts.html, text: opts.text, to };
   try {
     await Promise.race([
-      enviarCorreo(opts),
+      enviarCorreo(correo),
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout correo")), 12_000)),
     ]);
     return true;
@@ -22,14 +24,7 @@ async function enviarConLimite(opts: { subject: string; html: string; text?: str
 }
 
 function ahoraBolivia(): string {
-  return new Intl.DateTimeFormat("es-BO", {
-    timeZone: "America/La_Paz",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
+  return new Intl.DateTimeFormat("es-BO", { timeZone: "America/La_Paz", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date());
 }
 
 interface Catalogos {
@@ -47,31 +42,16 @@ async function cargarCatalogos(admin: SupabaseClient, userId: string): Promise<C
   ]);
   if (cuentasRes.error) throw cuentasRes.error;
   if (categoriasRes.error) throw categoriasRes.error;
-
   const cuentas = (cuentasRes.data ?? []) as Catalogos["cuentas"];
   const categorias = (categoriasRes.data ?? []) as Array<{ id: string; name: string; kind: string }>;
   const categoriasGasto = categorias.filter((c) => c.kind === "gasto").map(({ id, name }) => ({ id, name }));
   const categoriasIngreso = categorias.filter((c) => c.kind === "ingreso").map(({ id, name }) => ({ id, name }));
-  const categoriaNombre = new Map(categorias.map((c) => [c.id, c.name]));
-
-  return {
-    cuentas,
-    cuentaNombre: new Map(cuentas.map((c) => [c.id, c.name])),
-    categoriasGasto,
-    categoriasIngreso,
-    categoriaNombre,
-  };
+  return { cuentas, cuentaNombre: new Map(cuentas.map((c) => [c.id, c.name])), categoriasGasto, categoriasIngreso, categoriaNombre: new Map(categorias.map((c) => [c.id, c.name])) };
 }
 
 async function obtenerCorreoDestino(admin: SupabaseClient, userId: string): Promise<string | null> {
-  const { data: setting, error } = await admin
-    .from("app_settings")
-    .select("value")
-    .eq("user_id", userId)
-    .eq("key", "email_destino")
-    .maybeSingle();
+  const { data: setting, error } = await admin.from("app_settings").select("value").eq("user_id", userId).eq("key", "email_destino").maybeSingle();
   if (!error && setting?.value) return String(setting.value).trim() || null;
-
   const { data } = await admin.auth.admin.getUserById(userId);
   return data.user?.email?.trim() || null;
 }
@@ -88,27 +68,15 @@ interface Resultado {
   correoOk: boolean;
 }
 
-export async function procesarSolicitudVoz(
-  admin: SupabaseClient,
-  opts: { userId: string; audioBase64: string; mimeType: string }
-): Promise<Resultado> {
+export async function procesarSolicitudVoz(admin: SupabaseClient, opts: { userId: string; audioBase64: string; mimeType: string }): Promise<Resultado> {
   const { userId } = opts;
   const fechaHora = ahoraBolivia();
   const correoDestino = await obtenerCorreoDestino(admin, userId).catch(() => null);
 
   try {
-    // Este SELECT es deliberadamente justo antes del prompt: Gemini recibe solo
-    // cuentas y categorías activas del usuario autenticado. Nunca se usa un
-    // catálogo global ni una cuenta histórica de otro usuario.
+    // SELECT justo antes del prompt: Gemini solo recibe los catálogos activos del usuario.
     const cat = await cargarCatalogos(admin, userId);
-    const parsed = await interpretarAudio({
-      audioBase64: opts.audioBase64,
-      mimeType: opts.mimeType,
-      hoy: fechaBoliviaHoy(),
-      cuentas: cat.cuentas,
-      categoriasGasto: cat.categoriasGasto,
-      categoriasIngreso: cat.categoriasIngreso,
-    });
+    const parsed = await interpretarAudio({ audioBase64: opts.audioBase64, mimeType: opts.mimeType, hoy: fechaBoliviaHoy(), cuentas: cat.cuentas, categoriasGasto: cat.categoriasGasto, categoriasIngreso: cat.categoriasIngreso });
 
     let rateExt: number | null = null;
     if ([...parsed.gastos, ...parsed.ingresos].some((m) => m.moneda !== "BOB")) {
@@ -116,9 +84,7 @@ export async function procesarSolicitudVoz(
         const cfg = await getTcConfig(admin, userId);
         const row = await getUltimoTc(admin, fechaBoliviaHoy(), cfg.cod_moneda, userId);
         rateExt = row?.valor ?? null;
-      } catch {
-        rateExt = null;
-      }
+      } catch { rateExt = null; }
     }
 
     const registradosGasto: Array<{ descripcion: string; monto: number; moneda: string; cuenta: string | null; categoria: string | null }> = [];
@@ -128,152 +94,42 @@ export async function procesarSolicitudVoz(
 
     for (const g of parsed.gastos) {
       const etiqueta = g.descripcion || "gasto";
-      if (g.monto == null || !(g.monto > 0)) {
-        incompletos.push(`Gasto “${etiqueta}”: falta el monto.`);
-        continue;
-      }
-      if (g.moneda !== "BOB" && !(rateExt && rateExt > 0)) {
-        incompletos.push(`Gasto “${etiqueta}”: falta el tipo de cambio para ${g.moneda}.`);
-        continue;
-      }
-      await crearTransaccion(admin, {
-        occurred_at: new Date().toISOString(),
-        type: "gasto",
-        amount: g.monto,
-        currency: g.moneda,
-        exchange_rate: g.moneda === "BOB" ? null : rateExt,
-        account_id: g.cuenta_id,
-        category_id: g.categoria_id,
-        description: g.descripcion || null,
-        source: "voz",
-      }, userId);
-      registradosGasto.push({
-        descripcion: g.descripcion || "Gasto",
-        monto: g.monto,
-        moneda: g.moneda,
-        cuenta: g.cuenta_id ? cat.cuentaNombre.get(g.cuenta_id) ?? null : null,
-        categoria: g.categoria_id ? cat.categoriaNombre.get(g.categoria_id) ?? null : null,
-      });
+      if (g.monto == null || !(g.monto > 0)) { incompletos.push(`Gasto “${etiqueta}”: falta el monto.`); continue; }
+      if (g.moneda !== "BOB" && !(rateExt && rateExt > 0)) { incompletos.push(`Gasto “${etiqueta}”: falta el tipo de cambio para ${g.moneda}.`); continue; }
+      await crearTransaccion(admin, { occurred_at: new Date().toISOString(), type: "gasto", amount: g.monto, currency: g.moneda, exchange_rate: g.moneda === "BOB" ? null : rateExt, account_id: g.cuenta_id, category_id: g.categoria_id, description: g.descripcion || null, source: "voz" }, userId);
+      registradosGasto.push({ descripcion: g.descripcion || "Gasto", monto: g.monto, moneda: g.moneda, cuenta: g.cuenta_id ? cat.cuentaNombre.get(g.cuenta_id) ?? null : null, categoria: g.categoria_id ? cat.categoriaNombre.get(g.categoria_id) ?? null : null });
     }
 
     for (const i of parsed.ingresos) {
       const etiqueta = i.descripcion || "ingreso";
-      if (i.monto == null || !(i.monto > 0)) {
-        incompletos.push(`Ingreso “${etiqueta}”: falta el monto.`);
-        continue;
-      }
-      if (i.moneda !== "BOB" && !(rateExt && rateExt > 0)) {
-        incompletos.push(`Ingreso “${etiqueta}”: falta el tipo de cambio para ${i.moneda}.`);
-        continue;
-      }
-      await crearTransaccion(admin, {
-        occurred_at: new Date().toISOString(),
-        type: "ingreso",
-        amount: i.monto,
-        currency: i.moneda,
-        exchange_rate: i.moneda === "BOB" ? null : rateExt,
-        account_id: i.cuenta_id,
-        category_id: i.categoria_id,
-        description: i.descripcion || null,
-        source: "voz",
-      }, userId);
-      registradosIngreso.push({
-        descripcion: i.descripcion || "Ingreso",
-        monto: i.monto,
-        moneda: i.moneda,
-        cuenta: i.cuenta_id ? cat.cuentaNombre.get(i.cuenta_id) ?? null : null,
-        categoria: i.categoria_id ? cat.categoriaNombre.get(i.categoria_id) ?? null : null,
-      });
+      if (i.monto == null || !(i.monto > 0)) { incompletos.push(`Ingreso “${etiqueta}”: falta el monto.`); continue; }
+      if (i.moneda !== "BOB" && !(rateExt && rateExt > 0)) { incompletos.push(`Ingreso “${etiqueta}”: falta el tipo de cambio para ${i.moneda}.`); continue; }
+      await crearTransaccion(admin, { occurred_at: new Date().toISOString(), type: "ingreso", amount: i.monto, currency: i.moneda, exchange_rate: i.moneda === "BOB" ? null : rateExt, account_id: i.cuenta_id, category_id: i.categoria_id, description: i.descripcion || null, source: "voz" }, userId);
+      registradosIngreso.push({ descripcion: i.descripcion || "Ingreso", monto: i.monto, moneda: i.moneda, cuenta: i.cuenta_id ? cat.cuentaNombre.get(i.cuenta_id) ?? null : null, categoria: i.categoria_id ? cat.categoriaNombre.get(i.categoria_id) ?? null : null });
     }
 
     for (const d of parsed.deudas) {
       const quien = d.quien || "alguien";
-      if (d.monto == null || !(d.monto > 0)) {
-        incompletos.push(`Deuda de ${quien}: falta el monto.`);
-        continue;
-      }
-      await crearDeuda(admin, {
-        debt_date: fechaBoliviaHoy(),
-        amount: d.monto,
-        paid_amount: 0,
-        reason: d.motivo,
-        counterparty: d.quien,
-        status: "pendiente",
-      }, userId);
+      if (d.monto == null || !(d.monto > 0)) { incompletos.push(`Deuda de ${quien}: falta el monto.`); continue; }
+      await crearDeuda(admin, { debt_date: fechaBoliviaHoy(), amount: d.monto, paid_amount: 0, reason: d.motivo, counterparty: d.quien, status: "pendiente" }, userId);
       registradosDeuda.push({ quien: d.quien, monto: d.monto, motivo: d.motivo });
     }
 
-    const nGastos = registradosGasto.length;
-    const nIngresos = registradosIngreso.length;
-    const nDeudas = registradosDeuda.length;
-    const totalReg = nGastos + nIngresos + nDeudas;
-
-    let status: Resultado["status"];
-    if (totalReg > 0 && incompletos.length === 0) status = "completado";
-    else if (totalReg > 0) status = "parcial";
-    else status = "incompleto";
-
+    const nGastos = registradosGasto.length, nIngresos = registradosIngreso.length, nDeudas = registradosDeuda.length, totalReg = nGastos + nIngresos + nDeudas;
+    const status: Resultado["status"] = totalReg > 0 ? incompletos.length ? "parcial" : "completado" : "incompleto";
     let correoOk = false;
-    if (totalReg > 0) {
-      correoOk = await enviarConLimite({
-        ...htmlReciboVozCompleto({
-          fechaHora,
-          transcripcion: parsed.transcripcion,
-          gastos: registradosGasto,
-          ingresos: registradosIngreso,
-          deudas: registradosDeuda,
-          incompletos,
-        }),
-        to: correoDestino,
-      });
-    } else {
-      correoOk = await enviarConLimite({
-        ...htmlAlertaVoz({
-          fechaHora,
-          transcripcion: parsed.transcripcion,
-          motivos: incompletos.length ? incompletos : ["No se detectó ningún gasto, ingreso ni deuda en el audio."],
-        }),
-        to: correoDestino,
-      });
-    }
+    if (totalReg > 0) correoOk = await enviarConLimite({ ...htmlReciboVozCompleto({ fechaHora, transcripcion: parsed.transcripcion, gastos: registradosGasto, ingresos: registradosIngreso, deudas: registradosDeuda, incompletos }), to: correoDestino });
+    else correoOk = await enviarConLimite({ ...htmlAlertaVoz({ fechaHora, transcripcion: parsed.transcripcion, motivos: incompletos.length ? incompletos : ["No se detectó ningún gasto, ingreso ni deuda en el audio."] }), to: correoDestino });
 
     const resumenPartes: string[] = [];
     if (nGastos) resumenPartes.push(`${nGastos} gasto${nGastos > 1 ? "s" : ""}`);
     if (nIngresos) resumenPartes.push(`${nIngresos} ingreso${nIngresos > 1 ? "s" : ""}`);
     if (nDeudas) resumenPartes.push(`${nDeudas} deuda${nDeudas > 1 ? "s" : ""}`);
     if (incompletos.length) resumenPartes.push(`${incompletos.length} sin registrar`);
-
-    return {
-      status,
-      nGastos,
-      nIngresos,
-      nDeudas,
-      resumen: resumenPartes.join(", ") || "Sin datos",
-      transcripcion: parsed.transcripcion,
-      detalle: { gastos: registradosGasto, ingresos: registradosIngreso, deudas: registradosDeuda, incompletos },
-      error: incompletos.length ? incompletos.join(" ") : null,
-      correoOk,
-    };
+    return { status, nGastos, nIngresos, nDeudas, resumen: resumenPartes.join(", ") || "Sin datos", transcripcion: parsed.transcripcion, detalle: { gastos: registradosGasto, ingresos: registradosIngreso, deudas: registradosDeuda, incompletos }, error: incompletos.length ? incompletos.join(" ") : null, correoOk };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al procesar el audio.";
-    const correoOk = await enviarConLimite({
-      ...htmlAlertaVoz({
-        fechaHora,
-        transcripcion: null,
-        motivos: [`Ocurrió un error al procesar el audio: ${msg}`],
-      }),
-      to: correoDestino,
-    });
-    return {
-      status: "error",
-      nGastos: 0,
-      nIngresos: 0,
-      nDeudas: 0,
-      resumen: "Error",
-      transcripcion: null,
-      detalle: null,
-      error: msg,
-      correoOk,
-    };
+    const correoOk = await enviarConLimite({ ...htmlAlertaVoz({ fechaHora, transcripcion: null, motivos: [`Ocurrió un error al procesar el audio: ${msg}`] }), to: correoDestino });
+    return { status: "error", nGastos: 0, nIngresos: 0, nDeudas: 0, resumen: "Error", transcripcion: null, detalle: null, error: msg, correoOk };
   }
 }
