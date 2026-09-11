@@ -6,9 +6,6 @@ import type { DeudaVoz, GastoVoz, IngresoVoz, ResultadoVoz } from "@/lib/voz/tip
 export interface CuentaCatalogo { id: string; name: string; type: string; currency: string; }
 export interface CategoriaCatalogo { id: string; name: string; }
 
-// 3.1 Flash-Lite ofrece mejor capacidad que 2.5 Flash-Lite y actualmente
-// tiene menor coste de entrada de audio. Mantenemos una salida JSON pequeña
-// para que el coste total siga siendo bajo.
 const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
 const LOCATION = process.env.GCP_LOCATION?.trim() || "global";
 const REINTENTOS = 2;
@@ -51,6 +48,22 @@ REGLA CRÍTICA — MÚLTIPLES MOVIMIENTOS:
 - También puedes devolver varios ingresos y/o deudas si aparecen varios movimientos de esos tipos.
 - Un solo audio puede mezclar gastos, ingresos y deudas; clasifica cada movimiento por separado.
 
+REGLA CRÍTICA — DECIMALES Y CENTAVOS:
+Los montos pueden tener bolivianos y centavos. NUNCA redondees un monto que incluya centavos.
+- "3 punto 50" => 3.50
+- "3 punto cinco" => 3.50
+- "3 coma 50" => 3.50
+- "3 coma cinco" => 3.50
+- "3 con 50 centavos" => 3.50
+- "3 bolivianos con 50 centavos" => 3.50
+- "3 50" o "3 con 50" cuando se está dictando un precio => 3.50, NO 350.
+- "10 punto 25" => 10.25
+- "10 coma 25" => 10.25
+- Si se pronuncian explícitamente centavos, los dos dígitos siguientes representan centavos, incluso si son "05".
+- Diferencia entre "350" y "3 50": "350" es trescientos cincuenta; "3 50" en contexto de precio es tres bolivianos con cincuenta centavos.
+- Conserva siempre hasta 2 decimales en monto cuando corresponda. No conviertas 3.50 en 3.
+- El campo monto debe ser un NÚMERO JSON, por ejemplo 3.5 o 3.50, nunca una cadena.
+
 Distingue:
 - GASTO: la persona pagó/compró/gastó algo. Ej: "gasté", "pagué", "compré", "me costó".
 - INGRESO: la persona recibió dinero. Ej: "recibí", "me pagaron", "cobré", "me depositaron", "recibí mi sueldo".
@@ -64,32 +77,28 @@ Para cada INGRESO, compara semánticamente el origen o concepto del dinero contr
 IMPORTANTE SOBRE CATEGORÍAS:
 - Si existe al menos una categoría disponible del tipo correspondiente, intenta seleccionar SIEMPRE la mejor categoría existente.
 - NO necesitas encontrar coincidencia literal entre las palabras del audio y el nombre de la categoría.
-- Usa significado y contexto. Por ejemplo, "hamburguesa", "almuerzo", "café" o "pan" pueden corresponder a una categoría llamada "Alimentación".
-- "Netflix" o "Spotify" pueden corresponder a una categoría llamada "Suscripciones".
-- "sueldo" o "salario" pueden corresponder a una categoría llamada "Salario".
+- Usa significado y contexto.
 - No inventes categorías ni IDs.
 - Si ninguna categoría es perfecta pero hay categorías disponibles, elige la más cercana semánticamente.
 - categoria_id puede ser null ÚNICAMENTE cuando la lista correspondiente de categorías esté vacía o cuando sea imposible determinar el tipo del movimiento.
-- Si el movimiento es un gasto y hay categorías de gasto disponibles, NO devuelvas null solo porque no exista coincidencia literal.
-- Si el movimiento es un ingreso y hay categorías de ingreso disponibles, NO devuelvas null solo porque no exista coincidencia literal.
 
 Para cada GASTO extrae:
 - descripcion: qué se compró/pagó, usando únicamente palabras presentes en el audio.
-- monto: número explícitamente pronunciado. Si NO se entiende o no se menciona, usa null.
+- monto: número explícitamente pronunciado, respetando exactamente los centavos indicados.
 - moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
 - cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
-- categoria_id: ID de la mejor CATEGORÍA DE GASTO disponible según similitud semántica. Puede ser null solo en las excepciones indicadas arriba.
+- categoria_id: ID de la mejor CATEGORÍA DE GASTO disponible.
 
 Para cada INGRESO extrae:
 - descripcion: origen del dinero, usando únicamente palabras presentes en el audio.
-- monto: número explícitamente pronunciado. Si NO se entiende o no se menciona, usa null.
+- monto: número explícitamente pronunciado, respetando exactamente los centavos indicados.
 - moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
 - cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
-- categoria_id: ID de la mejor CATEGORÍA DE INGRESO disponible según similitud semántica. Puede ser null solo en las excepciones indicadas arriba.
+- categoria_id: ID de la mejor CATEGORÍA DE INGRESO disponible.
 
 Para cada DEUDA extrae:
 - quien: nombre de quien debe, solo si se entiende claramente; si no, null.
-- monto: número explícitamente pronunciado; si no se dijo o no se entiende, usa null.
+- monto: número explícitamente pronunciado, respetando exactamente los centavos indicados.
 - moneda: "BOB" por defecto, "USD" si dice dólares, "USDT" si dice USDT/tether.
 - motivo: motivo del préstamo solo si fue pronunciado claramente; si no, null.
 
@@ -112,9 +121,10 @@ Antes de responder, haz una segunda revisión del audio y verifica:
 5. que no hayas creado movimientos que no fueron pronunciados;
 6. que el tipo sea correcto para cada movimiento;
 7. que el monto de cada movimiento esté realmente presente en el audio;
-8. que cuenta_id pertenezca a las cuentas disponibles;
-9. que categoria_id pertenezca al catálogo correcto;
-10. que, si existen categorías disponibles, hayas elegido la categoría semánticamente más cercana en lugar de dejarla en null sin motivo.
+8. que hayas preservado los centavos y no hayas redondeado;
+9. que "3 50" en contexto de precio se interprete como 3.50 y no 350;
+10. que cuenta_id pertenezca a las cuentas disponibles;
+11. que categoria_id pertenezca al catálogo correcto.
 
 Devuelve ÚNICAMENTE JSON válido, sin markdown, con esta forma exacta:
 {"audio_con_habla":true,"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"ingresos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
@@ -167,9 +177,7 @@ function parsear(textoModelo: string, cuentas: CuentaCatalogo[], categoriasGasto
   try { obj = JSON.parse(limpio); } catch { throw new Error("No se pudo interpretar la respuesta del modelo."); }
   const raw = obj as { audio_con_habla?: unknown; transcripcion?: unknown; gastos?: unknown; ingresos?: unknown; deudas?: unknown };
   const transcripcion = textoONull(raw.transcripcion);
-
   if (!transcripcion) return { gastos: [], ingresos: [], deudas: [], transcripcion: null };
-
   const idsCuenta = new Set(cuentas.map((c) => c.id));
   const idsCatGasto = new Set(categoriasGasto.map((c) => c.id));
   const idsCatIngreso = new Set(categoriasIngreso.map((c) => c.id));
@@ -180,20 +188,40 @@ function parsear(textoModelo: string, cuentas: CuentaCatalogo[], categoriasGasto
 }
 
 function moneda(v: unknown): Currency { return v === "USD" || v === "USDT" ? v : "BOB"; }
-function numeroONull(v: unknown): number | null { const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN; return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; }
+function numeroONull(v: unknown): number | null {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(",", ".").trim()) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
 function textoONull(v: unknown): string | null { const t = typeof v === "string" ? v.trim() : ""; return t.length ? t : null; }
 const EVIDENCIA: Record<"gasto" | "ingreso" | "deuda", RegExp> = { gasto: /\b(gast|pagu|compr|cost|consum|adquir)\w*/i, ingreso: /\b(recib|pagaron|cobr|deposit|sueldo|salario|gan|ingres)\w*/i, deuda: /\b(prest|fi[eé]|debe|deben|deuda|debiendo|cobrar|prestado)\w*/i };
 function tieneEvidenciaDeTipo(transcripcion: string, tipo: "gasto" | "ingreso" | "deuda"): boolean { return EVIDENCIA[tipo].test(transcripcion); }
 function quitarAcentos(texto: string): string { return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
 function escapeRegExp(value: string): string { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
 function montoApareceEnTranscripcion(monto: number | null, transcripcion: string): boolean {
   if (monto == null) return false;
-  const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/[,]/g, ".");
+  const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/,/g, ".").replace(/\s+/g, " ").trim();
   const entero = Number.isInteger(monto) ? String(monto) : monto.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
   if (new RegExp(`(?:^|\\D)${escapeRegExp(entero)}(?:\\D|$)`).test(texto)) return true;
-  if (Number.isInteger(monto)) { const palabras = numeroEnPalabras(monto); if (palabras && texto.includes(quitarAcentos(palabras))) return true; }
+
+  const parteEntera = Math.floor(monto);
+  const centavos = Math.round((monto - parteEntera) * 100);
+  if (centavos > 0) {
+    const palabrasEntero = numeroEnPalabras(parteEntera);
+    const palabrasCentavos = numeroEnPalabras(centavos);
+    const patronDecimal = new RegExp(`${escapeRegExp(palabrasEntero ?? "")}\\s+(?:punto|coma|con)(?:\\s+de)?\\s+${escapeRegExp(palabrasCentavos ?? "")}`, "i");
+    if (patronDecimal.test(texto)) return true;
+    const patronCentavos = new RegExp(`${escapeRegExp(palabrasEntero ?? "")}\\s+(?:bolivianos?|bs)(?:\\s+con)?\\s+${escapeRegExp(palabrasCentavos ?? "")}\\s+centavos?`, "i");
+    if (patronCentavos.test(texto)) return true;
+  }
+
+  if (Number.isInteger(monto)) {
+    const palabras = numeroEnPalabras(monto);
+    if (palabras && texto.includes(quitarAcentos(palabras))) return true;
+  }
   return false;
 }
+
 function monedaApareceEnTranscripcion(moneda: Currency, transcripcion: string): boolean { if (moneda === "BOB") return true; if (moneda === "USD") return /d[oó]lar|usd|d[oó]lares/i.test(transcripcion); return /usdt|tether/i.test(transcripcion); }
 function numeroEnPalabras(n: number): string | null {
   if (!Number.isInteger(n) || n < 0 || n > 999999) return null;
@@ -207,6 +235,7 @@ function numeroEnPalabras(n: number): string | null {
   const miles = Math.floor(n / 1000), resto = n % 1000;
   return `${miles === 1 ? "mil" : `${hasta999(miles)} mil`}${resto ? ` ${hasta999(resto)}` : ""}`;
 }
+
 function normalizarMovimiento(value: unknown, idsCuenta: Set<string>, idsCategoria: Set<string>, cuentas: CuentaCatalogo[], transcripcion: string, tipo: "gasto" | "ingreso"): GastoVoz | IngresoVoz | null {
   if (!value || typeof value !== "object") return null;
   const r = value as Record<string, unknown>;
