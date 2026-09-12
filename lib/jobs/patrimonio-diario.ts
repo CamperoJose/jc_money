@@ -15,7 +15,7 @@ export async function ejecutarPatrimonioDiario(admin: SupabaseClient, opts?: { t
   // El cierre diario NO puede heredar el T/C de la foto base. Debe existir una
   // cotización BCB exactamente para el día que se está cerrando.
   const cfg = await getTcConfig(admin, userId);
-  const tc = await getTcExacto(admin, targetDate, cfg.cod_moneda, userId);
+  const tc = await getTcExacto(admin, targetDate, cfg.cod_moneda, userId, cfg.cod_indicador);
   if (!tc?.valor || tc.valor <= 0) {
     return { ok: false, reason: `No existe T/C BCB exacto para ${targetDate}.`, target_date: targetDate };
   }
