@@ -41,6 +41,10 @@ export async function getExchangeRates(supabase: SupabaseClient, codMoneda?: num
   return (data ?? []).map((r) => aRate(r as Record<string, unknown>));
 }
 
+/**
+ * Obtiene la última cotización disponible hasta una fecha. Para registros
+ * históricos esto evita usar un T/C posterior al movimiento.
+ */
 export async function getUltimoTc(
   supabase: SupabaseClient,
   date: string,
@@ -52,6 +56,25 @@ export async function getUltimoTc(
     .select(CAMPOS)
     .eq("cod_moneda", codMoneda)
     .lte("rate_date", date)
+    .order("rate_date", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const row = data?.[0];
+  return row ? aRate(row as Record<string, unknown>) : null;
+}
+
+/** Obtiene exclusivamente el T/C de una fecha. No hace fallback a días anteriores. */
+export async function getTcExacto(
+  supabase: SupabaseClient,
+  date: string,
+  codMoneda: number,
+  _userId?: string
+): Promise<ExchangeRate | null> {
+  const { data, error } = await supabase
+    .from("exchange_rates")
+    .select(CAMPOS)
+    .eq("cod_moneda", codMoneda)
+    .eq("rate_date", date)
     .order("rate_date", { ascending: false })
     .limit(1);
   if (error) throw error;
