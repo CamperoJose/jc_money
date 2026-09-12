@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isoAFechaBolivia } from "@/lib/datetime";
+import { getTcConfig, getUltimoTc } from "@/lib/queries/tc";
 import type { Currency, TxnSource, TxnType } from "@/lib/types";
 
 export interface TransaccionInput {
@@ -36,19 +37,33 @@ export function validarTransaccion(input: TransaccionInput): string | null {
   return null;
 }
 
-function filaDesde(input: TransaccionInput) {
+function filaDesde(input: TransaccionInput, exchangeRate?: number | null) {
   return {
     occurred_at: input.occurred_at,
     txn_date: isoAFechaBolivia(input.occurred_at),
     type: input.type,
     amount: input.amount,
     currency: input.currency,
-    exchange_rate: input.currency === "BOB" ? null : input.exchange_rate ?? null,
+    exchange_rate: input.currency === "BOB" ? null : exchangeRate ?? input.exchange_rate ?? null,
     account_id: input.account_id || null,
     category_id: input.category_id || null,
     description: input.description?.trim() || null,
     source: input.source ?? "manual",
   };
+}
+
+/**
+ * El T/C almacenado en una transacción no se toma del cliente cuando existe una
+ * cotización BCB disponible. Así, voz, formulario y API guardan exactamente el
+ * mismo T/C histórico para la fecha del movimiento.
+ */
+async function obtenerTcHistorico(supabase: SupabaseClient, input: TransaccionInput, userId?: string): Promise<number | null> {
+  if (input.currency === "BOB") return null;
+  const fecha = isoAFechaBolivia(input.occurred_at);
+  const cfg = await getTcConfig(supabase, userId);
+  const row = await getUltimoTc(supabase, fecha, cfg.cod_moneda, userId);
+  if (row?.valor && row.valor > 0) return row.valor;
+  throw new Error(`No existe un tipo de cambio disponible para ${fecha}.`);
 }
 
 export async function crearTransaccion(
@@ -58,7 +73,8 @@ export async function crearTransaccion(
 ): Promise<string> {
   // Con la service role (jobs/ingesta) auth.uid() es null, así que el user_id
   // debe ir explícito; con sesión, se omite y aplica el default auth.uid().
-  const fila = userId ? { ...filaDesde(input), user_id: userId } : filaDesde(input);
+  const rate = await obtenerTcHistorico(supabase, input, userId);
+  const fila = userId ? { ...filaDesde(input, rate), user_id: userId } : filaDesde(input, rate);
   const { data, error } = await supabase.from("transactions").insert(fila).select("id").single();
   if (error) throw error;
   return data.id as string;
@@ -69,7 +85,8 @@ export async function actualizarTransaccion(
   id: string,
   input: TransaccionInput
 ): Promise<void> {
-  const { error } = await supabase.from("transactions").update(filaDesde(input)).eq("id", id);
+  const rate = await obtenerTcHistorico(supabase, input);
+  const { error } = await supabase.from("transactions").update(filaDesde(input, rate)).eq("id", id);
   if (error) throw error;
 }
 
