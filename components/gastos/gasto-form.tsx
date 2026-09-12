@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAvisos } from "@/components/ui/toast";
 import { FloppyDisk, Warning, Clock, TrendDown, TrendUp } from "@phosphor-icons/react";
@@ -43,12 +43,33 @@ export function GastoForm({
   );
   const [monto, setMonto] = useState(registro ? String(registro.amount) : "");
   const [moneda, setMoneda] = useState<Currency>(registro?.currency ?? "BOB");
-  const [tc, setTc] = useState(registro?.exchange_rate ? String(registro.exchange_rate) : "9.60");
+  const [tc, setTc] = useState(registro?.exchange_rate ? String(registro.exchange_rate) : "");
   const [cuentaId, setCuentaId] = useState(registro?.account_id ?? "");
   const [categoriaId, setCategoriaId] = useState(registro?.category_id ?? "");
   const [descripcion, setDescripcion] = useState(registro?.description ?? "");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Para movimientos nuevos en USD/USDT, mostrar el T/C histórico disponible
+  // para la fecha elegida. El servidor vuelve a validarlo al guardar.
+  useEffect(() => {
+    if (moneda === "BOB" || registro?.exchange_rate) return;
+    let activo = true;
+    const date = cuando.slice(0, 10);
+    fetch(`/api/tipo-cambio/ultimo?date=${encodeURIComponent(date)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!activo) return;
+        const valor = Number(data?.rate?.valor);
+        setTc(Number.isFinite(valor) && valor > 0 ? String(valor) : "");
+      })
+      .catch(() => {
+        if (activo) setTc("");
+      });
+    return () => {
+      activo = false;
+    };
+  }, [moneda, cuando, registro?.exchange_rate]);
 
   // Categorías del tipo actual (gasto/ingreso). Las de inversión no aplican aquí.
   const categoriasFiltradas = useMemo(
@@ -72,7 +93,7 @@ export function GastoForm({
       return;
     }
     if (moneda !== "BOB" && (!(parseFloat(tc) > 0))) {
-      setError("Con moneda distinta a BOB, el T/C es obligatorio.");
+      setError("No hay un tipo de cambio disponible para la fecha seleccionada.");
       return;
     }
 
