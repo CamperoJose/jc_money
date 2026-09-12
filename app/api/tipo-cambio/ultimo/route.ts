@@ -5,8 +5,8 @@ import { getTcConfig, getUltimoTc } from "@/lib/queries/tc";
 export const dynamic = "force-dynamic";
 
 /**
- * Último T/C registrado en o antes de ?date=YYYY-MM-DD para la moneda configurada.
- * Usado para prellenar el T/C de una foto de patrimonio manual.
+ * Último T/C registrado en o antes de ?date=YYYY-MM-DD para el indicador y
+ * moneda configurados. Usado para prellenar el T/C de un movimiento o foto.
  */
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   try {
     const cfg = await getTcConfig(supabase);
-    const rate = await getUltimoTc(supabase, date, cfg.cod_moneda);
+    const rate = await getUltimoTc(supabase, date, cfg.cod_moneda, undefined, cfg.cod_indicador);
     return NextResponse.json({ rate });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error" }, { status: 500 });
