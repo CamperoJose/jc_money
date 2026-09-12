@@ -29,10 +29,10 @@ export function validarTransaccion(input: TransaccionInput): string | null {
   if (!["BOB", "USD", "USDT"].includes(input.currency)) {
     return "Moneda inválida.";
   }
-  if (input.currency !== "BOB") {
-    if (!input.exchange_rate || input.exchange_rate <= 0) {
-      return "Con moneda distinta a BOB, el tipo de cambio (T/C) es obligatorio y > 0.";
-    }
+  // El servidor obtiene el T/C real del BCB antes de guardar. Si el cliente lo
+  // manda, solo validamos que no sea un valor inválido; no confiamos en él.
+  if (input.currency !== "BOB" && input.exchange_rate != null && input.exchange_rate <= 0) {
+    return "El tipo de cambio enviado es inválido.";
   }
   return null;
 }
