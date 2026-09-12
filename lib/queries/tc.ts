@@ -42,18 +42,21 @@ export async function getExchangeRates(supabase: SupabaseClient, codMoneda?: num
 }
 
 /**
- * Obtiene la última cotización disponible hasta una fecha. Para registros
- * históricos esto evita usar un T/C posterior al movimiento.
+ * Obtiene la última cotización disponible hasta una fecha, respetando indicador
+ * y moneda. Para registros históricos esto evita usar un T/C posterior o de otro
+ * indicador del BCB.
  */
 export async function getUltimoTc(
   supabase: SupabaseClient,
   date: string,
   codMoneda: number,
-  _userId?: string
+  _userId?: string,
+  codIndicador = DEFAULT_CONFIG.cod_indicador
 ): Promise<ExchangeRate | null> {
   const { data, error } = await supabase
     .from("exchange_rates")
     .select(CAMPOS)
+    .eq("cod_indicador", codIndicador)
     .eq("cod_moneda", codMoneda)
     .lte("rate_date", date)
     .order("rate_date", { ascending: false })
@@ -63,19 +66,20 @@ export async function getUltimoTc(
   return row ? aRate(row as Record<string, unknown>) : null;
 }
 
-/** Obtiene exclusivamente el T/C de una fecha. No hace fallback a días anteriores. */
+/** Obtiene exclusivamente el T/C de una fecha e indicador. No hace fallback. */
 export async function getTcExacto(
   supabase: SupabaseClient,
   date: string,
   codMoneda: number,
-  _userId?: string
+  _userId?: string,
+  codIndicador = DEFAULT_CONFIG.cod_indicador
 ): Promise<ExchangeRate | null> {
   const { data, error } = await supabase
     .from("exchange_rates")
     .select(CAMPOS)
+    .eq("cod_indicador", codIndicador)
     .eq("cod_moneda", codMoneda)
     .eq("rate_date", date)
-    .order("rate_date", { ascending: false })
     .limit(1);
   if (error) throw error;
   const row = data?.[0];
