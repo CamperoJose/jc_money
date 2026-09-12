@@ -61,7 +61,7 @@ async function obtenerTcHistorico(supabase: SupabaseClient, input: TransaccionIn
   if (input.currency === "BOB") return null;
   const fecha = isoAFechaBolivia(input.occurred_at);
   const cfg = await getTcConfig(supabase, userId);
-  const row = await getUltimoTc(supabase, fecha, cfg.cod_moneda, userId);
+  const row = await getUltimoTc(supabase, fecha, cfg.cod_moneda, userId, cfg.cod_indicador);
   if (row?.valor && row.valor > 0) return row.valor;
   throw new Error(`No existe un tipo de cambio disponible para ${fecha}.`);
 }
