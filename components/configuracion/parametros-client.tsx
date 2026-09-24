@@ -14,15 +14,11 @@ import {
   TrendUp,
   Bank,
   CurrencyDollar,
-  FloppyDisk,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { BCB_INDICADORES, BCB_MONEDAS } from "@/lib/bcb";
 import type { Category, CategoryKind, TcConfig } from "@/lib/types";
 
 type Tab = "gasto" | "ingreso" | "inversion" | "tipo_cambio";
@@ -113,93 +109,35 @@ export function ParametrosClient({
 }
 
 function TipoCambioPanel({ config }: { config: TcConfig }) {
-  const router = useRouter();
-  const avisos = useAvisos();
-  const [indicador, setIndicador] = useState(String(config.cod_indicador));
-  const [moneda, setMoneda] = useState(String(config.cod_moneda));
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
-
-  async function guardar() {
-    setError(null);
-    setOk(false);
-    setGuardando(true);
-    try {
-      const res = await fetch("/api/parametros/tipo-cambio", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cod_indicador: Number(indicador), cod_moneda: Number(moneda) }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error ?? `Error ${res.status}`);
-      }
-      setOk(true);
-      avisos.exito("Tipo de cambio guardado");
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    } finally {
-      setGuardando(false);
-    }
-  }
-
   return (
     <Card>
       <CardContent className="space-y-4 p-4 sm:p-6">
-        <p className="text-sm text-muted-foreground">
-          Códigos del Banco Central de Bolivia (BCB) que usa el job diario para traer el tipo de cambio.
-          Por defecto: <strong>USD venta oficial</strong>. Cámbialos si prefieres otra moneda o el dólar
-          referencial.
-        </p>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="indicador">Indicador</Label>
-            <Select id="indicador" value={indicador} onChange={(e) => setIndicador(e.target.value)}>
-              {BCB_INDICADORES.map((i) => (
-                <option key={i.cod} value={i.cod}>
-                  {i.cod} — {i.desc}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="moneda">Moneda</Label>
-            <Select id="moneda" value={moneda} onChange={(e) => setMoneda(e.target.value)}>
-              {BCB_MONEDAS.map((m) => (
-                <option key={m.cod} value={m.cod}>
-                  {m.cod} — {m.desc}
-                </option>
-              ))}
-            </Select>
-          </div>
+        <div className="space-y-1">
+          <p className="font-medium">Binance P2P · compradores BOB/USDT</p>
+          <p className="text-sm text-muted-foreground">
+            El job diario consulta Dólar Blue Bolivia y guarda la mediana de las
+            cotizaciones válidas de compradores de Binance P2P. La mediana reduce
+            el impacto de órdenes aisladas o precios anómalos.
+          </p>
         </div>
 
-        {error && (
-          <p className="flex items-center gap-1.5 text-sm text-destructive">
-            <Warning weight="fill" className="size-4" />
-            {error}
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+          <p>
+            <strong>Método:</strong> mediana de cotizaciones válidas
           </p>
-        )}
-        {ok && (
-          <p className="flex items-center gap-1.5 text-sm text-primary">
-            <Check weight="bold" className="size-4" />
-            Configuración guardada.
+          <p>
+            <strong>Par:</strong> BOB/USDT · <strong>lado:</strong> buy
           </p>
-        )}
-
-        <div className="flex justify-end">
-          <Button onClick={guardar} disabled={guardando}>
-            <FloppyDisk weight="bold" className="size-4" />
-            {guardando ? "Guardando…" : "Guardar"}
-          </Button>
+          <p className="text-muted-foreground">
+            Identificadores internos conservados para compatibilidad histórica:
+            indicador {config.cod_indicador}, moneda {config.cod_moneda}.
+          </p>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Nota: el BCB publica el dólar oficial (~6,96 venta). Si tu patrimonio usa un T/C distinto
-          (paralelo), el valor autollenado en una foto manual siempre queda editable.
+          La API key se configura únicamente en el servidor mediante
+          DOLAR_BLUE_BOLIVIA_API_KEY; no se guarda en el repositorio ni se expone
+          al navegador.
         </p>
       </CardContent>
     </Card>
