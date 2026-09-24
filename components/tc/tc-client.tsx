@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Area,
   AreaChart,
@@ -10,6 +12,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import { CurrencyDollar, TrendUp, TrendDown, Bank, ArrowsClockwise } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { useAvisos } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Kpi } from "@/components/tremor/kpi-card";
 import { conTs, rangoEnDias, propsEjeTiempo, formatoFechaTooltip } from "@/lib/charts";
@@ -52,7 +56,39 @@ export function TcClient({
   config: TcConfig;
   pronostico: ResultadoPronostico | null;
 }) {
+  const router = useRouter();
+  const avisos = useAvisos();
+  const [actualizando, setActualizando] = useState(false);
   const [rango, setRango] = usePreferencia<RangoId>("tc.rango", "todo", IDS_RANGO as RangoId[]);
+
+  async function actualizarTc() {
+    if (actualizando) return;
+    setActualizando(true);
+    try {
+      const res = await fetch("/api/tc/actualizar", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? `Error ${res.status}`);
+      }
+
+      const valor = Number(data.resultado?.valor);
+      avisos.exito(
+        "Tipo de cambio actualizado",
+        Number.isFinite(valor)
+          ? `Nuevo T/C global: Bs ${formatNumber(valor, 5)}`
+          : "La cotización global se actualizó correctamente."
+      );
+      router.refresh();
+    } catch (e) {
+      avisos.error(
+        "No se pudo actualizar el T/C",
+        e instanceof Error ? e.message : "Error inesperado."
+      );
+    } finally {
+      setActualizando(false);
+    }
+  }
   const ultimo = rates[0] ?? null;
   const anterior = rates[1] ?? null;
   const variacion =
@@ -74,14 +110,24 @@ export function TcClient({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <CurrencyDollar weight="duotone" className="size-6 text-primary" />
-          Tipo de cambio (Binance P2P)
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          BOB/USDT · referencia diaria calculada con la mediana de compradores en Binance P2P.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <CurrencyDollar weight="duotone" className="size-6 text-primary" />
+            Tipo de cambio (Binance P2P)
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            BOB/USDT · referencia diaria calculada con la mediana de compradores en Binance P2P.
+          </p>
+        </div>
+
+        <Button onClick={actualizarTc} disabled={actualizando} className="shrink-0">
+          <ArrowsClockwise
+            weight="bold"
+            className={`size-4 ${actualizando ? "animate-spin" : ""}`}
+          />
+          {actualizando ? "Actualizando…" : "Actualizar TC"}
+        </Button>
       </div>
 
       {rates.length === 0 ? (
