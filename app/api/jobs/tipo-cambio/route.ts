@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { diagnosticarTC, ejecutarTipoCambioBinanceP2P } from "@/lib/jobs/tipo-cambio";
-import { getUsuariosJob, ejecutarPorUsuario } from "@/lib/jobs/por-usuario";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -42,36 +41,18 @@ async function manejar(request: Request) {
 
   try {
     const admin = createAdminClient();
-    const usuarios = await getUsuariosJob(admin);
-
-    if (!usuarios.length) {
-      return NextResponse.json(
-        { ok: false, reason: "No hay usuarios en la app." },
-        { status: 500 }
-      );
-    }
 
     if (debug) {
-      const resultados = await ejecutarPorUsuario(admin, usuarios, () =>
-        diagnosticarTC(admin, { targetDate })
-      );
+      const resultado = await diagnosticarTC(admin, { targetDate });
       return NextResponse.json({
-        ok: resultados.every((r) => r.ok !== false),
+        ok: resultado.ok !== false,
         debug: true,
-        usuarios: resultados.length,
-        resultados,
+        resultado,
       });
     }
 
-    const resultados = await ejecutarPorUsuario(admin, usuarios, () =>
-      ejecutarTipoCambioBinanceP2P(admin, { targetDate })
-    );
-
-    return NextResponse.json({
-      ok: resultados.every((r) => r.ok),
-      usuarios: resultados.length,
-      resultados,
-    });
+    const resultado = await ejecutarTipoCambioBinanceP2P(admin, { targetDate });
+    return NextResponse.json({ ok: resultado.ok, resultado });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: detalleError(e) },
