@@ -31,7 +31,6 @@ import {
 } from "@/components/tremor/table";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber, formatDate, formatPercent } from "@/lib/format";
-import { descripcionMoneda } from "@/lib/bcb";
 import { PronosticoTc } from "@/components/tc/pronostico-tc";
 import type { ResultadoPronostico } from "@/lib/pronostico";
 import type { ExchangeRate, TcConfig } from "@/lib/types";
@@ -78,10 +77,10 @@ export function TcClient({
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <CurrencyDollar weight="duotone" className="size-6 text-primary" />
-          Tipo de cambio (BCB)
+          Tipo de cambio (Binance P2P)
         </h1>
         <p className="text-sm text-muted-foreground">
-          {descripcionMoneda(config.cod_moneda)} · se actualiza solo cada día desde el Banco Central de Bolivia.
+          BOB/USDT · referencia diaria calculada con la mediana de compradores en Binance P2P.
         </p>
       </div>
 
@@ -89,8 +88,8 @@ export function TcClient({
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-14 text-center text-sm text-muted-foreground">
             <Bank weight="duotone" className="size-8 opacity-60" />
-            Aún no hay tipos de cambio registrados. El job diario (00:17 Bolivia) los irá cargando desde el
-            BCB. También puedes dispararlo a mano desde GitHub → Actions.
+            Aún no hay tipos de cambio registrados. El job diario (00:17 Bolivia) los irá cargando desde
+            Binance P2P. También puedes dispararlo a mano desde GitHub → Actions.
           </CardContent>
         </Card>
       ) : (
@@ -118,7 +117,7 @@ export function TcClient({
             <Kpi
               etiqueta="Registros"
               valor={String(rates.length)}
-              detalle="Histórico almacenado del BCB"
+              detalle="Histórico diario almacenado"
               icono={<ArrowsClockwise weight="duotone" className="size-4" />}
             />
             <Kpi
@@ -187,7 +186,7 @@ export function TcClient({
                               {formatDate(r.rate_date)}
                             </TableCell>
                             <TableCell className="text-muted-foreground">
-                              {r.moneda_desc ?? descripcionMoneda(r.cod_moneda)}
+                              {r.moneda_desc ?? (r.cod_moneda === 12 ? "USD/USDT" : `Moneda ${r.cod_moneda}`)}
                             </TableCell>
                             <TableCell className="text-right font-medium tabular-nums">
                               {formatNumber(r.valor, 5)}
@@ -207,8 +206,12 @@ export function TcClient({
                               )}
                             </TableCell>
                             <TableCell>
-                              <Badge variant={r.source === "bcb" ? "success" : "neutral"}>
-                                {r.source === "bcb" ? "BCB" : r.source}
+                              <Badge variant={r.source === "binance_p2p_median" ? "success" : "neutral"}>
+                                {r.source === "binance_p2p_median"
+                                  ? "Binance P2P · mediana"
+                                  : r.source === "bcb"
+                                    ? "BCB (histórico)"
+                                    : r.source}
                               </Badge>
                             </TableCell>
                           </TableRow>
