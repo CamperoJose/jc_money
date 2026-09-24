@@ -92,23 +92,24 @@ estas variables en Vercel (todas opcionales, traen valores por defecto razonable
 
 - [ ] Si alguna vez el Atajo devuelve **HTTP 429**, subí `VOZ_LIMITE_POR_VENTANA` en Vercel.
 
-## 8.d Histórico de tipo de cambio (opcional) — GRATIS
-El job diario solo carga el T/C de hoy en adelante. Para tener años de historia y que el módulo de
-pronóstico tenga con qué trabajar, hay un script que la trae del propio BCB:
+## 8.d Tipo de cambio Binance P2P — variable obligatoria
+El job diario ya no consulta el BCB. Usa el endpoint privado de Dólar Blue Bolivia para compradores
+BOB/USDT de Binance P2P y persiste la **mediana** de las cotizaciones válidas.
 
-```bash
-node --experimental-strip-types scripts/backfill/tc-bcb.mjs --desde 2005-01-01
-```
+- [ ] En **Vercel → Project Settings → Environment Variables**, crear:
+      `DOLAR_BLUE_BOLIVIA_API_KEY` = la API key privada entregada por Dólar Blue Bolivia.
+- [ ] Aplicarla a Production (y Preview si quieres probar ramas).
+- [ ] Redeploy de producción después de crear la variable.
+- [ ] Probar `POST /api/jobs/tipo-cambio?debug=1` con el Bearer del job y verificar:
+      `source=binance_p2p_median`, `pair=BOB/USDT`, `side=buy` y un `valor` positivo.
 
-- [ ] Ejecutarlo (tarda ~25 min por cada 10 años; si se corta, relanzar con `--reanudar`).
-- [ ] Pegar el `.sql` que genera en **Supabase → SQL Editor**. Es idempotente.
-- ⚠️ El dólar oficial está **anclado en 6,96 desde noviembre de 2011**: cargarlo te da historial
-      real, pero el pronóstico seguirá diciendo «régimen anclado», que es lo correcto. Para una
-      serie que sí se mueva, usá `--moneda 76` (UFV).
+> No subas la API key al repositorio. El cliente la lee solo del entorno del servidor.
 
-Detalle completo en `scripts/backfill/README.md`.
+## 8.e Histórico anterior de tipo de cambio (opcional)
+El histórico BCB existente puede conservarse como referencia previa al cambio de fuente. El script
+`scripts/backfill/tc-bcb.mjs` queda únicamente para históricos y **no participa del job diario**.
 
-## 8.e Barrera de seguridad para registro por voz — PRIORITARIO
+## 8.f Barrera de seguridad para registro por voz — PRIORITARIO
 La ingesta por voz ahora usa **dos etapas**: primero Cloud Speech-to-Text verifica que exista habla
 real y obtiene una transcripción; recién después Gemini estructura esa transcripción. Si Speech-to-Text
 no detecta habla, **no se llama a Gemini y no se crea ninguna transacción**.
