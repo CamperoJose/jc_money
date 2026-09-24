@@ -15,7 +15,7 @@ jobs:
   cerrar-dia:
     runs-on: ubuntu-latest
     steps:
-      - name: Tipo de cambio del día (BCB)
+      - name: Tipo de cambio del día (Binance P2P)
         continue-on-error: true
         env:
           APP_URL: ${{ secrets.APP_URL }}
