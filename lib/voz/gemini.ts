@@ -85,47 +85,47 @@ EJEMPLOS:
 Devuelve únicamente JSON compatible con el esquema de respuesta.`;
 
 const RESPONSE_SCHEMA = {
-  type: "object",
+  type: "OBJECT",
   properties: {
-    audio_con_habla: { type: "boolean" },
-    transcripcion: { type: "string" },
+    audio_con_habla: { type: "BOOLEAN" },
+    transcripcion: { type: "STRING" },
     gastos: {
-      type: "array",
+      type: "ARRAY",
       items: {
-        type: "object",
+        type: "OBJECT",
         properties: {
-          descripcion: { type: "string" },
-          monto: { type: "number", nullable: true },
-          moneda: { type: "string", enum: ["BOB", "USD", "USDT"] },
-          cuenta_id: { type: "string", nullable: true },
-          categoria_id: { type: "string", nullable: true },
+          descripcion: { type: "STRING" },
+          monto: { type: "NUMBER", nullable: true },
+          moneda: { type: "STRING", enum: ["BOB", "USD", "USDT"] },
+          cuenta_id: { type: "STRING", nullable: true },
+          categoria_id: { type: "STRING", nullable: true },
         },
         required: ["descripcion", "monto", "moneda", "cuenta_id", "categoria_id"],
       },
     },
     ingresos: {
-      type: "array",
+      type: "ARRAY",
       items: {
-        type: "object",
+        type: "OBJECT",
         properties: {
-          descripcion: { type: "string" },
-          monto: { type: "number", nullable: true },
-          moneda: { type: "string", enum: ["BOB", "USD", "USDT"] },
-          cuenta_id: { type: "string", nullable: true },
-          categoria_id: { type: "string", nullable: true },
+          descripcion: { type: "STRING" },
+          monto: { type: "NUMBER", nullable: true },
+          moneda: { type: "STRING", enum: ["BOB", "USD", "USDT"] },
+          cuenta_id: { type: "STRING", nullable: true },
+          categoria_id: { type: "STRING", nullable: true },
         },
         required: ["descripcion", "monto", "moneda", "cuenta_id", "categoria_id"],
       },
     },
     deudas: {
-      type: "array",
+      type: "ARRAY",
       items: {
-        type: "object",
+        type: "OBJECT",
         properties: {
-          quien: { type: "string", nullable: true },
-          monto: { type: "number", nullable: true },
-          moneda: { type: "string", enum: ["BOB", "USD", "USDT"] },
-          motivo: { type: "string", nullable: true },
+          quien: { type: "STRING", nullable: true },
+          monto: { type: "NUMBER", nullable: true },
+          moneda: { type: "STRING", enum: ["BOB", "USD", "USDT"] },
+          motivo: { type: "STRING", nullable: true },
         },
         required: ["quien", "monto", "moneda", "motivo"],
       },
