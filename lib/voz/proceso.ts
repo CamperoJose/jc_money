@@ -121,7 +121,7 @@ function encontrarCuenta(transcripcion: string, cuentas: Catalogos["cuentas"]): 
   for (const c of cuentas) {
     const nombre = nombreCuentaComparable(c.name);
     if (!nombre) continue;
-    const patronNombre = new RegExp(`(?:^| )${nombre.replace(/ /g, "\\\\s+")}(?: |$)`);
+    const patronNombre = new RegExp(`(?:^| )${nombre.split(" ").join("\\s+")}(?: |$)`);
     if (patronNombre.test(n)) return c.id;
 
     const palabras = nombre.split(" ").filter((p) => p.length >= 3 && !genericas.has(p));
