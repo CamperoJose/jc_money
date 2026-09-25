@@ -15,122 +15,145 @@ const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 function hostVertex(location: string): string { return location === "global" ? "https://aiplatform.googleapis.com" : `https://${location}-aiplatform.googleapis.com`; }
 
+const PROMPT_SISTEMA = `Eres un parser financiero especializado en comandos de voz en español boliviano.
+
+Tu trabajo tiene DOS pasos inseparables:
+1) escuchar y transcribir fielmente el audio;
+2) convertir SOLO los movimientos financieros realmente pronunciados al JSON solicitado.
+
+ORDEN DE PRIORIDAD DE LAS REGLAS:
+
+1. SEGURIDAD DEL AUDIO
+- Si no hay habla humana inteligible, devuelve audio_con_habla=false, transcripcion="" y los tres arrays vacíos.
+- No inventes palabras, montos, cuentas, categorías, personas ni movimientos.
+- No conviertas horas, edades, teléfonos, fechas u otros números no financieros en movimientos.
+- La regla de "asumir gasto" SOLO aplica después de detectar que la frase sí describe un movimiento financiero.
+
+2. TRANSCRIPCIÓN
+- transcripcion debe contener todo lo financiero que se oyó, no solo un resumen.
+- Conserva nombres de comercios, productos, personas y cuentas tal como se entiendan.
+- Puedes normalizar números hablados a dígitos para evitar ambigüedad: "treinta y cinco" -> "35", "tres con cincuenta" -> "3.50".
+- No agregues información que no esté en el audio.
+
+3. SEGMENTACIÓN
+- Detecta CADA movimiento independiente. Nunca sumes ni agrupes movimientos distintos.
+- "Netflix 45 y almuerzo 25" son DOS gastos.
+- "pan 10, leche 8 y huevos 15" son TRES gastos.
+- Un mismo audio puede mezclar gastos, ingresos y deudas.
+
+4. CLASIFICACIÓN
+- INGRESO solo cuando haya señal explícita de dinero recibido: "recibí", "me pagaron", "cobré", "me depositaron", "me entraron", "me abonaron", "sueldo", "salario", "venta", "reembolso" o equivalente inequívoco.
+- DEUDA solo cuando sea explícito que otra persona le debe dinero al usuario: "me debe", "presté", "le fié", "por cobrar", "quedó debiendo" o equivalente.
+- Si la frase describe un movimiento financiero pero NO dice explícitamente ingreso ni deuda, clasifícalo como GASTO, aunque no aparezcan las palabras "gasté", "pagué" o "compré".
+- Ejemplos válidos de gasto implícito: "35 taxi", "Netflix 45", "30 del Fortaleza por unas papas", "efectivo 12 café".
+
+5. MONTOS Y MONEDA
+- Extrae únicamente montos realmente pronunciados.
+- BOB es la moneda por defecto si no se menciona otra.
+- USD solo si se oyen "dólares", "USD" o equivalente.
+- USDT solo si se oye "USDT", "tether" o equivalente.
+- Respeta centavos: "3 con 50", "3 punto 50", "3 coma 50", "3 bolivianos con 50 centavos" -> 3.50.
+- No redondees ni conviertas 3.50 en 350.
+
+6. CUENTAS
+- Usa únicamente IDs del catálogo recibido.
+- Una cuenta puede mencionarse de forma natural o abreviada. Si el catálogo dice "FortalezaBOB" y el usuario dice "Fortaleza", puedes asociarla si la coincidencia es inequívoca.
+- Lo mismo aplica a sufijos de moneda como BOB, USD o USDT y palabras genéricas como "Banco" o "Cuenta".
+- Si no hay una mención razonablemente clara de una cuenta concreta, cuenta_id=null.
+- Si hay varios movimientos, asigna una cuenta solo al movimiento al que pertenece su mención; no propagues una cuenta mencionada una vez a los demás.
+- Nunca descartes un movimiento solo porque no se pudo identificar la cuenta.
+
+7. CATEGORÍAS
+- Usa únicamente IDs del catálogo recibido.
+- Selecciona la categoría semánticamente más cercana; no hace falta coincidencia literal.
+- Si no existe una categoría razonable o el catálogo está vacío, categoria_id=null.
+- Nunca inventes IDs.
+
+8. CAMPOS
+- descripcion: concepto breve y fiel al audio.
+- monto: número positivo o null si realmente no se entiende.
+- quien y motivo en deudas: solo información realmente pronunciada.
+- Mantén el orden de los movimientos cuando sea posible.
+
+EJEMPLOS:
+- "30 del Fortaleza por unas papas" => un GASTO de 30 BOB; cuenta Fortaleza si existe una única coincidencia razonable; descripción "papas".
+- "Netflix 45 y almuerzo 25" => dos GASTOS separados.
+- "me pagaron 250 al BNB por un trabajo" => un INGRESO de 250.
+- "Juan me debe 80 del almuerzo" => una DEUDA de 80.
+- "me depositaron 1000 de sueldo y 30 taxi" => un INGRESO de 1000 y un GASTO de 30.
+- "reunión mañana a las 8" => ningún movimiento.
+
+Devuelve únicamente JSON compatible con el esquema de respuesta.`;
+
+const RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    audio_con_habla: { type: "BOOLEAN" },
+    transcripcion: { type: "STRING" },
+    gastos: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          descripcion: { type: "STRING" },
+          monto: { type: "NUMBER", nullable: true },
+          moneda: { type: "STRING", enum: ["BOB", "USD", "USDT"] },
+          cuenta_id: { type: "STRING", nullable: true },
+          categoria_id: { type: "STRING", nullable: true },
+        },
+        required: ["descripcion", "monto", "moneda", "cuenta_id", "categoria_id"],
+      },
+    },
+    ingresos: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          descripcion: { type: "STRING" },
+          monto: { type: "NUMBER", nullable: true },
+          moneda: { type: "STRING", enum: ["BOB", "USD", "USDT"] },
+          cuenta_id: { type: "STRING", nullable: true },
+          categoria_id: { type: "STRING", nullable: true },
+        },
+        required: ["descripcion", "monto", "moneda", "cuenta_id", "categoria_id"],
+      },
+    },
+    deudas: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          quien: { type: "STRING", nullable: true },
+          monto: { type: "NUMBER", nullable: true },
+          moneda: { type: "STRING", enum: ["BOB", "USD", "USDT"] },
+          motivo: { type: "STRING", nullable: true },
+        },
+        required: ["quien", "monto", "moneda", "motivo"],
+      },
+    },
+  },
+  required: ["audio_con_habla", "transcripcion", "gastos", "ingresos", "deudas"],
+} as const;
+
 function construirPrompt(cuentas: CuentaCatalogo[], categoriasGasto: CategoriaCatalogo[], categoriasIngreso: CategoriaCatalogo[], hoy: string): string {
   const listaCuentas = cuentas.map((c) => `- id="${c.id}" | nombre="${c.name}" | tipo=${c.type} | moneda=${c.currency}`).join("\n");
   const listaCategoriasGasto = categoriasGasto.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
   const listaCategoriasIngreso = categoriasIngreso.map((c) => `- id="${c.id}" | nombre="${c.name}"`).join("\n");
-  return `Eres un parser financiero para comandos de voz en español boliviano.
 
-PRIMERA REGLA — SEGURIDAD DEL AUDIO:
-Primero inspecciona el AUDIO adjunto y decide si contiene habla humana inteligible.
-- Si el audio está vacío, contiene solo silencio, ruido, está incompleto, es inaudible o NO puedes identificar con claridad habla humana, responde con audio_con_habla=false, transcripcion="" y TODOS los arrays vacíos.
-- NUNCA inventes, completes ni supongas palabras, números, nombres o movimientos financieros.
-- Un audio con silencio no es una orden financiera.
-- Solo considera información realmente pronunciada en el audio.
+  return `Fecha de hoy en Bolivia: ${hoy}.
 
-Fecha de hoy: ${hoy}.
-
-La persona puede dictar UNO O VARIOS movimientos financieros en el MISMO audio.
-Debes detectar y registrar CADA movimiento independiente que haya sido pronunciado. NUNCA resumas, agrupes ni conviertas varios movimientos en uno solo.
-Si una frase financiera es suficientemente comprensible, intenta interpretarla aunque la redacción sea informal, incompleta o tenga errores gramaticales.
-Si no dice explícitamente que es ingreso o deuda, un movimiento monetario debe considerarse GASTO como primera opción. Solo clasifícalo como INGRESO o DEUDA cuando exista evidencia explícita de ello.
-
-REGLA CRÍTICA — MÚLTIPLES MOVIMIENTOS:
-- Un audio puede contener 2, 3 o más gastos.
-- Cada compra, pago o gasto independiente debe convertirse en un objeto separado dentro de gastos[].
-- Si aparecen varios importes asociados a diferentes compras, crea un gasto por cada importe.
-- Ejemplo: "gasté 20 en pan y 35 en almuerzo" => DOS gastos: pan=20 y almuerzo=35.
-- Ejemplo: "compré pan 10, leche 8 y huevos 15" => TRES gastos: pan=10, leche=8 y huevos=15.
-- Ejemplo: "pagué 50 de Netflix y 30 de internet" => DOS gastos independientes.
-- NO sumes importes. NO agrupes productos. NO conviertas una lista de compras en un único gasto.
-- Conserva cada descripción y su importe correspondiente.
-- Mantén los movimientos en el orden en que fueron mencionados cuando sea posible.
-- También puedes devolver varios ingresos y/o deudas si aparecen varios movimientos de esos tipos.
-- Un solo audio puede mezclar gastos, ingresos y deudas; clasifica cada movimiento por separado.
-
-REGLA CRÍTICA — DECIMALES Y CENTAVOS:
-Los montos pueden tener bolivianos y centavos. NUNCA redondees un monto que incluya centavos.
-- "3 punto 50" => 3.50
-- "3 punto cinco" => 3.50
-- "3 coma 50" => 3.50
-- "3 coma cinco" => 3.50
-- "3 con 50 centavos" => 3.50
-- "3 bolivianos con 50 centavos" => 3.50
-- "3 50" o "3 con 50" cuando se está dictando un precio => 3.50, NO 350.
-- "10 punto 25" => 10.25
-- "10 coma 25" => 10.25
-- Si se pronuncian explícitamente centavos, los dos dígitos siguientes representan centavos, incluso si son "05".
-- Diferencia entre "350" y "3 50": "350" es trescientos cincuenta; "3 50" en contexto de precio es tres bolivianos con cincuenta centavos.
-- Conserva siempre hasta 2 decimales en monto cuando corresponda. No conviertas 3.50 en 3.
-- El campo monto debe ser un NÚMERO JSON, por ejemplo 3.5 o 3.50, nunca una cadena.
-
-Distingue:
-- GASTO: la persona pagó/compró/gastó algo. Ej: "gasté", "pagué", "compré", "me costó".
-- INGRESO: la persona recibió dinero. Ej: "recibí", "me pagaron", "cobré", "me depositaron", "recibí mi sueldo".
-- DEUDA (que me deben): la persona prestó dinero o alguien le debe. Ej: "presté", "le fié", "me debe", "quedó debiendo", "por cobrar".
-
-CATEGORIZACIÓN — REGLA OBLIGATORIA:
-Las categorías disponibles que aparecen más abajo son el catálogo REAL y cerrado del usuario.
-Para cada GASTO, compara semánticamente la descripción, el comercio, producto o servicio mencionado contra TODAS las categorías de gasto disponibles y selecciona la que mejor represente el movimiento.
-Para cada INGRESO, compara semánticamente el origen o concepto del dinero contra TODAS las categorías de ingreso disponibles y selecciona la que mejor represente el movimiento.
-
-IMPORTANTE SOBRE CATEGORÍAS:
-- Si existe al menos una categoría disponible del tipo correspondiente, intenta seleccionar SIEMPRE la mejor categoría existente.
-- NO necesitas encontrar coincidencia literal entre las palabras del audio y el nombre de la categoría.
-- Usa significado y contexto.
-- No inventes categorías ni IDs.
-- Si ninguna categoría es perfecta pero hay categorías disponibles, elige la más cercana semánticamente.
-- categoria_id puede ser null ÚNICAMENTE cuando la lista correspondiente de categorías esté vacía o cuando sea imposible determinar el tipo del movimiento.
-
-Para cada GASTO extrae:
-- descripcion: qué se compró/pagó, usando únicamente palabras presentes en el audio.
-- monto: número explícitamente pronunciado, respetando exactamente los centavos indicados.
-- moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
-- cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
-- categoria_id: ID de la mejor CATEGORÍA DE GASTO disponible.
-
-Para cada INGRESO extrae:
-- descripcion: origen del dinero, usando únicamente palabras presentes en el audio.
-- monto: número explícitamente pronunciado, respetando exactamente los centavos indicados.
-- moneda: "BOB" por defecto en Bolivia, "USD" si dice dólares, "USDT" si dice USDT/tether.
-- cuenta_id: SOLO un id de CUENTAS cuyo nombre haya sido mencionado claramente. Si no, null.
-- categoria_id: ID de la mejor CATEGORÍA DE INGRESO disponible.
-
-Para cada DEUDA extrae:
-- quien: nombre de quien debe, solo si se entiende claramente; si no, null.
-- monto: número explícitamente pronunciado, respetando exactamente los centavos indicados.
-- moneda: "BOB" por defecto, "USD" si dice dólares, "USDT" si dice USDT/tether.
-- motivo: motivo del préstamo solo si fue pronunciado claramente; si no, null.
-
-REGLA DE CUENTAS: las cuentas pertenecen exclusivamente al usuario actual. Solo puedes usar IDs presentes en la lista. No inventes IDs ni elijas una cuenta solo porque parece probable.
-
-CUENTAS disponibles del usuario actual:
+CUENTAS DISPONIBLES DEL USUARIO:
 ${listaCuentas || "(ninguna)"}
 
-CATEGORÍAS DE GASTO disponibles del usuario actual:
+CATEGORÍAS DE GASTO:
 ${listaCategoriasGasto || "(ninguna)"}
 
-CATEGORÍAS DE INGRESO disponibles del usuario actual:
+CATEGORÍAS DE INGRESO:
 ${listaCategoriasIngreso || "(ninguna)"}
 
-Antes de responder, haz una segunda revisión del audio y verifica:
-1. cuántos movimientos financieros independientes fueron pronunciados;
-2. que exista un objeto separado para CADA movimiento;
-3. que cada importe esté asociado al movimiento correcto;
-4. que no hayas combinado dos o más importes en un solo movimiento;
-5. que no hayas creado movimientos que no fueron pronunciados;
-6. que el tipo sea correcto para cada movimiento;
-7. que el monto de cada movimiento esté realmente presente en el audio;
-8. que hayas preservado los centavos y no hayas redondeado;
-9. que "3 50" en contexto de precio se interprete como 3.50 y no 350;
-10. que cuenta_id pertenezca a las cuentas disponibles;
-11. que categoria_id pertenezca al catálogo correcto.
-
-Devuelve ÚNICAMENTE JSON válido, sin markdown, con esta forma exacta:
-{"audio_con_habla":true,"transcripcion":"","gastos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"ingresos":[{"descripcion":"","monto":0,"moneda":"BOB","cuenta_id":null,"categoria_id":null}],"deudas":[{"quien":null,"monto":0,"moneda":"BOB","motivo":null}]}
-
-Si el audio no contiene habla humana clara, devuelve exactamente audio_con_habla=false, transcripcion="" y gastos=[], ingresos=[], deudas=[].
-No inventes montos, cuentas, categorías, personas, transcripciones ni movimientos.`;
+Interpreta el audio adjunto usando las reglas del sistema.
+Recuerda: ingreso y deuda requieren evidencia explícita; cualquier otro movimiento financiero es gasto por defecto.
+Usa exclusivamente IDs de estos catálogos y devuelve todos los movimientos independientes.`;
 }
 
 interface VertexResponse { candidates?: { content?: { parts?: { text?: string }[] } }[]; }
@@ -138,7 +161,17 @@ interface VertexResponse { candidates?: { content?: { parts?: { text?: string }[
 async function llamarVertex(prompt: string, audioBase64: string, mimeType: string): Promise<string> {
   const sa = cargarServiceAccount();
   const url = `${hostVertex(LOCATION)}/v1/projects/${sa.project_id}/locations/${LOCATION}/publishers/google/models/${MODEL}:generateContent`;
-  const body = { contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType, data: audioBase64 } }] }], generationConfig: { temperature: 0, responseMimeType: "application/json" } };
+  const body = {
+    systemInstruction: { parts: [{ text: PROMPT_SISTEMA }] },
+    contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType, data: audioBase64 } }] }],
+    generationConfig: {
+      temperature: 0,
+      candidateCount: 1,
+      maxOutputTokens: 2048,
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  };
   let ultimoError = "";
   for (let intento = 1; intento <= REINTENTOS; intento++) {
     let res: Response;
@@ -193,7 +226,11 @@ function numeroONull(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
 function textoONull(v: unknown): string | null { const t = typeof v === "string" ? v.trim() : ""; return t.length ? t : null; }
-const EVIDENCIA: Record<"gasto" | "ingreso" | "deuda", RegExp> = { gasto: /\b(gast|pagu|compr|cost|consum|adquir)\w*/i, ingreso: /\b(recib|pagaron|cobr|deposit|sueldo|salario|gan|ingres)\w*/i, deuda: /\b(prest|fi[eé]|debe|deben|deuda|debiendo|cobrar|prestado)\w*/i };
+const EVIDENCIA: Record<"gasto" | "ingreso" | "deuda", RegExp> = {
+  gasto: /\b(gast|pagu|compr|cost|consum|adquir|salio|salida)\w*/i,
+  ingreso: /\b(recib|pagaron|cobr|deposit|sueldo|salario|gan|ingres|entr[oó]|entraron|abon|transfirieron|devolvieron|reembolso|venta)\w*/i,
+  deuda: /\b(prest|fi[eé]|debe|deben|deuda|debiendo|cobrar|prestado)\w*/i,
+};
 function tieneEvidenciaDeTipo(transcripcion: string, tipo: "gasto" | "ingreso" | "deuda"): boolean { return EVIDENCIA[tipo].test(transcripcion); }
 function quitarAcentos(texto: string): string { return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
 function escapeRegExp(value: string): string { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
@@ -236,30 +273,61 @@ function numeroEnPalabras(n: number): string | null {
   return `${miles === 1 ? "mil" : `${hasta999(miles)} mil`}${resto ? ` ${hasta999(resto)}` : ""}`;
 }
 
+function normalizarNombreCuenta(nombre: string): string {
+  return quitarAcentos(nombre.toLowerCase())
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(bob|usd|usdt)\b/g, " ")
+    .replace(/(bob|usd|usdt)$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cuentaMencionada(transcripcion: string, nombreCuenta: string): boolean {
+  const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  const nombre = normalizarNombreCuenta(nombreCuenta);
+  if (!nombre) return false;
+  const patronNombre = new RegExp(`(?:^| )${nombre.split(" ").map(escapeRegExp).join("\\s+")}(?: |$)`);
+  if (patronNombre.test(texto)) return true;
+
+  const genericas = new Set(["banco", "cuenta", "bob", "usd", "usdt", "bs", "bolivianos", "boliviano"]);
+  const tokens = nombre.split(" ").filter((p) => p.length >= 3 && !genericas.has(p));
+  const palabrasTexto = new Set(texto.split(" "));
+  return tokens.length > 0 && tokens.some((p) => palabrasTexto.has(p));
+}
+
 function normalizarMovimiento(value: unknown, idsCuenta: Set<string>, idsCategoria: Set<string>, cuentas: CuentaCatalogo[], transcripcion: string, tipo: "gasto" | "ingreso"): GastoVoz | IngresoVoz | null {
   if (!value || typeof value !== "object") return null;
   const r = value as Record<string, unknown>;
   const descripcion = textoONull(r.descripcion) ?? "";
   const monto = numeroONull(r.monto);
-  const cuenta = typeof r.cuenta_id === "string" && idsCuenta.has(r.cuenta_id) ? r.cuenta_id : null;
+  const cuentaId = typeof r.cuenta_id === "string" && idsCuenta.has(r.cuenta_id) ? r.cuenta_id : null;
+  const cuentaCatalogo = cuentaId ? cuentas.find((c) => c.id === cuentaId) : null;
+  const cuenta = cuentaId && cuentaCatalogo && cuentaMencionada(transcripcion, cuentaCatalogo.name) ? cuentaId : null;
   const categoria = typeof r.categoria_id === "string" && idsCategoria.has(r.categoria_id) ? r.categoria_id : null;
-  if (!tieneEvidenciaDeTipo(transcripcion, tipo)) return null;
+
+  // Ingreso sí requiere una señal explícita. Gasto NO: por diseño es el tipo por defecto
+  // cuando Gemini detecta un movimiento financiero que no es ingreso ni deuda.
+  if (tipo === "ingreso" && !tieneEvidenciaDeTipo(transcripcion, "ingreso")) return null;
   if (monto != null && !montoApareceEnTranscripcion(monto, transcripcion)) return null;
-  const monedaMovimiento = moneda(r.moneda);
-  if (!monedaApareceEnTranscripcion(monedaMovimiento, transcripcion)) return null;
-  if (cuenta) { const cuentaCatalogo = cuentas.find((c) => c.id === cuenta); if (!cuentaCatalogo || !textoContieneFrase(transcripcion, cuentaCatalogo.name)) return null; }
+
+  const monedaSolicitada = moneda(r.moneda);
+  const monedaMovimiento = monedaSolicitada === "BOB" || monedaApareceEnTranscripcion(monedaSolicitada, transcripcion)
+    ? monedaSolicitada
+    : "BOB";
+
   if (!descripcion && monto == null) return null;
   return { descripcion, monto, moneda: monedaMovimiento, cuenta_id: cuenta, categoria_id: categoria };
 }
-function textoContieneFrase(texto: string, frase: string): boolean { const a = quitarAcentos(texto.toLowerCase()).replace(/\s+/g, " ").trim(); const b = quitarAcentos(frase.toLowerCase()).replace(/\s+/g, " ").trim(); return Boolean(b) && a.includes(b); }
 function normalizarDeuda(d: unknown, transcripcion: string): DeudaVoz | null {
   if (!d || typeof d !== "object") return null;
   const r = d as Record<string, unknown>;
   const quien = textoONull(r.quien), motivo = textoONull(r.motivo), monto = numeroONull(r.monto);
   if (!tieneEvidenciaDeTipo(transcripcion, "deuda")) return null;
   if (monto != null && !montoApareceEnTranscripcion(monto, transcripcion)) return null;
-  const monedaDeuda = moneda(r.moneda);
-  if (!monedaApareceEnTranscripcion(monedaDeuda, transcripcion)) return null;
+  const monedaSolicitada = moneda(r.moneda);
+  const monedaDeuda = monedaSolicitada === "BOB" || monedaApareceEnTranscripcion(monedaSolicitada, transcripcion)
+    ? monedaSolicitada
+    : "BOB";
   if (!quien && !motivo && monto == null) return null;
   return { quien, monto, moneda: monedaDeuda, motivo };
 }

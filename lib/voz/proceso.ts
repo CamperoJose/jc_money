@@ -84,7 +84,7 @@ function numeroEnPalabras(tokens: string[]): number | null {
 
 function extraerMontoExplicito(texto: string): number | null {
   const normal = normalizarTexto(texto);
-  const digitos = normal.match(/(?:^|\s)(\d+(?:[.,]\d{1,2})?)(?:\s|$)/);
+  const digitos = normal.match(/(?:^|[^\d])(\d+(?:[.,]\d{1,2})?)(?!\d)/);
   if (digitos) {
     const n = Number(digitos[1].replace(",", "."));
     if (Number.isFinite(n) && n > 0) return Math.round(n * 100) / 100;
@@ -100,20 +100,38 @@ function extraerMontoExplicito(texto: string): number | null {
 function contieneTipo(texto: string, tipo: "gasto" | "ingreso" | "deuda"): boolean {
   const n = normalizarTexto(texto);
   if (tipo === "gasto") return /\b(gasto|gastos|gaste|gastar|pague|pagar|pagado|compre|comprar|compra|costo|coste|consumi|consumo|adquiri|adquirir|salio|salida)\b/.test(n);
-  if (tipo === "ingreso") return /\b(ingreso|ingrese|recibi|recibir|pagaron|cobre|cobrar|depositaron|deposito|sueldo|salario|me dieron)\b/.test(n);
-  return /\b(preste|prestar|fie|fio|debe|deben|deuda|debiendo|cobrar|prestado|me debe)\b/.test(n);
+  if (tipo === "ingreso") return /\b(ingreso|ingrese|recibi|recibir|pagaron|cobre|cobrar|depositaron|deposito|sueldo|salario|me dieron|me entro|entraron|abonaron|abono|transfirieron|devolvieron|reembolso|venta)\b/.test(n);
+  return /\b(preste|prestar|fie|fio|debe|deben|deuda|debiendo|por cobrar|prestado|me debe|me deben)\b/.test(n);
+}
+
+function nombreCuentaComparable(nombre: string): string {
+  return normalizarTexto(nombre)
+    .replace(/\b(bob|usd|usdt)\b/g, " ")
+    .replace(/(bob|usd|usdt)$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function encontrarCuenta(transcripcion: string, cuentas: Catalogos["cuentas"]): string | null {
-  const n = normalizarTexto(transcripcion);
-  let mejor: { id: string; score: number } | null = null;
+  const n = normalizarTexto(transcripcion).replace(/[^a-z0-9 ]+/g, " ");
+  const palabrasTexto = new Set(n.split(" ").filter(Boolean));
+  const genericas = new Set(["banco", "cuenta", "bob", "usd", "usdt", "bs", "bolivianos", "boliviano"]);
+  let mejor: { id: string; score: number; exacta: boolean } | null = null;
+
   for (const c of cuentas) {
-    const nombre = normalizarTexto(c.name);
+    const nombre = nombreCuentaComparable(c.name);
     if (!nombre) continue;
-    if (n.includes(nombre)) return c.id;
-    const palabras = nombre.split(" ").filter((p) => p.length >= 3);
-    const score = palabras.filter((p) => n.includes(p)).length;
-    if (score > 0 && (!mejor || score > mejor.score)) mejor = { id: c.id, score };
+    const patronNombre = new RegExp(`(?:^| )${nombre.split(" ").join("\\s+")}(?: |$)`);
+    if (patronNombre.test(n)) return c.id;
+
+    const palabras = nombre.split(" ").filter((p) => p.length >= 3 && !genericas.has(p));
+    const score = palabras.filter((p) => palabrasTexto.has(p)).length;
+    if (score === 0) continue;
+
+    const exacta = score === palabras.length;
+    if (!mejor || Number(exacta) > Number(mejor.exacta) || (exacta === mejor.exacta && score > mejor.score)) {
+      mejor = { id: c.id, score, exacta };
+    }
   }
   return mejor?.id ?? null;
 }
@@ -137,6 +155,17 @@ function recuperarDesdeTranscripcion(parsed: Awaited<ReturnType<typeof interpret
   const monto = extraerMontoExplicito(t);
   if (monto == null) return parsed;
   const resultado = { ...parsed, gastos: [...parsed.gastos], ingresos: [...parsed.ingresos], deudas: [...parsed.deudas] };
+
+  // Si Gemini detectó exactamente un movimiento pero dejó la cuenta en null,
+  // podemos completar la cuenta de forma determinística desde la transcripción.
+  // No hacemos esto con varios movimientos para evitar asignar una cuenta global
+  // al movimiento equivocado.
+  const totalDetectados = resultado.gastos.length + resultado.ingresos.length + resultado.deudas.length;
+  if (totalDetectados === 1) {
+    const cuenta = encontrarCuenta(t, cat.cuentas);
+    if (cuenta && resultado.gastos.length === 1 && !resultado.gastos[0].cuenta_id) resultado.gastos[0].cuenta_id = cuenta;
+    if (cuenta && resultado.ingresos.length === 1 && !resultado.ingresos[0].cuenta_id) resultado.ingresos[0].cuenta_id = cuenta;
+  }
 
   // Prioridad semántica: ingreso y deuda solo cuando son explícitos.
   // Si no hay una señal explícita de ninguno de ellos, una frase financiera
