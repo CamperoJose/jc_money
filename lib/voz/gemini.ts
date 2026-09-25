@@ -286,7 +286,7 @@ function cuentaMencionada(transcripcion: string, nombreCuenta: string): boolean 
   const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
   const nombre = normalizarNombreCuenta(nombreCuenta);
   if (!nombre) return false;
-  const patronNombre = new RegExp(`(?:^| )${escapeRegExp(nombre).replace(/\\ /g, "\\\\s+")}(?: |$)`);
+  const patronNombre = new RegExp(`(?:^| )${nombre.split(" ").map(escapeRegExp).join("\\s+")}(?: |$)`);
   if (patronNombre.test(texto)) return true;
 
   const genericas = new Set(["banco", "cuenta", "bob", "usd", "usdt", "bs", "bolivianos", "boliviano"]);
