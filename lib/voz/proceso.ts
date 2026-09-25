@@ -84,7 +84,7 @@ function numeroEnPalabras(tokens: string[]): number | null {
 
 function extraerMontoExplicito(texto: string): number | null {
   const normal = normalizarTexto(texto);
-  const digitos = normal.match(/(?:^|\s)(\d+(?:[.,]\d{1,2})?)(?:\s|$)/);
+  const digitos = normal.match(/(?:^|[^\d])(\d+(?:[.,]\d{1,2})?)(?!\d)/);
   if (digitos) {
     const n = Number(digitos[1].replace(",", "."));
     if (Number.isFinite(n) && n > 0) return Math.round(n * 100) / 100;
@@ -121,7 +121,8 @@ function encontrarCuenta(transcripcion: string, cuentas: Catalogos["cuentas"]): 
   for (const c of cuentas) {
     const nombre = nombreCuentaComparable(c.name);
     if (!nombre) continue;
-    if (n.includes(nombre)) return c.id;
+    const patronNombre = new RegExp(`(?:^| )${nombre.replace(/ /g, "\\\\s+")}(?: |$)`);
+    if (patronNombre.test(n)) return c.id;
 
     const palabras = nombre.split(" ").filter((p) => p.length >= 3 && !genericas.has(p));
     const score = palabras.filter((p) => palabrasTexto.has(p)).length;
