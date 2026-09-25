@@ -60,6 +60,7 @@ ORDEN DE PRIORIDAD DE LAS REGLAS:
 - Una cuenta puede mencionarse de forma natural o abreviada. Si el catálogo dice "FortalezaBOB" y el usuario dice "Fortaleza", puedes asociarla si la coincidencia es inequívoca.
 - Lo mismo aplica a sufijos de moneda como BOB, USD o USDT y palabras genéricas como "Banco" o "Cuenta".
 - Si no hay una mención razonablemente clara de una cuenta concreta, cuenta_id=null.
+- Si hay varios movimientos, asigna una cuenta solo al movimiento al que pertenece su mención; no propagues una cuenta mencionada una vez a los demás.
 - Nunca descartes un movimiento solo porque no se pudo identificar la cuenta.
 
 7. CATEGORÍAS
@@ -285,7 +286,8 @@ function cuentaMencionada(transcripcion: string, nombreCuenta: string): boolean 
   const texto = quitarAcentos(transcripcion.toLowerCase()).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
   const nombre = normalizarNombreCuenta(nombreCuenta);
   if (!nombre) return false;
-  if (texto.includes(nombre)) return true;
+  const patronNombre = new RegExp(`(?:^| )${escapeRegExp(nombre).replace(/\\ /g, "\\\\s+")}(?: |$)`);
+  if (patronNombre.test(texto)) return true;
 
   const genericas = new Set(["banco", "cuenta", "bob", "usd", "usdt", "bs", "bolivianos", "boliviano"]);
   const tokens = nombre.split(" ").filter((p) => p.length >= 3 && !genericas.has(p));
