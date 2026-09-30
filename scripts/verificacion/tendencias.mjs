@@ -1,110 +1,92 @@
-// Verifica lib/tendencias.ts con series construidas a mano, donde la respuesta
-// se conoce de antemano. No es una suite de tests (decisión E6): es la
-// herramienta con la que se revisó este módulo, y queda para volver a correrla.
-import { build } from "esbuild";
-await build({ entryPoints: ["/home/user/jc_money/lib/tendencias.ts"], bundle: true,
-  format: "esm", platform: "node", outfile: "/tmp/tendencias.mjs", logLevel: "error",
-  alias: { "@": "/home/user/jc_money" } });
-const { analizarTendencia } = await import("/tmp/tendencias.mjs");
-
-const pruebas = [];
-const check = (n, ok, extra = "") => pruebas.push([n, ok, extra]);
-const cerca = (a, b, tol = 0.51) => a != null && Math.abs(a - b) <= tol;
-
-// --- Serie perfectamente lineal: +100 Bs/día durante 100 días ---
-const lineal = [];
-for (let i = 0; i <= 100; i += 10) {
-  const d = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
-  lineal.push({ fecha: d, bob: 10000 + 100 * i });
+// Verificación manual de las tendencias y aperturas con datos conocidos.
+// Sin framework, sin CI y sin acceso a cuentas reales. Ejecutar explícitamente:
+//   node scripts/verificacion/tendencias.mjs
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+const require = createRequire(import.meta.url);
+const ts = require("typescript");
+require.extensions[".ts"] = (mod, file) => mod._compile(ts.transpileModule(readFileSync(file, "utf8"), {
+  compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS },
+}).outputText, file);
+const { analizarTendencia } = require("../../lib/tendencias.ts");
+const { proyectarPatrimonio, aplicarEscenario, resumirFlujos } = require("../../lib/proyeccion-patrimonio.ts");
+const { normalizarFotos, proximasAperturas, sumarDias, diasEntre } = require("../../lib/tendencias-fechas.ts");
+const { leerTodasLasFilas } = require("../../lib/queries/paginas.ts");
+let revisados = 0;
+let fallos = 0;
+function check(nombre, ok) { revisados++; if (!ok) fallos++; console.log(`${ok ? "OK" : "FALLA"} ${nombre}`); }
+const cerca = (a, b) => Math.abs(a - b) < 0.02;
+const base = (fecha, bob) => ({ fecha, bob, disponible: 20000, exposicion: 1000, rate: 10, enVivo: true });
+function diario(desde, hasta, fn) {
+  return Array.from({ length: diasEntre(desde, hasta) + 1 }, (_, i) => ({ fecha: sumarDias(desde, i), bob: fn(i) }));
 }
-const L = analizarTendencia(lineal);
-check("una recta perfecta da R² = 1", L.r2 === 1, `R²=${L.r2}`);
-check("y el ritmo diario exacto", cerca(L.ritmoDiario, 100, 0.01), `${L.ritmoDiario}`);
-check("ritmo mensual = diario · 30,44", cerca(L.ritmoMensual, 100 * 30.4375, 0.01));
-check("sin residuos, la banda es de ancho cero",
-  L.puntos.filter((p) => p.banda).every((p) => cerca(p.banda[1] - p.banda[0], 0, 0.01)));
-check("estando en el pico, el drawdown es 0", L.drawdown.monto === 0 && L.drawdown.pct === 0);
-check("y lo dice como hallazgo", L.hallazgos.some((h) => h.id === "maximo" && h.tono === "bueno"));
-
-// --- Serie con caída: sube y luego se desploma ---
-const caida = [
-  { fecha: "2026-01-01", bob: 50000 },
-  { fecha: "2026-02-01", bob: 60000 },
-  { fecha: "2026-03-01", bob: 70000 },  // máximo
-  { fecha: "2026-04-01", bob: 65000 },
-  { fecha: "2026-05-01", bob: 58000 },
-  { fecha: "2026-06-01", bob: 56000 },
-];
-const C = analizarTendencia(caida);
-check("encuentra el máximo histórico", C.maximo.valor === 70000 && C.maximo.fecha === "2026-03-01");
-check("mide el drawdown contra ese máximo", C.drawdown.monto === 14000 && cerca(C.drawdown.pct, 0.2, 0.001),
-  `${C.drawdown.monto} / ${C.drawdown.pct}`);
-check("cuenta la racha a la baja (abr, may, jun)",
-  C.racha?.direccion === "baja" && C.racha.meses === 3, JSON.stringify(C.racha));
-check("mejor mes = febrero (+10.000)", C.mejorMes?.period === "2026-02" && C.mejorMes.cambio === 10000);
-check("peor mes = mayo (−7.000)", C.peorMes?.period === "2026-05" && C.peorMes.cambio === -7000);
-check("detecta que se está frenando", C.aceleracion.direccion === "desacelerando",
-  JSON.stringify(C.aceleracion));
-check("avisa del drawdown con tono malo",
-  C.hallazgos.some((h) => h.id === "drawdown" && h.tono === "malo"));
-check("y NO dice que estás en tu máximo", !C.hallazgos.some((h) => h.id === "maximo"));
-
-// --- Los meses encadenan aunque las fotos sean irregulares ---
-const irregular = [
-  { fecha: "2026-01-03", bob: 10000 },
-  { fecha: "2026-01-28", bob: 12000 }, // el cierre de enero es este
-  { fecha: "2026-02-14", bob: 15000 },
-];
-const I = analizarTendencia(irregular);
-check("el cambio mensual usa la última foto del mes anterior",
-  I.porMes.length === 1 && I.porMes[0].period === "2026-02" && I.porMes[0].cambio === 3000,
-  JSON.stringify(I.porMes));
-
-// --- Serie ruidosa: la banda debe abrirse y el ajuste ser bajo ---
-const ruidosa = [
-  { fecha: "2026-01-01", bob: 40000 },
-  { fecha: "2026-02-01", bob: 55000 },
-  { fecha: "2026-03-01", bob: 42000 },
-  { fecha: "2026-04-01", bob: 61000 },
-  { fecha: "2026-05-01", bob: 45000 },
-  { fecha: "2026-06-01", bob: 63000 },
-];
-const R = analizarTendencia(ruidosa);
-const bandas = R.puntos.filter((p) => p.banda);
-check("con ruido, la banda tiene ancho real", bandas[0].banda[1] - bandas[0].banda[0] > 5000);
-// Ojo: comparar los anchos con un simple ">" no sirve — con una banda de ancho
-// constante el ruido de coma flotante hacía pasar la comprobación. Se exige un
-// ensanchamiento real, que es la propiedad del intervalo de predicción.
-const ancho = (p) => p.banda[1] - p.banda[0];
-check("y se ensancha con el horizonte (al menos 1,5× a 24 meses)",
-  ancho(bandas[bandas.length - 1]) > ancho(bandas[0]) * 1.5,
-  `${ancho(bandas[0]).toFixed(0)} → ${ancho(bandas[bandas.length - 1]).toFixed(0)}`);
-check("el piso de la banda nunca es negativo", bandas.every((p) => p.banda[0] >= 0));
-check("avisa de que no sigue una recta", R.hallazgos.some((h) => h.id === "ajuste-bajo"));
-check("la banda contiene siempre a la proyección",
-  bandas.every((p) => p.proyeccion >= p.banda[0] && p.proyeccion <= p.banda[1]));
-
-// --- Casos límite ---
-const U = analizarTendencia([{ fecha: "2026-01-01", bob: 100 }]);
-check("con una sola foto no proyecta nada", !U.suficienteData && U.hallazgos.length === 0);
-const D = analizarTendencia([{ fecha: "2026-01-01", bob: 100 }, { fecha: "2026-02-01", bob: 200 }]);
-check("con dos fotos proyecta pero sin banda (0 grados de libertad)",
-  D.suficienteData && D.errorEstandar === null && D.puntos.every((p) => p.banda === null));
-check("la banda arranca en la última foto, no un mes después",
-  R.puntos.filter((p) => p.real != null && p.banda != null).length === 1 &&
-  R.puntos.find((p) => p.banda != null).fecha === R.hasta,
-  R.puntos.find((p) => p.banda != null)?.fecha);
-check("y en el resto del histórico no hay banda",
-  R.puntos.filter((p) => p.real != null).slice(0, -1).every((p) => p.banda === null));
-check("y avisa de que son pocos datos", D.hallazgos.some((h) => h.id === "pocas-fotos"));
-const Z = analizarTendencia([{ fecha: "2026-01-01", bob: 0 }, { fecha: "2026-02-01", bob: 0 }]);
-check("una serie en cero no rompe ni produce NaN",
-  Number.isFinite(Z.ritmoMensual) && !Number.isNaN(Z.drawdown.pct));
-
-let f = 0;
-for (const [n, ok, extra] of pruebas) {
-  if (!ok) f++;
-  console.log(`${ok ? "OK   " : "FALLA"} ${n}${!ok && extra ? `  → ${extra}` : ""}`);
-}
-console.log(`\n${pruebas.length - f}/${pruebas.length}`);
-process.exit(f ? 1 : 0);
+const lineal = diario("2025-01-01", "2026-09-29", (i) => 50000 + i * 100);
+const hoy = "2026-09-30";
+const saldo = 50000 + diasEntre("2025-01-01", hoy) * 100;
+const p = proyectarPatrimonio({ hoy, serie: lineal, base: base(hoy, saldo) });
+check("doce aperturas consecutivas, todas el día 1", p.aperturas.length === 12 && p.aperturas.every((a) => a.fecha.endsWith("-01")));
+check("primera apertura desde HOY, no desde una foto antigua", p.aperturas[0].fecha === "2026-10-01");
+check("apertura equivale al cierre anterior; no agrega movimientos del día 1", p.aperturas[0].dias === 0 && p.aperturas[0].patrimonio === saldo);
+check("noviembre conserva los 31 días reales de octubre", p.aperturas[1].dias === 31 && p.aperturas[1].patrimonio === saldo + 3100);
+check("backtest elige tendencia frente a saldo constante", p.modelo.validado && p.modelo.id !== "constante" && p.validacion.find((v) => v.id === p.modelo.id).mae < 0.01);
+check("comparación justa: igual número de cierres por modelo", new Set(p.validacion.map((v) => v.evaluaciones)).size === 1);
+check("todos los valores y rangos son finitos", p.aperturas.every((a) => Number.isFinite(a.patrimonio) && (!a.rango || a.rango.every(Number.isFinite))));
+check("fechas lejanas se marcan extrapolación", p.aperturas.at(-1).extrapolacion);
+check("diciembre avanza al año siguiente", proximasAperturas("2026-12-31")[0] === "2027-01-01");
+check("febrero bisiesto termina el 29", sumarDias("2028-03-01", -1) === "2028-02-29");
+check("febrero no bisiesto termina el 28", sumarDias("2027-03-01", -1) === "2027-02-28");
+check("si hoy es día 1 se proyecta el MES SIGUIENTE", proximasAperturas("2026-10-01")[0] === "2026-11-01");
+const limpia = normalizarFotos([{ fecha: "2026-02-02", bob: 20 }, { fecha: "2026-02-01", bob: 10 }, { fecha: "2026-02-02", bob: 30 }, { fecha: "2026-02-30", bob: 9 }, { fecha: "2026-02-03", bob: NaN }, { fecha: "2027-01-01", bob: 100 }], "2026-09-30");
+check("ordena, consolida duplicados y excluye fechas inválidas y futuras", limpia.length === 2 && limpia[0].bob === 10 && limpia[1].bob === 30);
+const corta = proyectarPatrimonio({ hoy, serie: [{ fecha: hoy, bob: 500 }], base: base(hoy, 500) });
+check("un solo registro conserva el saldo y no finge validación", corta.modelo.id === "constante" && !corta.modelo.validado && corta.aperturas.every((a) => a.rango === null));
+const vacia = proyectarPatrimonio({ hoy, serie: [] });
+check("sin base no inventa patrimonio ni aperturas", vacia.base === null && vacia.aperturas.length === 0);
+const cero = proyectarPatrimonio({ hoy, serie: diario("2026-01-01", "2026-09-29", () => 0), base: base(hoy, 0) });
+check("serie constante y cero no generan NaN", cero.modelo.id === "constante" && cero.aperturas.every((a) => a.patrimonio === 0));
+const negativa = proyectarPatrimonio({ hoy, serie: diario("2026-01-01", "2026-09-29", (i) => -10000 - 100 * i), base: base(hoy, -37200) });
+check("patrimonio negativo no se recorta a cero", negativa.aperturas.every((a) => a.patrimonio < 0));
+const vieja = proyectarPatrimonio({ hoy, serie: [{ fecha: "2026-06-30", bob: 1000 }] });
+check("la base antigua avisa y mantiene fechas futuras desde hoy", vieja.diasSinActualizar === 92 && vieja.aperturas[0].fecha === "2026-10-01");
+const hist = analizarTendencia([...lineal, { fecha: hoy, bob: saldo }], { hoy });
+check("regresión descriptiva conserva pendiente exacta", cerca(hist.ritmoDiario, 100) && hist.r2 === 1);
+check("mes actual sigue parcial aunque hoy sea fin de mes", hist.porMes.at(-1).parcial);
+const hueco = analizarTendencia([{ fecha: "2026-01-31", bob: 1000 }, { fecha: "2026-03-31", bob: 3000 }, { fecha: "2026-04-30", bob: 4000 }], { hoy: "2026-05-01" });
+check("salto enero-marzo no se etiqueta cambio de marzo", !hueco.porMes.some((m) => m.period === "2026-03"));
+const cierres = analizarTendencia([{ fecha: "2026-01-31", bob: 1000 }, { fecha: "2026-02-28", bob: 2000 }, { fecha: "2026-03-31", bob: 3000 }, { fecha: "2026-04-30", bob: 2000 }, { fecha: "2026-05-31", bob: 1500 }, { fecha: "2026-06-30", bob: 500 }], { hoy: "2026-07-01" });
+check("racha exige meses consecutivos con cierres completos", cierres.racha?.meses === 3 && cierres.racha.direccion === "baja");
+check("caída desde máximo se mantiene", cierres.drawdown.monto === 2500);
+const roto = analizarTendencia([{ fecha: "2026-01-31", bob: 1000 }, { fecha: "2026-02-28", bob: 2000 }, { fecha: "2026-04-30", bob: 3000 }, { fecha: "2026-05-31", bob: 4000 }], { hoy: "2026-06-01" });
+check("meses faltantes rompen la racha", roto.racha?.meses === 1);
+function txn(fecha, type, monto, currency = "BOB", rate = null) { return { txn_date: fecha, type, amount: monto, amount_bob: monto, currency, exchange_rate: rate }; }
+const txs = [txn("2026-06-01", "ingreso", 10000), txn("2026-06-15", "gasto", 2000), txn("2026-07-01", "ingreso", 12000), txn("2026-07-15", "gasto", 3000), txn("2026-08-01", "ingreso", 12000), txn("2026-08-15", "gasto", 5000), txn("2026-09-02", "gasto", 99000)];
+const flujos = resumirFlujos(txs, hoy);
+check("flujos usan meses cerrados y excluyen el mes actual", flujos.meses.length === 3 && cerca(flujos.netoMensual, 8000));
+const invalidos = resumirFlujos([...txs, txn("2026-08-20", "gasto", 100, "USD"), txn("2026-10-01", "ingreso", 1000)], hoy);
+check("cotización faltante excluye todo ese mes de referencia", invalidos.omitidas === 1 && !invalidos.meses.includes("2026-08"));
+check("transacción futura no contamina histórico", invalidos.futuras === 1 && invalidos.ingresoMensual === 11000);
+const iniciada = resumirFlujos(txs.map((t, i) => i === 0 ? { ...t, txn_date: "2026-06-05" } : t), hoy);
+check("primer mes iniciado a mitad no cuenta como completo", !iniciada.meses.includes("2026-06"));
+const calendario = { dpfs: [{ status: "activo", start_date: "2026-01-01", end_date: "2026-10-15", principal: 8000 }], deudas: [{ status: "pendiente", debt_date: "2026-01-01", due_date: "2026-10-20", outstanding: 3000 }] };
+const conFlujos = proyectarPatrimonio({ hoy, serie: lineal, base: base(hoy, saldo), transacciones: txs, ...calendario });
+check("DPF y cobro quedan en el periodo correcto", conFlujos.aperturas[1].capitalDpf === 8000 && conFlujos.aperturas[1].porCobrar === 3000 && conFlujos.aperturas[0].capitalDpf === 0);
+check("capital previsto no duplica el patrimonio", conFlujos.aperturas[1].patrimonio === p.aperturas[1].patrimonio);
+check("disponibilidad por flujos no suma capital previsto", cerca(conFlujos.aperturas[1].disponiblePorFlujos, 20000 + 8000 * 31 / 30.4375));
+const eventoDia1 = proyectarPatrimonio({ hoy, serie: lineal, base: base(hoy, saldo), dpfs: [{ ...calendario.dpfs[0], end_date: "2026-11-01" }] });
+check("vencimiento del día 1 pertenece al siguiente periodo", eventoDia1.aperturas[1].capitalDpf === 0 && eventoDia1.aperturas[2].capitalDpf === 8000);
+const atrasado = proyectarPatrimonio({ hoy, serie: lineal, base: base(hoy, saldo), dpfs: [{ ...calendario.dpfs[0], end_date: "2026-09-29" }] });
+check("vencimiento atrasado no se inventa como cobro futuro", atrasado.aperturas.every((a) => a.capitalDpf === 0));
+const escenario = aplicarEscenario(conFlujos, 500, 10);
+check("shock de cotización se aplica una vez sobre exposición neta", cerca(escenario[0].patrimonio - conFlujos.aperturas[0].patrimonio, 1000));
+check("ahorro adicional usa días reales", cerca(escenario[1].patrimonio - conFlujos.aperturas[1].patrimonio, 1000 + 500 * 31 / 30.4375));
+check("escenario no altera el objeto base", conFlujos.aperturas[0].patrimonio === saldo);
+check("shock cambiario no se finge como efectivo disponible", escenario[0].disponiblePorFlujos === conFlujos.aperturas[0].disponiblePorFlujos);
+const sinVivo = proyectarPatrimonio({ hoy, serie: lineal, base: { ...base("2026-09-29", saldo), enVivo: false }, transacciones: txs });
+check("base desactualizada no extrapola flujos como actuales", sinVivo.aperturas.every((a) => a.disponiblePorFlujos === null));
+// Alterar solo el último punto no debe cambiar los errores de cortes anteriores.
+const cambioFinal = proyectarPatrimonio({ hoy, serie: [...lineal.slice(0, -1), { ...lineal.at(-1), bob: 999999 }] });
+check("backtest no utiliza registros posteriores al cierre evaluado", JSON.stringify(cambioFinal.validacion) === JSON.stringify(p.validacion));
+const paginas = await leerTodasLasFilas(async (desde, hasta) => ({ data: Array.from({ length: Math.max(0, Math.min(100, 1250 - desde, hasta - desde + 1)) }, (_, i) => i + desde), error: null }));
+check("lector recupera más de 1000 filas incluso si el servidor limita páginas", paginas.length === 1250 && paginas.at(-1) === 1249);
+console.log(`\n${revisados - fallos}/${revisados} verificaciones correctas`);
+process.exitCode = fallos ? 1 : 0;

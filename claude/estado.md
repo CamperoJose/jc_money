@@ -2,7 +2,43 @@
 
 > Actualiza este archivo al cerrar cada bloque de trabajo, para retomar sin recontextualizar.
 
-## Última actualización: 2026-09-07 (sesión 23 — correos, alertas y análisis)
+## Última actualización: 2026-09-30 — tendencias y aperturas mensuales
+
+- Panel con doce aperturas al día 1, tabla ordenable en escritorio y tarjetas en móvil.
+  Horizonte visible 3/6/12 meses, escenarios de ahorro y shock de T/C, y meta personal
+  conservados en URL. Reutiliza tokens y componentes existentes.
+- Base actualizada mediante `calcularEstadoPatrimonio`, sin escribir fotos adicionales.
+  Si falla, se usa la última foto y se indica su antigüedad. Ningún cambio en jobs,
+  reglas de saldo, migraciones ni datos financieros.
+- `lib/proyeccion-patrimonio.ts`: compara saldo constante, pendiente histórica y últimos
+  90 días contra cierres exactos posteriores, usando el mismo conjunto de cortes.
+  Se exige al menos cuatro cierres y mejora de 5% para elegir una tendencia sobre
+  el saldo constante. Muestra MAE y sesgo. El rango es orientativo basado en errores
+  observados, no una probabilidad del 95%; los horizontes largos son extrapolaciones.
+- Flujo mensual registrado de los últimos tres meses cerrados (mínimo dos utilizables)
+  como alternativa a la tendencia, no sumado a ella. Disponible por flujos supone
+  ahorro en cuentas líquidas. DPF y deudas muestran capital potencial por periodo,
+  sin suponer cobro ni sumar dos veces capital existente. No se añaden intereses
+  porque no se puede inferir su modalidad de pago con los datos disponibles.
+- Normaliza fechas y duplicados diarios; excluye meses actuales/incompletos de rachas,
+  extremos y variabilidad. Huecos mensuales rompen rachas. Aceleración 90 contra 90 días.
+  R² pasa a «ajuste histórico» y el crecimiento se distingue de rentabilidad.
+- Fotos y movimientos se leen por páginas con orden estable. Tendencias usa el usuario
+  autenticado en movimientos, DPF y deudas, sin que JOB_USER_ID sustituya al usuario.
+- Verificación: 40/40 comprobaciones manuales con datos conocidos en
+  `scripts/verificacion/tendencias.mjs`; tipos, lint sin errores y build. UI local con
+  datos sintéticos: gráficos, escenarios, reset, metas, orden, horizonte y móviles
+  390/320 px sin desbordes ni errores de hidratación (13 comprobaciones). Escritorio
+  a 1360 px; tema oscuro revisado. Sin credenciales Supabase de producción: no se
+  verificaron registros reales. La ruta de revisión y su excepción de middleware
+  fueron temporales y se retiraron antes de publicar.
+
+Ver [TODOs de este bloque](todos/tendencias-mensuales.md). Producción se promueve
+manualmente en Vercel, como en las sesiones anteriores.
+
+---
+
+## Actualización anterior: 2026-09-07 (sesión 23 — correos, alertas y análisis)
 
 ### Sesión 23 — lo hecho ✅
 

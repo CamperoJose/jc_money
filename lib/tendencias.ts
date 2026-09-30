@@ -1,20 +1,8 @@
 // Análisis de tendencia del patrimonio: regresión lineal + proyección compuesta.
 // Puro (sin red). Trabaja sobre la serie histórica (fecha ISO, valor en BOB).
 
-function diasEntre(a: string, b: string): number {
-  const ma = Date.parse(`${a}T00:00:00Z`);
-  const mb = Date.parse(`${b}T00:00:00Z`);
-  if (Number.isNaN(ma) || Number.isNaN(mb)) return 0;
-  return Math.round((mb - ma) / 86_400_000);
-}
-function sumarMeses(fecha: string, meses: number): string {
-  const [y, m, dd] = fecha.split("-").map(Number);
-  const base = new Date(Date.UTC(y, m - 1 + meses, 1));
-  const ultimoDia = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), Math.min(dd, ultimoDia)))
-    .toISOString()
-    .slice(0, 10);
-}
+import { diasEntre, normalizarFotos, proximasAperturas, sumarDias } from "./tendencias-fechas";
+
 function r2n(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -50,6 +38,8 @@ export interface CambioMensual {
   fin: number;
   cambio: number; // fin − inicio, en BOB
   pct: number | null; // cambio / inicio
+  parcial: boolean;
+  cierreFecha: string;
 }
 
 export interface Aceleracion {
@@ -97,7 +87,7 @@ export interface ResumenTendencias {
   hallazgos: Hallazgo[];
 }
 
-const MESES_HORIZONTE = [1, 3, 6, 12, 24];
+const MESES_HORIZONTE = Array.from({ length: 12 }, (_, i) => i + 1);
 const DIAS_MES = 30.4375;
 
 function etiquetaMeses(m: number): string {
@@ -116,9 +106,10 @@ function metasSugeridas(valor: number): number[] {
 }
 
 export function analizarTendencia(
-  serie: { fecha: string; bob: number }[]
+  serie: { fecha: string; bob: number }[],
+  opciones: { hoy?: string } = {}
 ): ResumenTendencias {
-  const puntosValidos = serie.filter((p) => p.fecha && Number.isFinite(p.bob));
+  const puntosValidos = normalizarFotos(serie, opciones.hoy);
   const n = puntosValidos.length;
   const vacio: ResumenTendencias = {
     suficienteData: false,
@@ -180,12 +171,13 @@ export function analizarTendencia(
       ? r4(Math.pow(valorActual / primero, 1 / mesesTotales) - 1)
       : null;
 
-  const proyecciones: Proyeccion[] = MESES_HORIZONTE.map((m) => {
-    const fecha = sumarMeses(hasta, m);
+  const fechasObjetivo = proximasAperturas(opciones.hoy ?? hasta);
+  const proyecciones: Proyeccion[] = MESES_HORIZONTE.map((m, i) => {
+    const fecha = fechasObjetivo[i];
     const dia = diasEntre(desde, fecha);
     const valorLineal = r2n(predict(dia));
     const valorCompuesto =
-      crecimientoMensualPct != null ? r2n(valorActual * Math.pow(1 + crecimientoMensualPct, m)) : null;
+      crecimientoMensualPct != null ? r2n(valorActual * Math.pow(1 + crecimientoMensualPct, diasEntre(hasta, fecha) / DIAS_MES)) : null;
     return { meses: m, label: etiquetaMeses(m), fecha, valorLineal, valorCompuesto };
   });
 
@@ -208,7 +200,9 @@ export function analizarTendencia(
   const se = gl > 0 ? Math.sqrt(ssRes / gl) : null;
   const mediaX = sumX / n;
   const sxx = xs.reduce((a, x) => a + (x - mediaX) ** 2, 0);
-  const T95 = 1.96; // normal; con n muy chico subestima un poco, y se avisa
+  // Cuantil Student al 95%; con pocas fotos 1,96 subestima el margen.
+  const tablaT = [0, 12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228];
+  const T95 = gl <= 10 ? tablaT[Math.max(1, gl)] : gl <= 20 ? 2.228 : gl <= 30 ? 2.086 : gl <= 60 ? 2.042 : 1.96;
   const margen = (dia: number): number | null => {
     if (se == null || sxx <= 0) return null;
     return T95 * se * Math.sqrt(1 + 1 / n + (dia - mediaX) ** 2 / sxx);
@@ -225,11 +219,10 @@ export function analizarTendencia(
       fecha: p.fecha,
       real: r2n(p.bob),
       proyeccion: r2n(centro),
-      banda: mrg == null ? null : [r2n(Math.max(0, centro - mrg)), r2n(centro + mrg)],
+      banda: mrg == null ? null : [r2n(centro - mrg), r2n(centro + mrg)],
     };
   });
-  for (const m of MESES_HORIZONTE) {
-    const fecha = sumarMeses(hasta, m);
+  for (const fecha of fechasObjetivo) {
     const dia = diasEntre(desde, fecha);
     const centro = predict(dia);
     const mrg = margen(dia);
@@ -237,9 +230,8 @@ export function analizarTendencia(
       fecha,
       real: null,
       proyeccion: r2n(centro),
-      // El piso no baja de cero: un patrimonio negativo no es un escenario, y
-      // dibujarlo desplazaría el eje Y hasta hacer ilegible el resto.
-      banda: mrg == null ? null : [r2n(Math.max(0, centro - mrg)), r2n(centro + mrg)],
+      // El patrimonio neto puede ser negativo; no recortar el intervalo.
+      banda: mrg == null ? null : [r2n(centro - mrg), r2n(centro + mrg)],
     });
   }
 
@@ -257,31 +249,39 @@ export function analizarTendencia(
   };
 
   // Cambio mes a mes: se toma la ÚLTIMA foto de cada mes como cierre, y el
-  // cierre del mes anterior como apertura, para que los meses encadenen sin
-  // huecos aunque las fotos sean irregulares.
-  const cierrePorMes = new Map<string, number>();
-  for (const p of puntosValidos) cierrePorMes.set(p.fecha.slice(0, 7), p.bob);
+  // registro del mes anterior como referencia. Un mes sin cierres exactos
+  // queda como parcial, y un hueco de calendario rompe la comparación.
+  const cierrePorMes = new Map<string, { fecha: string; bob: number }>();
+  for (const p of puntosValidos) cierrePorMes.set(p.fecha.slice(0, 7), p);
   const mesesOrdenados = [...cierrePorMes.keys()].sort();
   const porMes: CambioMensual[] = [];
   for (let i = 1; i < mesesOrdenados.length; i++) {
-    const inicio = cierrePorMes.get(mesesOrdenados[i - 1])!;
-    const fin = cierrePorMes.get(mesesOrdenados[i])!;
+    const anterior = cierrePorMes.get(mesesOrdenados[i - 1])!;
+    const actual = cierrePorMes.get(mesesOrdenados[i])!;
+    const siguiente = proximasAperturas(anterior.fecha, 1)[0].slice(0, 7);
+    // Un hueco de varios meses no es el resultado de un solo mes.
+    if (siguiente !== mesesOrdenados[i]) continue;
+    const inicio = anterior.bob;
+    const fin = actual.bob;
     porMes.push({
       period: mesesOrdenados[i],
+      cierreFecha: actual.fecha,
+      parcial: (opciones.hoy != null && actual.fecha.slice(0, 7) === opciones.hoy.slice(0, 7)) || actual.fecha !== sumarDias(proximasAperturas(actual.fecha, 1)[0], -1) || anterior.fecha !== sumarDias(proximasAperturas(anterior.fecha, 1)[0], -1),
       inicio: r2n(inicio),
       fin: r2n(fin),
       cambio: r2n(fin - inicio),
       pct: inicio > 0 ? r4((fin - inicio) / inicio) : null,
     });
   }
-  const mejorMes = porMes.length ? porMes.reduce((a, b) => (b.cambio > a.cambio ? b : a)) : null;
-  const peorMes = porMes.length ? porMes.reduce((a, b) => (b.cambio < a.cambio ? b : a)) : null;
+  const completos = porMes.filter((m) => !m.parcial);
+  const mejorMes = completos.length ? completos.reduce((a, b) => (b.cambio > a.cambio ? b : a)) : null;
+  const peorMes = completos.length ? completos.reduce((a, b) => (b.cambio < a.cambio ? b : a)) : null;
 
   // Volatilidad: desviación típica de los cambios mensuales. Dice si el ritmo
   // es parejo o a los saltos, que es distinto de si sube o baja.
   let volatilidadMensual: number | null = null;
-  if (porMes.length >= 2) {
-    const cambios = porMes.map((m) => m.cambio);
+  if (completos.length >= 2) {
+    const cambios = completos.map((m) => m.cambio);
     const media = cambios.reduce((a, b) => a + b, 0) / cambios.length;
     const varianza = cambios.reduce((a, c) => a + (c - media) ** 2, 0) / (cambios.length - 1);
     volatilidadMensual = r2n(Math.sqrt(varianza));
@@ -289,29 +289,31 @@ export function analizarTendencia(
 
   // Racha: meses consecutivos en la misma dirección, desde el último hacia atrás.
   let racha: { meses: number; direccion: "alza" | "baja" } | null = null;
-  if (porMes.length > 0) {
-    const ultimo = porMes[porMes.length - 1];
+  if (completos.length > 0) {
+    const ultimo = completos[completos.length - 1];
     if (ultimo.cambio !== 0) {
       const direccion: "alza" | "baja" = ultimo.cambio > 0 ? "alza" : "baja";
       let cuenta = 0;
-      for (let i = porMes.length - 1; i >= 0; i--) {
-        const sube = porMes[i].cambio > 0;
-        if (porMes[i].cambio === 0 || sube !== (direccion === "alza")) break;
+      for (let i = completos.length - 1; i >= 0; i--) {
+        if (i < completos.length - 1 && proximasAperturas(`${completos[i].period}-01`, 1)[0].slice(0, 7) !== completos[i + 1].period) break;
+        const sube = completos[i].cambio > 0;
+        if (completos[i].cambio === 0 || sube !== (direccion === "alza")) break;
         cuenta++;
       }
       racha = { meses: cuenta, direccion };
     }
   }
 
-  // Aceleración: ritmo de los últimos 90 días contra el de todo lo anterior.
+  // Aceleración: ritmo de los últimos 90 días contra los 90 días anteriores.
   // Se compara con la MISMA regresión sobre cada tramo, no con el promedio
   // simple, para que un par de fotos juntas no distorsionen la lectura.
   const VENTANA_DIAS = 90;
   const corteReciente = sumarDiasISO(hasta, -VENTANA_DIAS);
   const recientes = puntosValidos.filter((p) => p.fecha >= corteReciente);
-  const previos = puntosValidos.filter((p) => p.fecha < corteReciente);
+  const cortePrevio = sumarDiasISO(hasta, -2 * VENTANA_DIAS);
+  const previos = puntosValidos.filter((p) => p.fecha >= cortePrevio && p.fecha < corteReciente);
   const pendienteDe = (pts: { fecha: string; bob: number }[]): number | null => {
-    if (pts.length < 2) return null;
+    if (pts.length < 6 || diasEntre(pts[0].fecha, pts.at(-1)!.fecha) < 30) return null;
     const base = pts[0].fecha;
     const px = pts.map((p) => diasEntre(base, p.fecha));
     const py = pts.map((p) => p.bob);
@@ -343,7 +345,7 @@ export function analizarTendencia(
     hallazgos.push({
       id: "pocas-fotos",
       titulo: "Pocos datos todavía",
-      detalle: `La proyección se apoya en ${n} fotos. Con más historial las bandas se van a cerrar bastante.`,
+      detalle: `La proyección se apoya en ${n} fotos. El ajuste histórico no demuestra precisión futura; hace falta evaluar cierres posteriores.`,
       tono: "aviso",
     });
   }
@@ -351,7 +353,7 @@ export function analizarTendencia(
     hallazgos.push({
       id: "ajuste-bajo",
       titulo: "Tu patrimonio no sigue una recta",
-      detalle: `El ajuste explica solo el ${Math.round(r2 * 100)}% de la variación: se mueve más a saltos que en línea. La banda del gráfico es la lectura honesta, no la línea del centro.`,
+      detalle: `El ajuste explica solo el ${Math.round(r2 * 100)}% de la variación: se mueve más a saltos que en línea. Revisa el error en cierres posteriores antes de interpretar la línea como una predicción fiable.`,
       tono: "aviso",
     });
   }
@@ -359,7 +361,7 @@ export function analizarTendencia(
     hallazgos.push({
       id: "aceleracion",
       titulo: direccion === "acelerando" ? "El ritmo se está acelerando" : "El ritmo se está frenando",
-      detalle: `Últimos ${VENTANA_DIAS} días: ${fmtSigno(ritmoReciente!)} Bs/mes, contra ${fmtSigno(ritmoPrevio!)} Bs/mes antes.`,
+      detalle: `Últimos ${VENTANA_DIAS} días: ${fmtSigno(ritmoReciente!)} Bs/mes, contra ${fmtSigno(ritmoPrevio!)} Bs/mes en los 90 días anteriores.`,
       // Acelerar hacia abajo no es una buena noticia: el tono mira el signo del
       // ritmo actual, no solo si el cambio fue a más o a menos.
       tono: ritmoReciente! >= 0 && direccion === "acelerando" ? "bueno" : "aviso",
@@ -454,14 +456,14 @@ function fmtSigno(n: number): string {
 }
 function nombreMes(period: string): string {
   const [y, m] = period.split("-").map(Number);
-  return new Intl.DateTimeFormat("es-BO", { month: "long", year: "numeric" }).format(new Date(Date.UTC(y, m - 1, 1)));
+  return new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", month: "long", year: "numeric" }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 function fmt(n: number): string {
   return new Intl.NumberFormat("es-BO", { maximumFractionDigits: 0 }).format(n);
 }
 function fechaLarga(iso: string): string {
   const [y, m, dd] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("es-BO", { day: "2-digit", month: "long", year: "numeric" }).format(
+  return new Intl.DateTimeFormat("es-BO", { timeZone: "UTC", day: "2-digit", month: "long", year: "numeric" }).format(
     new Date(Date.UTC(y, m - 1, dd))
   );
 }

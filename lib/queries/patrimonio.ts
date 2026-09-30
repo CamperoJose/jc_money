@@ -1,3 +1,4 @@
+import { leerTodasLasFilas } from "./paginas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account, Currency, SnapshotKind } from "@/lib/types";
 import {
@@ -95,14 +96,14 @@ export async function getCuentas(supabase: SupabaseClient): Promise<Account[]> {
 export async function getSnapshots(
   supabase: SupabaseClient
 ): Promise<SnapshotUI[]> {
-  const { data, error } = await supabase
+  const data = await leerTodasLasFilas((desde, hasta) => supabase
     .from("net_worth_snapshots")
     .select(
       "id, snapshot_date, snapshot_at, kind, exchange_rate, note, total_bob, total_usd, net_worth_balances(id, account_id, amount, accounts(id, name, type, currency, is_liability, active))"
     )
-    .order("snapshot_at", { ascending: true });
-
-  if (error) throw error;
+    .order("snapshot_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(desde, hasta));
 
   return (data ?? []).map((s: Record<string, unknown>) => {
     const balances: BalanceUI[] = (
