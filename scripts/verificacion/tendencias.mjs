@@ -50,6 +50,12 @@ const vieja = proyectarPatrimonio({ hoy, serie: [{ fecha: "2026-06-30", bob: 100
 check("la base antigua avisa y mantiene fechas futuras desde hoy", vieja.diasSinActualizar === 92 && vieja.aperturas[0].fecha === "2026-10-01");
 const hist = analizarTendencia([...lineal, { fecha: hoy, bob: saldo }], { hoy });
 check("regresión descriptiva conserva pendiente exacta", cerca(hist.ritmoDiario, 100) && hist.r2 === 1);
+const fotos44 = Array.from({ length: 44 }, (_, i) => ({ fecha: sumarDias("2026-08-01", i), bob: 50000 + i }));
+const fotos45 = Array.from({ length: 45 }, (_, i) => ({ fecha: sumarDias("2026-08-01", i), bob: 50000 + i }));
+const resumen44 = analizarTendencia(fotos44, { hoy });
+const resumen45 = analizarTendencia(fotos45, { hoy });
+check("44 snapshots no habilitan hallazgos de patrones", !resumen44.suficienteParaPatrones && resumen44.n === 44 && resumen44.suficienteData);
+check("45 snapshots habilitan hallazgos de patrones", resumen45.suficienteParaPatrones && resumen45.n === 45);
 check("mes actual sigue parcial aunque hoy sea fin de mes", hist.porMes.at(-1).parcial);
 const hueco = analizarTendencia([{ fecha: "2026-01-31", bob: 1000 }, { fecha: "2026-03-31", bob: 3000 }, { fecha: "2026-04-30", bob: 4000 }], { hoy: "2026-05-01" });
 check("salto enero-marzo no se etiqueta cambio de marzo", !hueco.porMes.some((m) => m.period === "2026-03"));

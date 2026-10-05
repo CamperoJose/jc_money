@@ -72,7 +72,14 @@ export function TendenciasClient({
               cuando está disponible.
             </p>
           </div>
-          <ListaHallazgos hallazgos={t.hallazgos} />
+          <ListaHallazgos
+            hallazgos={t.suficienteParaPatrones ? t.hallazgos : []}
+            vacio={
+              t.suficienteParaPatrones
+                ? "No se detectaron patrones claros en estos snapshots."
+                : `Hay ${t.n} de 45 snapshots; se necesitan 45 para detectar patrones.`
+            }
+          />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi
               etiqueta="Ritmo histórico mensual"

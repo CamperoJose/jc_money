@@ -57,6 +57,8 @@ export interface Hallazgo {
 
 export interface ResumenTendencias {
   suficienteData: boolean;
+  /** Solo muestra hallazgos cuando hay al menos 45 snapshots válidos. */
+  suficienteParaPatrones: boolean;
   n: number;
   desde: string | null;
   hasta: string | null;
@@ -113,6 +115,7 @@ export function analizarTendencia(
   const n = puntosValidos.length;
   const vacio: ResumenTendencias = {
     suficienteData: false,
+    suficienteParaPatrones: false,
     n,
     desde: null,
     hasta: null,
@@ -421,6 +424,7 @@ export function analizarTendencia(
 
   return {
     suficienteData: true,
+    suficienteParaPatrones: n >= 45,
     n,
     desde,
     hasta,
