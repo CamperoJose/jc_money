@@ -62,6 +62,11 @@ function txn(fecha, type, monto, currency = "BOB", rate = null) { return { txn_d
 const txs = [txn("2026-06-01", "ingreso", 10000), txn("2026-06-15", "gasto", 2000), txn("2026-07-01", "ingreso", 12000), txn("2026-07-15", "gasto", 3000), txn("2026-08-01", "ingreso", 12000), txn("2026-08-15", "gasto", 5000), txn("2026-09-02", "gasto", 99000)];
 const flujos = resumirFlujos(txs, hoy);
 check("flujos usan meses cerrados y excluyen el mes actual", flujos.meses.length === 3 && cerca(flujos.netoMensual, 8000));
+const foto = (fecha, saldo) => ({ snapshot_date: fecha, snapshot_at: `${fecha}T23:00:00Z`, exchange_rate: 10, balances: [{ account_id: "cuenta", amount: saldo, account: { currency: "BOB", is_liability: false } }] });
+const fotosMensuales = [foto("2026-05-31", 10000), foto("2026-06-30", 11000), foto("2026-07-31", 12000), foto("2026-08-31", 13000)];
+const conSnapshots = resumirFlujos(txs, hoy, fotosMensuales);
+check("variación neta usa diferencias de saldos por cuenta en snapshots", cerca(conSnapshots.variacionSaldoSnapshots, 1000));
+check("ingreso estimado combina variación de saldo y gasto de los mismos meses", cerca(conSnapshots.ingresoEstimadoSnapshots, 10000/3 + 1000) && cerca(conSnapshots.gastoReferenciaSnapshots, 10000/3));
 const invalidos = resumirFlujos([...txs, txn("2026-08-20", "gasto", 100, "USD"), txn("2026-10-01", "ingreso", 1000)], hoy);
 check("cotización faltante excluye todo ese mes de referencia", invalidos.omitidas === 1 && !invalidos.meses.includes("2026-08"));
 check("transacción futura no contamina histórico", invalidos.futuras === 1 && invalidos.ingresoMensual === 11000);

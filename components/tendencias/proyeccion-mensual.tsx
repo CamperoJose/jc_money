@@ -593,22 +593,22 @@ export function ProyeccionMensual({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
-          etiqueta="Ingreso mensual registrado"
-          valor={formatBobCompact(p.flujos.ingresoMensual)}
-          detalle="Promedio de meses cerrados utilizables"
+          etiqueta={p.flujos.ingresoEstimadoSnapshots != null ? "Ingreso mensual estimado" : "Ingreso mensual registrado"}
+          valor={formatBobCompact(p.flujos.ingresoEstimadoSnapshots ?? p.flujos.ingresoMensual)}
+          detalle={p.flujos.ingresoEstimadoSnapshots != null ? "Cambio de saldos + gastos registrados" : "Promedio de meses cerrados utilizables"}
           icono={<Wallet className="size-4" weight="duotone" />}
         />
         <Kpi
           etiqueta="Gasto mensual registrado"
-          valor={formatBobCompact(p.flujos.gastoMensual)}
-          detalle="Incluye gastos fijos y variables, una sola vez"
+          valor={formatBobCompact(p.flujos.gastoReferenciaSnapshots ?? p.flujos.gastoMensual)}
+          detalle={p.flujos.gastoReferenciaSnapshots != null ? "Promedio en meses con snapshots comparables" : "Incluye gastos fijos y variables, una sola vez"}
           icono={<Wallet className="size-4" weight="duotone" />}
         />
         <Kpi
-          etiqueta="Ahorro neto registrado"
-          valor={formatBobCompact(p.flujos.netoMensual)}
-          detalle="Ingresos menos gastos"
-          tono={(p.flujos.netoMensual ?? 0) >= 0 ? "pos" : "neg"}
+          etiqueta={p.flujos.variacionSaldoSnapshots != null ? "Variación neta en snapshots" : "Ahorro neto registrado"}
+          valor={formatBobCompact(p.flujos.variacionSaldoSnapshots ?? p.flujos.netoMensual)}
+          detalle={p.flujos.variacionSaldoSnapshots != null ? "Cambio mensual combinado de saldos por cuenta" : "Ingresos menos gastos registrados"}
+          tono={(p.flujos.variacionSaldoSnapshots ?? p.flujos.netoMensual ?? 0) >= 0 ? "pos" : "neg"}
           icono={<ChartLineUp className="size-4" weight="duotone" />}
         />
         <Kpi
@@ -618,14 +618,52 @@ export function ProyeccionMensual({
           icono={<ChartLineUp className="size-4" weight="duotone" />}
         />
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Lectura mensual de tus cuentas</CardTitle>
+          <CardDescription>
+            Estimación orientativa basada en cambios de saldo entre snapshots.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm leading-relaxed">
+          {p.flujos.ingresoEstimadoSnapshots != null && p.flujos.gastoReferenciaSnapshots != null ? (
+            <p>
+              Parece que cada mes ingresas aproximadamente{" "}
+              <strong>{formatBob(p.flujos.ingresoEstimadoSnapshots)}</strong> y
+              gastas <strong>{formatBob(p.flujos.gastoReferenciaSnapshots)}</strong>.
+              El ingreso se estima con la variación conjunta de los saldos por
+              cuenta más los gastos registrados en esos mismos meses.
+            </p>
+          ) : p.flujos.variacionSaldoSnapshots != null ? (
+            <p>
+              Tus snapshots muestran que el saldo combinado de tus cuentas
+              cambió en promedio{" "}
+              <strong>{formatBob(p.flujos.variacionSaldoSnapshots)}</strong> al
+              mes. Todavía no hay dos meses con snapshots y movimientos
+              coincidentes para estimar por separado ingresos y gastos.
+            </p>
+          ) : (
+            <p>
+              Todavía no hay suficientes snapshots mensuales comparables para
+              estimar la variación de tus saldos por cuenta.
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Es una aproximación, no un ingreso contable: los snapshots no
+            distinguen por sí solos ingresos, gastos, transferencias a DPF u
+            otros activos, ni cambios por tipo de cambio. Depende también de que
+            los gastos estén registrados completos.
+          </p>
+        </CardContent>
+      </Card>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Referencia de flujos:{" "}
+        Referencia de movimientos:{" "}
         {p.flujos.meses.length
           ? p.flujos.meses.map((m) => formatDate(`${m}-01`)).join(" · ")
           : "sin meses utilizables"}
         . Se requieren dos meses entre los últimos tres, sin usar el mes actual
-        incompleto. Los importes dependen de que hayas registrado todos tus
-        movimientos; se distribuyen uniformemente por días.
+        incompleto. La variación de saldos compara los snapshots por cuenta más
+        próximos al cierre mensual.
       </p>
 
       <div className="grid gap-6 xl:grid-cols-2">

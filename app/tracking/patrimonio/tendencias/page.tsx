@@ -117,6 +117,12 @@ export default async function TendenciasPage() {
     serie,
     base,
     transacciones,
+    snapshots: resumen.snapshots.map((s) => ({
+      snapshot_date: s.snapshot_date,
+      snapshot_at: s.snapshot_at,
+      exchange_rate: s.exchange_rate,
+      balances: s.balances,
+    })),
     dpfs,
     deudas,
     avisos,

@@ -50,8 +50,83 @@ export interface FlujosReferencia {
   ingresoMensual: number | null;
   gastoMensual: number | null;
   netoMensual: number | null;
+  /** Variación neta mensual observada al sumar saldos de las cuentas por snapshot. */
+  variacionSaldoSnapshots: number | null;
+  mesesSnapshots: string[];
+  /** Estimación: gastos registrados + variación de saldos de esos mismos meses. */
+  ingresoEstimadoSnapshots: number | null;
+  gastoReferenciaSnapshots: number | null;
   omitidas: number;
   futuras: number;
+}
+export interface SnapshotFlujos {
+  snapshot_date: string;
+  snapshot_at?: string | null;
+  exchange_rate: number;
+  balances: Array<{
+    account_id: string;
+    amount: number;
+    account: {
+      currency: "BOB" | "USD" | "USDT";
+      is_liability: boolean;
+    };
+  }>;
+}
+function saldoBobPorCuenta(snapshot: SnapshotFlujos): Map<string, number> | null {
+  const saldos = new Map<string, number>();
+  const rate = Number.isFinite(snapshot.exchange_rate) && snapshot.exchange_rate > 0
+    ? snapshot.exchange_rate
+    : 0;
+  if (!rate && snapshot.balances.some((b) => b.account.currency !== "BOB"))
+    return null;
+  for (const balance of snapshot.balances ?? []) {
+    const amount = Number(balance.amount);
+    if (!balance.account_id || !Number.isFinite(amount)) continue;
+    const bob = balance.account.currency === "BOB" ? amount : amount * rate;
+    saldos.set(balance.account_id, redondear(bob * (balance.account.is_liability ? -1 : 1)));
+  }
+  return saldos;
+}
+/** Diferencia el patrimonio observado en dos cierres, usando las filas por cuenta
+ * de cada snapshot. Solo compara meses con fotos en los últimos 7 días del mes. */
+function variacionMensualSnapshots(
+  snapshots: SnapshotFlujos[],
+  hoy: string,
+): Map<string, number> {
+  const porDia = new Map<string, SnapshotFlujos>();
+  for (const snapshot of snapshots) {
+    if (!fechaValida(snapshot.snapshot_date) || snapshot.snapshot_date > hoy) continue;
+    const anterior = porDia.get(snapshot.snapshot_date);
+    if (!anterior || (snapshot.snapshot_at ?? "") >= (anterior.snapshot_at ?? ""))
+      porDia.set(snapshot.snapshot_date, snapshot);
+  }
+  const ordenadas = [...porDia.values()].sort((a, b) =>
+    a.snapshot_date.localeCompare(b.snapshot_date),
+  );
+  const cierre = (fin: string): SnapshotFlujos | null =>
+    ordenadas.filter(
+      (snapshot) =>
+        snapshot.snapshot_date <= fin &&
+        snapshot.snapshot_date >= sumarDias(fin, -7),
+    ).at(-1) ?? null;
+  const cambios = new Map<string, number>();
+  for (const offset of [-3, -2, -1]) {
+    const mes = inicioMes(hoy, offset).slice(0, 7);
+    const fin = sumarDias(inicioMes(hoy, offset + 1), -1);
+    const finAnterior = sumarDias(inicioMes(hoy, offset), -1);
+    const actual = cierre(fin);
+    const previo = cierre(finAnterior);
+    if (!actual || !previo) continue;
+    const saldosActuales = saldoBobPorCuenta(actual);
+    const saldosPrevios = saldoBobPorCuenta(previo);
+    if (!saldosActuales || !saldosPrevios) continue;
+    const ids = new Set([...saldosActuales.keys(), ...saldosPrevios.keys()]);
+    let delta = 0;
+    for (const id of ids)
+      delta += (saldosActuales.get(id) ?? 0) - (saldosPrevios.get(id) ?? 0);
+    cambios.set(mes, redondear(delta));
+  }
+  return cambios;
 }
 export interface ProyeccionPatrimonio {
   hoy: string;
@@ -142,6 +217,7 @@ function validar(serie: FotoTendencia[]): Map<ModeloId, Evaluacion> {
 export function resumirFlujos(
   transacciones: TransactionUI[],
   hoy: string,
+  snapshots: SnapshotFlujos[] = [],
 ): FlujosReferencia {
   const futuras = transacciones.filter(
     (t) => fechaValida(t.txn_date) && t.txn_date > hoy,
@@ -190,12 +266,39 @@ export function resumirFlujos(
   const gasto = suficiente
     ? media(meses.map((p) => porMes.get(p)!.gasto))
     : null;
+  const cambiosSnapshots = variacionMensualSnapshots(snapshots, hoy);
+  const mesesSnapshots = [...cambiosSnapshots.keys()];
+  const variacionSaldoSnapshots =
+    mesesSnapshots.length >= 2
+      ? redondear(media(mesesSnapshots.map((mes) => cambiosSnapshots.get(mes)!)))
+      : null;
+  // Los snapshots muestran el cambio neto, pero no pueden separar por sí solos
+  // ingresos de gastos. Para estimar ingresos sumamos el gasto registrado de los
+  // mismos meses al cambio de saldo observado en las cuentas.
+  const mesesComunes = meses.filter(
+    (mes) => cambiosSnapshots.has(mes) && porMes.has(mes),
+  );
+  const gastoReferenciaSnapshots =
+    mesesComunes.length >= 2
+      ? redondear(media(mesesComunes.map((mes) => porMes.get(mes)!.gasto)))
+      : null;
+  const ingresosEstimados = mesesComunes.map(
+    (mes) => porMes.get(mes)!.gasto + cambiosSnapshots.get(mes)!,
+  );
+  const ingresoEstimadoSnapshots =
+    ingresosEstimados.length >= 2 && ingresosEstimados.every((n) => n >= 0)
+      ? redondear(media(ingresosEstimados))
+      : null;
   return {
     meses,
     ingresoMensual: ingreso == null ? null : redondear(ingreso),
     gastoMensual: gasto == null ? null : redondear(gasto),
     netoMensual:
       ingreso == null || gasto == null ? null : redondear(ingreso - gasto),
+    variacionSaldoSnapshots,
+    mesesSnapshots,
+    ingresoEstimadoSnapshots,
+    gastoReferenciaSnapshots,
     omitidas,
     futuras,
   };
@@ -206,6 +309,7 @@ export function proyectarPatrimonio(datos: {
   serie: FotoTendencia[];
   base?: BaseProyeccion | null;
   transacciones?: TransactionUI[];
+  snapshots?: SnapshotFlujos[];
   dpfs?: DpfDepositUI[];
   deudas?: DebtUI[];
   avisos?: string[];
@@ -230,7 +334,7 @@ export function proyectarPatrimonio(datos: {
             enVivo: false,
           }
         : null;
-  const flujos = resumirFlujos(datos.transacciones ?? [], hoy);
+  const flujos = resumirFlujos(datos.transacciones ?? [], hoy, datos.snapshots ?? []);
   const avisos = [...(datos.avisos ?? [])];
   const diasHistoria = serie.length
     ? diasEntre(serie[0].fecha, serie.at(-1)!.fecha)
